@@ -1,4 +1,4 @@
-# Decisions (Phases 1–6)
+# Decisions (Phases 1–7)
 
 1. Greenfield Next.js App Router, not a clone of any benchmark. TubeGen is a
    capability benchmark only.
@@ -35,3 +35,7 @@
     starter text; section rewrites show their would-be request behind the
     provider boundary; versions snapshot before restores/applies; notes live
     outside narration by construction; scenes sync-hash their sections.
+14. Phase 7: media without providers means on-device synthesis (SVG drafts,
+    system TTS, WebAudio beds) labeled as drafts + validated session uploads
+    + saved provider requests; approvals never auto-replace; playback is
+    exclusive; capabilities gate controls with reasons.

@@ -298,6 +298,12 @@ export default function ProjectOverviewPage() {
         <section aria-label="Project actions" className="rounded-xl border border-border bg-surface p-5">
           <h2 className="text-sm font-semibold">Manage</h2>
           <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={`/studio/media?project=${project.id}`}
+              className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Media Studio
+            </Link>
             <Button
               variant="outline"
               size="sm"

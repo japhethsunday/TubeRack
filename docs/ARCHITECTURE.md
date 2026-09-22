@@ -1,8 +1,9 @@
-# TubeRack Architecture (Phases 1–6)
+# TubeRack Architecture (Phases 1–7)
 
-Greenfield repo. Phases 1–5 built contracts, design system, auth UX,
-device-local workspace, and deterministic intelligence. Phase 6 added the
-script + story studios. Provider generation and cloud remain Phase 11.
+Greenfield repo. Phases 1–6 built contracts, design system, auth UX,
+device-local workspace, deterministic intelligence, and script/story
+studios. Phase 7 added on-device visual + audio. Providers and cloud
+remain Phase 11.
 
 ## Stack
 
@@ -44,8 +45,12 @@ script + story studios. Provider generation and cloud remain Phase 11.
   TaskRunner lifecycle, structured-output primitives
 - `app/(app)/intelligence/` — hub + lab/audience/strategy/titles/hooks/
   retention/gaps; project overview links per-studio intel via `?project=`
-- `app/(app)/studio/` — script (context/editor/tools) + storyboard (scenes,
-  timeline, sync); project overview + dashboard route into the studios
+- `app/(app)/studio/` — script (context/editor/tools), storyboard (scenes,
+  timeline, sync), media (library, scene needs, image/video/voice/music/
+  sfx/uploads/style/queue); overview + dashboard route into the studios
+- `src/lib/media/` — types, capability matrix, SVG drafts, prompt assembly,
+  audio recipes, upload validation; `src/components/media/` — provider,
+  players (exclusive playback), library, studios, uploads, queue
 - `src/lib/script/` — formats, measure, claims/refs, engine (assembly, ops,
   versions, loops, scenes), review; `src/components/script/` — provider,
   section/scene cards, generation dialog, studio panels

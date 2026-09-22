@@ -5,19 +5,19 @@ idea → research → strategy → script → storyboard → visuals → voice �
 music → video → thumbnail → SEO → repurposing → publishing →
 analytics → improvement.
 
-## Status: Phase 6 — Script & Story Studio
+## Status: Phase 7 — Visual & Audio Studio
 
-Structured script writing (sections, versions, hooks, loops, retention,
-claims, research refs) plus scene planning with script sync — assembled
-locally from intelligence, provider generation in Phase 11.
-See `docs/PHASE_6.md` and `docs/INTEGRATION_BOUNDARIES.md`.
+On-device media drafts (SVG visuals, system-voice takes, synthesized
+music/SFX), validated session uploads, and saved provider requests —
+approval, assignment, and queue included. Providers in Phase 11.
+See `docs/PHASE_7.md` and `docs/INTEGRATION_BOUNDARIES.md`.
 
 ## Develop
 
 ```bash
 npm install
 npm run dev     # http://localhost:3000
-npm test        # 91 tests: script, intelligence, domain, projects, auth, components
+npm test        # 98 tests: media, script, intelligence, projects, auth, components
 npm run typecheck
 npm run lint
 npm run build
@@ -34,6 +34,7 @@ npm run build
 - `/intelligence/lab|audience|strategy|titles|hooks|retention|gaps` — analysis studios
 - `/studio/script` — script writing: sections, versions, hooks, loops, retention
 - `/studio/storyboard` — scenes from sections, timeline, sync badges
+- `/studio/media` — library, scene needs, image/voice/music/SFX drafts, uploads, queue
 - `/activity` — filterable event feed
 - `/design` — component/token/pattern gallery
 - `/login`, `/signup`, `/forgot-password`, `/reset-password`,

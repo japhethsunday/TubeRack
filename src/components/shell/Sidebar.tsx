@@ -1,16 +1,45 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { NAV_SECTIONS, type NavItem } from "@/src/config/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { NAV_SECTIONS, ALL_NAV_ITEMS, type NavItem } from "@/src/config/navigation";
 import { Badge } from "@/src/components/ui/Badge";
 import { cx } from "@/src/components/ui/cx";
 
-function Item({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
+/** Query-aware active matching, computed once per sidebar (hooks rule). */
+function useActiveFor(): (item: NavItem) => boolean {
   const pathname = usePathname();
-  const active =
-    item.status === "live" &&
-    (pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)));
+  const search = useSearchParams();
+  return (item: NavItem) => {
+    if (item.status !== "live") return false;
+    const [hrefPath, query] = item.href.split("?");
+    if (pathname !== hrefPath && !pathname.startsWith(`${hrefPath}/`)) return false;
+    if (!query) {
+      // A query-less item yields to a same-path sibling whose query matches.
+      const tab = search.get("tab");
+      const claimed = ALL_NAV_ITEMS.filter(
+        (i) => i.status === "live" && i.href.split("?")[0] === hrefPath && i.href.includes("?"),
+      ).some((i) => new URLSearchParams(i.href.split("?")[1]).get("tab") === tab);
+      return !claimed;
+    }
+    const want = new URLSearchParams(query);
+    for (const [k, v] of want.entries()) {
+      if (search.get(k) !== v) return false;
+    }
+    return true;
+  };
+}
+
+function Item({
+  item,
+  active,
+  onNavigate,
+}: {
+  item: NavItem;
+  active: boolean;
+  onNavigate?: () => void;
+}) {
   const Icon = item.icon;
 
   const cls = cx(
@@ -60,8 +89,7 @@ function Item({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) 
   );
 }
 
-/** Hierarchized sidebar nav: primary work first, pipeline second, system last. */
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+function NavList({ onNavigate, activeFor }: { onNavigate?: () => void; activeFor: (item: NavItem) => boolean }) {
   return (
     <nav aria-label="Primary" className="flex h-full flex-col gap-6 overflow-y-auto px-3 py-4">
       {NAV_SECTIONS.map((section, si) => (
@@ -76,11 +104,25 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </h2>
           <ul className="mt-1.5 space-y-0.5">
             {section.items.map((item) => (
-              <Item key={item.slug} item={item} onNavigate={onNavigate} />
+              <Item key={item.slug} item={item} active={activeFor(item)} onNavigate={onNavigate} />
             ))}
           </ul>
         </div>
       ))}
     </nav>
+  );
+}
+
+function SidebarLive({ onNavigate }: { onNavigate?: () => void }) {
+  const activeFor = useActiveFor();
+  return <NavList onNavigate={onNavigate} activeFor={activeFor} />;
+}
+
+/** Hierarchized sidebar nav: primary work first, pipeline second, system last. */
+export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <Suspense fallback={<NavList activeFor={() => false} />}>
+      <SidebarLive onNavigate={onNavigate} />
+    </Suspense>
   );
 }
