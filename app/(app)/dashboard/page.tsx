@@ -17,7 +17,7 @@ import { LoadingState } from "@/src/components/ui/feedback";
 const QUICK_ACTIONS = [
   { href: "/intelligence/lab", icon: FlaskConical, label: "Analyze an idea", blurb: "Angles & evidence" },
   { href: "/studio/script", icon: PenLine, label: "Open Script Studio", blurb: "Write & structure" },
-  { href: "/projects/preview?stage=video", icon: Clapperboard, label: "Preview Video Studio", blurb: "Timeline & render" },
+  { href: "/studio/video", icon: Clapperboard, label: "Open Video Studio", blurb: "Timeline & preview" },
 ];
 
 /** Creator dashboard: real local state, honest empty states, no fabrication. */

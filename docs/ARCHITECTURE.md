@@ -1,9 +1,9 @@
-# TubeRack Architecture (Phases 1–7)
+# TubeRack Architecture (Phases 1–8)
 
-Greenfield repo. Phases 1–6 built contracts, design system, auth UX,
-device-local workspace, deterministic intelligence, and script/story
-studios. Phase 7 added on-device visual + audio. Providers and cloud
-remain Phase 11.
+Greenfield repo. Phases 1–7 built contracts, design system, auth UX,
+device-local workspace, deterministic intelligence, script/story studios,
+and on-device media. Phase 8 added the video composition studio. Workers
+and cloud remain Phase 11.
 
 ## Stack
 
@@ -47,7 +47,11 @@ remain Phase 11.
   retention/gaps; project overview links per-studio intel via `?project=`
 - `app/(app)/studio/` — script (context/editor/tools), storyboard (scenes,
   timeline, sync), media (library, scene needs, image/video/voice/music/
-  sfx/uploads/style/queue); overview + dashboard route into the studios
+  sfx/uploads/style/queue), video (composition, preview, timeline, export);
+  overview + dashboard route into the studios
+- `src/lib/video/` — composition model, presets, auto-build, validation,
+  timeline ops; `src/components/video/` — provider (history, snapshots,
+  requests), timeline, synchronized preview, studio panels
 - `src/lib/media/` — types, capability matrix, SVG drafts, prompt assembly,
   audio recipes, upload validation; `src/components/media/` — provider,
   players (exclusive playback), library, studios, uploads, queue

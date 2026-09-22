@@ -53,9 +53,10 @@ describe("navigation config", () => {
     assert.ok(FULL_COMMAND_INDEX.some((i) => i.href === "/intelligence"));
   });
 
-  it("exposes script + storyboard studios to search", () => {
-    assert.equal(STUDIO_PAGES.length, 2);
+  it("exposes script, storyboard, and video studios to search", () => {
+    assert.equal(STUDIO_PAGES.length, 3);
     assert.ok(FULL_COMMAND_INDEX.some((i) => i.href === "/studio/script"));
     assert.ok(FULL_COMMAND_INDEX.some((i) => i.href === "/studio/storyboard"));
+    assert.ok(FULL_COMMAND_INDEX.some((i) => i.href === "/studio/video"));
   });
 });

@@ -149,11 +149,11 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         slug: "video",
         label: "Video Studio",
-        href: "/projects/preview?stage=video",
+        href: "/studio/video",
         icon: Clapperboard,
-        status: "preview",
+        status: "live",
         phase: "Phase 8",
-        blurb: "Timeline, edit, render.",
+        blurb: "Timeline, preview, export prep.",
       },
       {
         slug: "thumbnail",
@@ -369,6 +369,15 @@ export const STUDIO_PAGES: NavItem[] = [
     status: "live",
     phase: "Phase 6",
     blurb: "Scenes from script sections.",
+  },
+  {
+    slug: "studio-video",
+    label: "Video Studio",
+    href: "/studio/video",
+    icon: Clapperboard,
+    status: "live",
+    phase: "Phase 8",
+    blurb: "Timeline, preview, export prep.",
   },
 ];
 

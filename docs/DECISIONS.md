@@ -1,4 +1,4 @@
-# Decisions (Phases 1–7)
+# Decisions (Phases 1–8)
 
 1. Greenfield Next.js App Router, not a clone of any benchmark. TubeGen is a
    capability benchmark only.
@@ -39,3 +39,7 @@
     system TTS, WebAudio beds) labeled as drafts + validated session uploads
     + saved provider requests; approvals never auto-replace; playback is
     exclusive; capabilities gate controls with reasons.
+15. Phase 8: the timeline references assets by ID and renders a live DOM
+    preview (never a fake render); history tracks structural edits while
+    typing autosaves; export health is ready/review/blocked with fixes;
+    render requests save parameters only — no percentages, no fake jobs.

@@ -4,6 +4,7 @@ import { ProjectsProvider } from "@/src/components/projects/ProjectsProvider";
 import { IntelProvider } from "@/src/components/intelligence/IntelProvider";
 import { ScriptProvider } from "@/src/components/script/ScriptProvider";
 import { MediaProvider } from "@/src/components/media/MediaProvider";
+import { VideoProvider } from "@/src/components/video/VideoProvider";
 
 /** Client state for the authenticated app group (device-local until Phase 11). */
 export function WorkspaceProviders({ children }: { children: React.ReactNode }) {
@@ -11,7 +12,9 @@ export function WorkspaceProviders({ children }: { children: React.ReactNode }) 
     <ProjectsProvider>
       <IntelProvider>
         <ScriptProvider>
-          <MediaProvider>{children}</MediaProvider>
+          <MediaProvider>
+            <VideoProvider>{children}</VideoProvider>
+          </MediaProvider>
         </ScriptProvider>
       </IntelProvider>
     </ProjectsProvider>

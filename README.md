@@ -5,19 +5,19 @@ idea → research → strategy → script → storyboard → visuals → voice �
 music → video → thumbnail → SEO → repurposing → publishing →
 analytics → improvement.
 
-## Status: Phase 7 — Visual & Audio Studio
+## Status: Phase 8 — Video Production Studio
 
-On-device media drafts (SVG visuals, system-voice takes, synthesized
-music/SFX), validated session uploads, and saved provider requests —
-approval, assignment, and queue included. Providers in Phase 11.
-See `docs/PHASE_7.md` and `docs/INTEGRATION_BOUNDARIES.md`.
+Timeline composition over scenes and approved assets with a live
+synchronized preview, validation + health, snapshots, and saved render
+requests. Workers render in Phase 11.
+See `docs/PHASE_8.md` and `docs/INTEGRATION_BOUNDARIES.md`.
 
 ## Develop
 
 ```bash
 npm install
 npm run dev     # http://localhost:3000
-npm test        # 98 tests: media, script, intelligence, projects, auth, components
+npm test        # 100+ tests: video, media, script, intelligence, projects, auth, components
 npm run typecheck
 npm run lint
 npm run build
@@ -35,6 +35,7 @@ npm run build
 - `/studio/script` — script writing: sections, versions, hooks, loops, retention
 - `/studio/storyboard` — scenes from sections, timeline, sync badges
 - `/studio/media` — library, scene needs, image/voice/music/SFX drafts, uploads, queue
+- `/studio/video` — timeline composition, live preview, export validation
 - `/activity` — filterable event feed
 - `/design` — component/token/pattern gallery
 - `/login`, `/signup`, `/forgot-password`, `/reset-password`,

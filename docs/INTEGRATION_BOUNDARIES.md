@@ -8,6 +8,7 @@ or render an "Awaiting integration" state. Faking success is a defect.
 | Text / image / video / TTS / music / embedding / research providers | Registry + types only, no keys, no calls | Phase 11 |
 | Intelligence reasoning | Deterministic local heuristics labeled “Local analysis”; `requestIntelligence` throws | Phase 11 |
 | Image/video/TTS/music providers | On-device drafts + saved request drafts; capability matrix gates UI | Phase 11 |
+| Video rendering + workers | Live DOM preview + saved render requests with full parameters; no execution | Phase 11 |
 | Object storage + server validation | Session bytes + magic-byte client checks; re-upload after reload | Phase 11 |
 | Script section generation (rewrite/tone/expand) | Assembled request shown; execution throws/waits | Phase 11 |
 | Script/board cloud sync + autosave | Device-local (`tuberack.scripts.v1`) with UI disclosure | Phase 11 |

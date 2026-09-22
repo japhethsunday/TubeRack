@@ -88,3 +88,39 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Preview image motion (Ken Burns family). Applied to draft stills only. */
+@keyframes kb-drift {
+  from { transform: scale(1) translate(0, 0); }
+  to { transform: scale(1.12) translate(-1.5%, -1.5%); }
+}
+@keyframes kb-zoom-in {
+  from { transform: scale(1); }
+  to { transform: scale(1.18); }
+}
+@keyframes kb-zoom-out {
+  from { transform: scale(1.18); }
+  to { transform: scale(1); }
+}
+@keyframes kb-pan-x {
+  from { transform: scale(1.1) translateX(-2%); }
+  to { transform: scale(1.1) translateX(2%); }
+}
+@keyframes kb-pan-y {
+  from { transform: scale(1.1) translateY(-2%); }
+  to { transform: scale(1.1) translateY(2%); }
+}
+.anim-kb { animation: kb-drift 12s ease-in-out infinite alternate; }
+.anim-kb > svg { width: 100%; height: 100%; display: block; }
+.anim-zoom-in { animation: kb-zoom-in 10s ease-out forwards; }
+.anim-zoom-in > svg { width: 100%; height: 100%; display: block; }
+.anim-zoom-out { animation: kb-zoom-out 10s ease-out forwards; }
+.anim-zoom-out > svg { width: 100%; height: 100%; display: block; }
+.anim-pan-left { animation: kb-pan-x 10s ease-in-out infinite alternate-reverse; }
+.anim-pan-left > svg { width: 100%; height: 100%; display: block; }
+.anim-pan-right { animation: kb-pan-x 10s ease-in-out infinite alternate; }
+.anim-pan-right > svg { width: 100%; height: 100%; display: block; }
+.anim-pan-up { animation: kb-pan-y 10s ease-in-out infinite alternate-reverse; }
+.anim-pan-up > svg { width: 100%; height: 100%; display: block; }
+.anim-pan-down { animation: kb-pan-y 10s ease-in-out infinite alternate; }
+.anim-pan-down > svg { width: 100%; height: 100%; display: block; }
