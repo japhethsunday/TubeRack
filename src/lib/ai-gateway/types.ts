@@ -63,5 +63,62 @@ export interface TtsProvider {
   synthesizeSpeech(request: TtsRequest): Promise<TtsResponse>;
 }
 
+export interface MusicRequest {
+  prompt: string;
+  durationSec?: number;
+}
+
+export interface MusicResponse {
+  audioBase64: string;
+  mimeType: string;
+  model: string;
+}
+
+export interface MusicProvider {
+  readonly capability: "music";
+  readonly name: string;
+  composeMusic(request: MusicRequest): Promise<MusicResponse>;
+}
+
+export interface TranscriptSegment {
+  startSec: number;
+  endSec: number;
+  text: string;
+}
+
+export interface TranscriptionRequest {
+  audioBase64: string;
+  mimeType?: string;
+  language?: string;
+}
+
+export interface TranscriptionResponse {
+  text: string;
+  segments: TranscriptSegment[];
+  language?: string;
+  model: string;
+}
+
+export interface TranscriptionProvider {
+  readonly capability: "transcription";
+  readonly name: string;
+  transcribe(request: TranscriptionRequest): Promise<TranscriptionResponse>;
+}
+
+export interface RenderingRequest {
+  composition: unknown;
+  format?: "mp4" | "webm" | "gif";
+}
+
+export interface RenderingResponse {
+  jobId: string;
+}
+
+export interface RenderingProvider {
+  readonly capability: "video";
+  readonly name: string;
+  render(request: RenderingRequest): Promise<RenderingResponse>;
+}
+
 /** Union of provider contracts the gateway can route. Extend per capability in later phases. */
-export type AIProvider = TextProvider | ImageProvider | TtsProvider;
+export type AIProvider = TextProvider | ImageProvider | TtsProvider | MusicProvider | TranscriptionProvider | RenderingProvider;

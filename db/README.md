@@ -29,7 +29,7 @@ Re-running is safe (applied versions are skipped).
 
 ```bash
 curl -b cookies.txt http://localhost:3000/api/v1/system/db-status
-# {"data":{"applied":["001_core","002_content","003_platform","004_project_extras"],"upToDate":true}}
+# {"data":{"applied":["001_core","002_content","003_platform","004_project_extras","005_jobs"],"upToDate":true}}
 ```
 
 ## Backups & recovery (production configuration)

@@ -62,6 +62,7 @@ export const AI_CAPABILITIES = [
   "music",
   "embedding",
   "research",
+  "transcription",
 ] as const;
 
 export type AICapability = (typeof AI_CAPABILITIES)[number];

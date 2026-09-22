@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     } catch {
       applied = [];
     }
-    return NextResponse.json({ data: { applied, expected: ["001_core", "002_content", "003_platform", "004_project_extras"], upToDate: applied.length >= 4 } });
+    return NextResponse.json({ data: { applied, expected: ["001_core", "002_content", "003_platform", "004_project_extras", "005_jobs"], upToDate: applied.length >= 5 } });
   } catch (error) {
     return toErrorResponse(error);
   }
