@@ -1,10 +1,90 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   color-scheme: light;
+  --bg: #fafafa;
+  --fg: #18181b;
+  --surface: #ffffff;
+  --elevated: #ffffff;
+  --muted: #f4f4f5;
+  --border: #e4e4e7;
+  --primary: #18181b;
+  --primary-fg: #fafafa;
+  --secondary: #f4f4f5;
+  --success: #15803d;
+  --warning: #b45309;
+  --destructive: #be123c;
+  --info: #1d4ed8;
+  --muted-text: #52525b;
+  --disabled-text: #a1a1aa;
+  --ring: #18181b;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: #09090b;
+  --fg: #fafafa;
+  --surface: #101013;
+  --elevated: #18181b;
+  --muted: #1c1c21;
+  --border: #27272a;
+  --primary: #fafafa;
+  --primary-fg: #09090b;
+  --secondary: #1c1c21;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --destructive: #fb7185;
+  --info: #93c5fd;
+  --muted-text: #a1a1aa;
+  --disabled-text: #52525b;
+  --ring: #fafafa;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-fg);
+  --color-secondary: var(--secondary);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-info: var(--info);
+  --color-muted-text: var(--muted-text);
+  --color-disabled-text: var(--disabled-text);
 }
 
 body {
+  background-color: var(--bg);
+  color: var(--fg);
   font-feature-settings: "cv11", "ss01";
   text-rendering: optimizeLegibility;
+}
+
+/* Visible, consistent focus for keyboard users. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--primary-fg);
+}
+
+/* Motion communicates state; never decorates. Honor reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

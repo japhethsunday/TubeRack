@@ -1,4 +1,4 @@
-# Decisions (Phase 1)
+# Decisions (Phases 1–2)
 
 1. Greenfield Next.js App Router, not a clone of any benchmark. TubeGen is a
    capability benchmark only.
@@ -14,3 +14,8 @@
    Phase 11 target; paid services only for models/media/TTS/email/payments.
 8. Honest states: anything needing Phase 11 throws or is labeled
    "Awaiting integration" — never mocked as working.
+9. Phase 2: one icon set (`lucide-react`), semantic tokens consumed via
+   Tailwind utilities, single nav config with live/preview/planned states.
+   Preview fixtures live in `src/config/preview.ts` and must be labeled
+   "Preview" wherever rendered. Component tests server-render
+   (`react-dom/server`) — no browser harness until E2E is warranted.

@@ -12,31 +12,31 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Phase 12 wires this to real observability; console keeps Phase 1 honest.
+    // Phase 12 wires this to real observability; console keeps it honest until then.
     console.error("Route error:", error);
   }, [error]);
 
   return (
     <main id="main">
       <Container className="py-14">
-        <h1 className="text-2xl font-semibold">Something went wrong</h1>
-        <p className="mt-2 max-w-prose text-sm text-zinc-600">
-          The foundation caught this error instead of crashing. You can retry the
-          segment or return home.
+        <h1 className="text-2xl font-semibold tracking-tight">This section failed to load</h1>
+        <p className="mt-2 max-w-prose text-sm text-muted-text">
+          The route boundary caught this error instead of crashing the app.
+          Retrying reloads just this section — your other work is untouched.
         </p>
         <div className="mt-6 flex gap-3">
           <button
             type="button"
             onClick={reset}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+            className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
-            Retry
+            Retry section
           </button>
           <Link
-            href="/"
-            className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:border-zinc-400"
+            href="/dashboard"
+            className="inline-flex h-10 items-center rounded-lg border border-border bg-surface px-4 text-sm font-medium hover:bg-muted"
           >
-            Go home
+            Go to dashboard
           </Link>
         </div>
       </Container>

@@ -5,18 +5,19 @@ idea → research → strategy → script → storyboard → visuals → voice �
 music → video → thumbnail → SEO → repurposing → publishing →
 analytics → improvement.
 
-## Status: Phase 1 — Product Foundation & Architecture
+## Status: Phase 2 — Brand, Design System & UX
 
-Foundation contracts and quality gates only. See `docs/PHASE_1.md` for the
-honest completion record and `docs/INTEGRATION_BOUNDARIES.md` for what is
-explicitly awaiting Phase 11 (providers, DB, workers, YouTube, billing).
+Reusable visual + UX foundation on top of Phase 1 contracts. See
+`docs/PHASE_2.md` for the completion record and
+`docs/INTEGRATION_BOUNDARIES.md` for what is explicitly deferred
+(no backend, auth, providers, rendering, or billing yet).
 
 ## Develop
 
 ```bash
 npm install
 npm run dev     # http://localhost:3000
-npm test        # unit tests (env, gateway, jobs, credits, lifecycle)
+npm test        # 30 tests: domain + tokens + navigation + components
 npm run typecheck
 npm run lint
 npm run build
@@ -25,6 +26,10 @@ npm run build
 ## Routes (real)
 
 - `/` — foundation status, no fake product UI
+- `/dashboard` — overview with honest empty states
+- `/projects` — index + link to the preview workspace
+- `/projects/preview` — 11 stage tabs, progress, editor layout (static preview data)
+- `/design` — component/token/pattern gallery
 - `/api/health` — liveness probe
 - `/api/version` — static build metadata
 

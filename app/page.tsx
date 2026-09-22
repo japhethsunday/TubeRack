@@ -1,33 +1,32 @@
 import Link from "next/link";
+import { ArrowRight, LayoutDashboard, Palette } from "lucide-react";
 import { Container } from "@/src/components/ui/Container";
 import { Card } from "@/src/components/ui/Card";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
+import { Badge } from "@/src/components/ui/Badge";
 import { allStages } from "@/src/lib/project/lifecycle";
 import { allStatuses } from "@/src/lib/jobs/machine";
 
-/**
- * Phase 1 landing: honest foundation status only.
- * No product features are claimed; every CTA points at a real route.
- */
+/** Marketing/foundation home: honest status + real entry points. */
 export default function HomePage() {
   return (
     <main id="main">
       <Container className="py-14">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
-          TubeRack · Phase 1 — Foundation
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-text">
+          TubeRack · Phase 2 — Design foundation
         </p>
-        <h1 className="mt-3 max-w-2xl text-4xl font-semibold leading-tight tracking-tight">
-          AI video production operating system, built on a solid foundation.
+        <h1 className="mt-3 max-w-2xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+          AI video production operating system, designed like one.
         </h1>
-        <p className="mt-4 max-w-2xl text-base leading-relaxed text-zinc-600">
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-text">
           Idea → research → strategy → script → storyboard → visuals → voice →
           music → video → thumbnail → SEO → repurposing → publishing →
-          analytics → improvement. Phase 1 establishes the architecture,
-          contracts, and quality gates. Product studios arrive in later phases.
+          analytics → improvement. Phase 2 delivers the reusable design system
+          and app shell every studio will be built on.
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
-          <StatusBadge tone="ok">Implemented: foundation</StatusBadge>
+          <StatusBadge tone="ok">Implemented: foundation + design system</StatusBadge>
           <StatusBadge tone="pending">
             Awaiting integration: AI providers · DB · workers
           </StatusBadge>
@@ -35,16 +34,19 @@ export default function HomePage() {
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            href="/api/health"
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+            href="/dashboard"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
-            Check API health
+            <LayoutDashboard className="size-4" aria-hidden="true" />
+            Open dashboard
+            <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
           <Link
-            href="/api/version"
-            className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+            href="/design"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium hover:bg-muted"
           >
-            View version
+            <Palette className="size-4" aria-hidden="true" />
+            Design system
           </Link>
         </div>
 
@@ -55,11 +57,8 @@ export default function HomePage() {
           >
             <ol className="mt-3 flex flex-wrap gap-1.5" aria-label="Project stages">
               {allStages().map((s) => (
-                <li
-                  key={s}
-                  className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-700"
-                >
-                  {s}
+                <li key={s}>
+                  <Badge tone="neutral">{s}</Badge>
                 </li>
               ))}
             </ol>
@@ -70,20 +69,18 @@ export default function HomePage() {
           >
             <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Job statuses">
               {allStatuses().map((s) => (
-                <li
-                  key={s}
-                  className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-700"
-                >
-                  {s}
+                <li key={s}>
+                  <Badge tone="neutral">{s}</Badge>
                 </li>
               ))}
             </ul>
           </Card>
         </div>
 
-        <p className="mt-8 text-sm text-zinc-500">
-          Status detail: <span className="font-medium text-zinc-700">docs/PHASE_1.md</span> ·
-          boundaries: <span className="font-medium text-zinc-700">docs/INTEGRATION_BOUNDARIES.md</span>
+        <p className="mt-8 text-sm text-muted-text">
+          Status detail: <span className="font-medium text-foreground">docs/PHASE_2.md</span> ·
+          boundaries:{" "}
+          <span className="font-medium text-foreground">docs/INTEGRATION_BOUNDARIES.md</span>
         </p>
       </Container>
     </main>
