@@ -126,14 +126,36 @@ export default function ProjectOverviewPage() {
             <Pencil className="size-4" aria-hidden="true" />
             Edit details
           </Button>
-          <Link
-            href={`/projects/preview?stage=${STAGE_TAB[project.currentStage]}`}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
-            onClick={() => touch(project.id)}
-          >
-            {continueLabelFor(project)}
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </Link>
+          {(() => {
+            const inScriptWork = ["idea", "research", "strategy", "script", "storyboard"].includes(project.currentStage);
+            const studioHref = `/studio/script?project=${project.id}`;
+            const previewHref = `/projects/preview?stage=${STAGE_TAB[project.currentStage]}`;
+            const primary = inScriptWork
+              ? { href: studioHref, label: continueLabelFor(project) }
+              : { href: previewHref, label: `${continueLabelFor(project)} (preview)` };
+            const secondary = inScriptWork
+              ? { href: previewHref, label: "Module preview" }
+              : { href: studioHref, label: "Script Studio" };
+            return (
+              <>
+                <Link
+                  href={secondary.href}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted"
+                  onClick={() => touch(project.id)}
+                >
+                  {secondary.label}
+                </Link>
+                <Link
+                  href={primary.href}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+                  onClick={() => touch(project.id)}
+                >
+                  {primary.label}
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+              </>
+            );
+          })()}
         </div>
       </div>
       <LocalStorageNote compact />

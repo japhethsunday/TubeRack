@@ -5,18 +5,19 @@ idea → research → strategy → script → storyboard → visuals → voice �
 music → video → thumbnail → SEO → repurposing → publishing →
 analytics → improvement.
 
-## Status: Phase 5 — AI Content Intelligence
+## Status: Phase 6 — Script & Story Studio
 
-Deterministic local analysis (idea, audience, strategy, titles, hooks,
-retention, gaps) with disclosed methodology — provider reasoning arrives
-in Phase 11. See `docs/PHASE_5.md` and `docs/INTEGRATION_BOUNDARIES.md`.
+Structured script writing (sections, versions, hooks, loops, retention,
+claims, research refs) plus scene planning with script sync — assembled
+locally from intelligence, provider generation in Phase 11.
+See `docs/PHASE_6.md` and `docs/INTEGRATION_BOUNDARIES.md`.
 
 ## Develop
 
 ```bash
 npm install
 npm run dev     # http://localhost:3000
-npm test        # 80 tests: intelligence, domain, projects, auth, components
+npm test        # 91 tests: script, intelligence, domain, projects, auth, components
 npm run typecheck
 npm run lint
 npm run build
@@ -31,6 +32,8 @@ npm run build
 - `/projects/preview` — 11 stage tabs, progress, editor layout (static preview data)
 - `/intelligence` — hub: tasks, opportunities, Channel DNA
 - `/intelligence/lab|audience|strategy|titles|hooks|retention|gaps` — analysis studios
+- `/studio/script` — script writing: sections, versions, hooks, loops, retention
+- `/studio/storyboard` — scenes from sections, timeline, sync badges
 - `/activity` — filterable event feed
 - `/design` — component/token/pattern gallery
 - `/login`, `/signup`, `/forgot-password`, `/reset-password`,

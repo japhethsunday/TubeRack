@@ -1,4 +1,4 @@
-# Decisions (Phases 1–5)
+# Decisions (Phases 1–6)
 
 1. Greenfield Next.js App Router, not a clone of any benchmark. TubeGen is a
    capability benchmark only.
@@ -31,3 +31,7 @@
     analysis with disclosed methodology and qualitative ratings — never
     scores, metrics, or generated claims. TaskRunner reuses one lifecycle
     for local runs today and provider jobs in Phase 11.
+13. Phase 6: scripts are structured sections with local assembly flagged as
+    starter text; section rewrites show their would-be request behind the
+    provider boundary; versions snapshot before restores/applies; notes live
+    outside narration by construction; scenes sync-hash their sections.

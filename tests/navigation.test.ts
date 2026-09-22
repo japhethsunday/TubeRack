@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { NAV_SECTIONS, ALL_NAV_ITEMS, SEARCHABLE_ROUTES, AUTH_PAGES, COMMAND_INDEX, INTEL_PAGES, FULL_COMMAND_INDEX } from "@/src/config/navigation";
+import { NAV_SECTIONS, ALL_NAV_ITEMS, SEARCHABLE_ROUTES, AUTH_PAGES, COMMAND_INDEX, INTEL_PAGES, STUDIO_PAGES, FULL_COMMAND_INDEX } from "@/src/config/navigation";
 
 describe("navigation config", () => {
   it("keeps slugs unique and statuses valid", () => {
@@ -43,7 +43,7 @@ describe("navigation config", () => {
 
   it("exposes seven live intelligence pages under /intelligence", () => {
     assert.equal(INTEL_PAGES.length, 7);
-    const slugs = [...ALL_NAV_ITEMS.map((i) => i.slug), ...AUTH_PAGES.map((i) => i.slug), ...INTEL_PAGES.map((i) => i.slug)];
+    const slugs = [...ALL_NAV_ITEMS.map((i) => i.slug), ...AUTH_PAGES.map((i) => i.slug), ...INTEL_PAGES.map((i) => i.slug), ...STUDIO_PAGES.map((i) => i.slug)];
     assert.equal(new Set(slugs).size, slugs.length);
     for (const item of INTEL_PAGES) {
       assert.equal(item.status, "live");
@@ -51,5 +51,11 @@ describe("navigation config", () => {
     }
     assert.ok(FULL_COMMAND_INDEX.some((i) => i.href === "/intelligence/lab"));
     assert.ok(FULL_COMMAND_INDEX.some((i) => i.href === "/intelligence"));
+  });
+
+  it("exposes script + storyboard studios to search", () => {
+    assert.equal(STUDIO_PAGES.length, 2);
+    assert.ok(FULL_COMMAND_INDEX.some((i) => i.href === "/studio/script"));
+    assert.ok(FULL_COMMAND_INDEX.some((i) => i.href === "/studio/storyboard"));
   });
 });

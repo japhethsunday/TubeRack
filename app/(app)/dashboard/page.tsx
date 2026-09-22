@@ -15,9 +15,9 @@ import { Progress } from "@/src/components/ui/feedback";
 import { LoadingState } from "@/src/components/ui/feedback";
 
 const QUICK_ACTIONS = [
-  { href: "/projects/preview?stage=research", icon: FlaskConical, label: "Research topic", blurb: "Sources & evidence" },
-  { href: "/projects/preview?stage=script", icon: PenLine, label: "Open Script Studio", blurb: "Hooks & retention" },
-  { href: "/projects/preview?stage=video", icon: Clapperboard, label: "Open Video Studio", blurb: "Timeline & render" },
+  { href: "/intelligence/lab", icon: FlaskConical, label: "Analyze an idea", blurb: "Angles & evidence" },
+  { href: "/studio/script", icon: PenLine, label: "Open Script Studio", blurb: "Write & structure" },
+  { href: "/projects/preview?stage=video", icon: Clapperboard, label: "Preview Video Studio", blurb: "Timeline & render" },
 ];
 
 /** Creator dashboard: real local state, honest empty states, no fabrication. */

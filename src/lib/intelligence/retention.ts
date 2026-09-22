@@ -22,14 +22,14 @@ export const RETENTION_METHODOLOGY =
   "repetition is measured by shared 3-word phrases between sections; transitions by explicit connective phrases. " +
   "Flags are risks to inspect, not predictions.";
 
-const TRANSITIONS = ["but first", "here's why", "that means", "so what", "next", "meanwhile", "in contrast", "because of that", "which is why", "turns out"];
+export const TRANSITION_PHRASES = ["but first", "here's why", "that means", "so what", "next", "meanwhile", "in contrast", "because of that", "which is why", "turns out"];
 const PAYOFF_WORDS = ["result", "payoff", "answer", "reveal", "outcome", "verdict", "checklist", "template", "fix", "solution"];
 
 function words(s: string): number {
   return s.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function trigrams(s: string): Set<string> {
+export function extractTrigrams(s: string): Set<string> {
   const w = s.toLowerCase().split(/\s+/).filter(Boolean);
   const out = new Set<string>();
   for (let i = 0; i + 2 < w.length; i++) out.add(`${w[i]} ${w[i + 1]} ${w[i + 2]}`);
@@ -58,8 +58,8 @@ export function analyzeRetention(sections: OutlineSection[]): { flags: Retention
 
   for (let i = 0; i < sections.length; i++) {
     for (let j = i + 1; j < sections.length; j++) {
-      const a = trigrams(`${sections[i].heading} ${sections[i].body}`);
-      const b = trigrams(`${sections[j].heading} ${sections[j].body}`);
+      const a = extractTrigrams(`${sections[i].heading} ${sections[i].body}`);
+      const b = extractTrigrams(`${sections[j].heading} ${sections[j].body}`);
       let shared = 0;
       for (const t of a) if (b.has(t)) shared += 1;
       if (shared >= 4) {
@@ -75,7 +75,7 @@ export function analyzeRetention(sections: OutlineSection[]): { flags: Retention
   }
 
   const transitionCount = sections.reduce(
-    (n, s) => n + TRANSITIONS.filter((t) => s.body.toLowerCase().includes(t)).length,
+    (n, s) => n + TRANSITION_PHRASES.filter((t) => s.body.toLowerCase().includes(t)).length,
     0,
   );
   if (sections.length > 2 && transitionCount < sections.length - 1) {

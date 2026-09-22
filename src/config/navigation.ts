@@ -104,18 +104,18 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         slug: "script",
         label: "Script Studio",
-        href: "/projects/preview?stage=script",
+        href: "/studio/script",
         icon: PenLine,
-        status: "preview",
+        status: "live",
         phase: "Phase 6",
-        blurb: "Hooks, scripts, retention.",
+        blurb: "Write, structure, review scripts.",
       },
       {
         slug: "storyboard",
         label: "Storyboard",
-        href: "/projects/preview?stage=storyboard",
+        href: "/studio/storyboard",
         icon: Columns3,
-        status: "preview",
+        status: "live",
         phase: "Phase 6",
         blurb: "Scenes, pacing, visuals plan.",
       },
@@ -350,5 +350,27 @@ export const INTEL_PAGES: NavItem[] = [
   },
 ];
 
-/** Complete search index: shell + auth + intelligence. */
-export const FULL_COMMAND_INDEX: NavItem[] = [...COMMAND_INDEX, ...INTEL_PAGES];
+/** Script + storyboard studio routes for the command menu. */
+export const STUDIO_PAGES: NavItem[] = [
+  {
+    slug: "studio-script",
+    label: "Script Studio",
+    href: "/studio/script",
+    icon: PenLine,
+    status: "live",
+    phase: "Phase 6",
+    blurb: "Write, structure, review scripts.",
+  },
+  {
+    slug: "studio-storyboard",
+    label: "Storyboard",
+    href: "/studio/storyboard",
+    icon: Columns3,
+    status: "live",
+    phase: "Phase 6",
+    blurb: "Scenes from script sections.",
+  },
+];
+
+/** Complete search index: shell + auth + intelligence + studios. */
+export const FULL_COMMAND_INDEX: NavItem[] = [...COMMAND_INDEX, ...INTEL_PAGES, ...STUDIO_PAGES];
