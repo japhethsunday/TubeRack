@@ -10,6 +10,8 @@ import type {
   VoiceProfile,
 } from "@/src/lib/media/types";
 import { emptyMediaBundle, parseMediaBundle, MEDIA_STORAGE_KEY, type MediaBundle } from "@/src/lib/media/storage";
+import { useBackend } from "@/src/components/shell/BackendStatus";
+import { pullBundle, pushBundle, mergeById } from "@/src/lib/sync";
 import { InfoLine } from "@/src/components/ui/Toast";
 
 let seq = 0;
@@ -96,21 +98,55 @@ export async function runLocalJob(
   return true;
 }
 
+function mergeConsistency(local: ConsistencySettings[], remote: ConsistencySettings[]): ConsistencySettings[] {
+  const merged = new Map<string, ConsistencySettings>();
+  for (const c of local) merged.set(c.projectId, c);
+  for (const c of remote) merged.set(c.projectId, c);
+  return [...merged.values()];
+}
+
 export function MediaProvider({ children }: { children: React.ReactNode }) {
+  const { mode } = useBackend();
+  const cloud = mode === "cloud";
   const [bundle, setBundle] = useState<MediaBundle>(emptyMediaBundle());
   const [ready, setReady] = useState(false);
   const blobs = useRef(new Map<string, { url: string; blob: Blob }>());
+  const tombstones = useRef<{ assets: string[] }>({ assets: [] });
 
   useEffect(() => {
+    let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time sync with the external storage system.
-    setBundle(readBundle());
-    setReady(true);
+    void (async () => {
+      if (cloud) {
+        try {
+          const remote = await pullBundle("media", true);
+          if (!cancelled && remote) {
+            const incoming = parseMediaBundle(remote);
+            setBundle((local) => ({
+              version: 1,
+              assets: mergeById(local.assets, incoming.assets),
+              voices: mergeById(local.voices, incoming.voices),
+              consistency: mergeConsistency(local.consistency, incoming.consistency),
+            }));
+            setReady(true);
+            return;
+          }
+        } catch {
+          // Fall through to device storage.
+        }
+      }
+      if (!cancelled) {
+        setBundle(readBundle());
+        setReady(true);
+      }
+    })();
     const map = blobs.current;
     return () => {
+      cancelled = true;
       for (const { url } of map.values()) URL.revokeObjectURL(url);
       map.clear();
     };
-  }, []);
+  }, [cloud]);
 
   useEffect(() => {
     if (!ready) return;
@@ -120,7 +156,17 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
-  }, [bundle, ready]);
+    if (!cloud) return;
+    const timer = window.setTimeout(() => {
+      const tomb = { deletedAssetIds: [...new Set(tombstones.current.assets)] };
+      void pushBundle("media", true, { ...bundle, ...tomb }).then((result) => {
+        if (result) tombstones.current = { assets: [] };
+      }).catch(() => {
+        // Offline: local mirror holds; tombstones retry on the next push.
+      });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [bundle, ready, cloud]);
 
   const touchAsset = useCallback(
     (id: string, patch: Partial<MediaAsset>) =>
@@ -148,8 +194,10 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         return asset;
       },
       updateAsset: (id, patch) => touchAsset(id, patch),
-      removeAsset: (id) =>
-        setBundle((b) => ({ ...b, assets: b.assets.filter((a) => a.id !== id) })),
+      removeAsset: (id) => {
+        tombstones.current.assets.push(id);
+        return setBundle((b) => ({ ...b, assets: b.assets.filter((a) => a.id !== id) }));
+      },
       setApproval: (id, approval) => {
         const asset = bundle.assets.find((a) => a.id === id);
         if (!asset) return;

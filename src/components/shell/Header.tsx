@@ -7,6 +7,7 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { Drawer } from "@/src/components/ui/overlays";
 import { EmptyState } from "@/src/components/ui/states";
 import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
+import { BackendBadge } from "@/src/components/shell/BackendStatus";
 import { UserMenu } from "@/src/components/shell/UserMenu";
 import { CommandMenu } from "@/src/components/ui/search";
 import { Tooltip } from "@/src/components/ui/Tooltip";
@@ -56,6 +57,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         </button>
         <span className="sm:hidden" aria-hidden="true" />
         <div className="ml-auto flex items-center gap-1">
+          <BackendBadge />
           <span className="hidden items-center gap-2 rounded-lg px-2 md:flex">
             <Avatar name="Preview Workspace" size="sm" />
             <span className="max-w-32 truncate text-sm font-medium">Preview workspace</span>

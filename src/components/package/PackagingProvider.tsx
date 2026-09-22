@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ApprovalStage,
   Chapter,
@@ -21,6 +21,8 @@ import {
   type PackageBundle,
 } from "@/src/lib/package/storage";
 import { InfoLine } from "@/src/components/ui/Toast";
+import { useBackend } from "@/src/components/shell/BackendStatus";
+import { pullBundle, pushBundle, mergeById } from "@/src/lib/sync";
 
 let seq = 0;
 function nextId(prefix: string): string {
@@ -132,15 +134,94 @@ function readBundle(): StoredBundle {
   }
 }
 
+function readBundleFrom(data: unknown): StoredBundle {
+  const d = (data ?? {}) as Record<string, unknown>;
+  const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+  const withProject = (list: unknown): ({ id: string; projectId: string } & Record<string, unknown>)[] =>
+    arr(list)
+      .filter((item): item is { id: string; projectId: string } & Record<string, unknown> => {
+        const o = item as Record<string, unknown>;
+        return Boolean(o) && typeof o === "object" && typeof o.id === "string" && typeof o.projectId === "string";
+      })
+      .map((item) => ({ ...item, projectId: item.projectId }));
+  const withPack = (list: unknown): StoredPack[] =>
+    arr(list)
+      .filter((item): item is StoredPack => {
+        const o = item as Record<string, unknown>;
+        return Boolean(o) && typeof o === "object" && typeof o.projectId === "string" && typeof o.platform === "string";
+      })
+      .map((item) => item);
+  return {
+    version: 1,
+    concepts: withProject(d.concepts) as unknown as StoredConcept[],
+    variants: withProject(d.variants) as unknown as (ThumbnailVariant & { projectId: string })[],
+    titles: withProject(d.titles) as unknown as StoredTitle[],
+    seo: arr(d.seo).filter((s): s is SeoPackage => Boolean(s) && typeof s === "object" && typeof (s as { projectId?: unknown }).projectId === "string") as SeoPackage[],
+    packs: withPack(d.packs),
+    items: withProject(d.items) as unknown as StoredItem[],
+  };
+}
+
+function mergeConcepts(local: StoredConcept[], remote: StoredConcept[]): StoredConcept[] {
+  const remoteProjects = new Set(remote.map((c) => c.projectId));
+  return [...local.filter((c) => !remoteProjects.has(c.projectId)), ...remote];
+}
+
+function mergeSeo(local: SeoPackage[], remote: SeoPackage[]): SeoPackage[] {
+  const merged = new Map<string, SeoPackage>();
+  for (const s of local) merged.set(s.projectId, s);
+  for (const s of remote) merged.set(s.projectId, s);
+  return [...merged.values()];
+}
+
+function mergePacks(local: StoredPack[], remote: StoredPack[]): StoredPack[] {
+  const merged = new Map<string, StoredPack>();
+  for (const p of local) merged.set(`${p.projectId}:${p.platform}`, p);
+  for (const p of remote) merged.set(`${p.projectId}:${p.platform}`, p);
+  return [...merged.values()];
+}
+
 export function PackagingProvider({ children }: { children: React.ReactNode }) {
+  const { mode } = useBackend();
+  const cloud = mode === "cloud";
   const [bundle, setBundle] = useState<StoredBundle>({ version: 1, concepts: [], variants: [], titles: [], seo: [], packs: [], items: [] });
   const [ready, setReady] = useState(false);
+  const tombstones = useRef<{ variants: string[]; titles: string[]; items: string[] }>({ variants: [], titles: [], items: [] });
 
   useEffect(() => {
+    let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time sync with the external storage system.
-    setBundle(readBundle());
-    setReady(true);
-  }, []);
+    void (async () => {
+      if (cloud) {
+        try {
+          const remote = await pullBundle("packaging", true);
+          if (!cancelled && remote) {
+            const incoming = readBundleFrom(remote);
+            setBundle((local) => ({
+              version: 1,
+              concepts: mergeConcepts(local.concepts, incoming.concepts),
+              variants: mergeById(local.variants, incoming.variants),
+              titles: mergeById(local.titles, incoming.titles),
+              seo: mergeSeo(local.seo, incoming.seo),
+              packs: mergePacks(local.packs, incoming.packs),
+              items: mergeById(local.items, incoming.items),
+            }));
+            setReady(true);
+            return;
+          }
+        } catch {
+          // Fall through to device storage.
+        }
+      }
+      if (!cancelled) {
+        setBundle(readBundle());
+        setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cloud]);
 
   useEffect(() => {
     if (!ready) return;
@@ -149,7 +230,22 @@ export function PackagingProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
-  }, [bundle, ready]);
+    if (!cloud) return;
+    const timer = window.setTimeout(() => {
+      const tomb = {
+        deletedVariantIds: [...new Set(tombstones.current.variants)],
+        deletedTitleIds: [...new Set(tombstones.current.titles)],
+        deletedItemIds: [...new Set(tombstones.current.items)],
+        deletedProjects: [] as string[],
+      };
+      void pushBundle("packaging", true, { ...bundle, ...tomb }).then((result) => {
+        if (result) tombstones.current = { variants: [], titles: [], items: [] };
+      }).catch(() => {
+        // Offline: local mirror holds; tombstones retry on the next push.
+      });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [bundle, ready, cloud]);
 
   const value = useMemo<PackageContextValue>(() => {
     const scoped = <T extends { projectId: string }>(rows: T[], projectId: string): T[] =>
@@ -173,8 +269,10 @@ export function PackagingProvider({ children }: { children: React.ReactNode }) {
           ...b,
           variants: b.variants.map((v) => (v.id === id && v.projectId === projectId ? { ...v, ...patch, updatedAt: stamp() } : v)),
         })),
-      removeVariant: (projectId, id) =>
-        setBundle((b) => ({ ...b, variants: b.variants.filter((v) => !(v.id === id && v.projectId === projectId)) })),
+      removeVariant: (projectId, id) => {
+        tombstones.current.variants.push(id);
+        return setBundle((b) => ({ ...b, variants: b.variants.filter((v) => !(v.id === id && v.projectId === projectId)) }));
+      },
       setVariantApproval: (projectId, id, approval) =>
         setBundle((b) => ({
           ...b,
@@ -209,8 +307,10 @@ export function PackagingProvider({ children }: { children: React.ReactNode }) {
           ...b,
           titles: b.titles.map((t) => (t.projectId === projectId ? { ...t, isPrimary: t.id === id } : t)),
         })),
-      removeTitle: (projectId, id) =>
-        setBundle((b) => ({ ...b, titles: b.titles.filter((t) => !(t.id === id && t.projectId === projectId)) })),
+      removeTitle: (projectId, id) => {
+        tombstones.current.titles.push(id);
+        return setBundle((b) => ({ ...b, titles: b.titles.filter((t) => !(t.id === id && t.projectId === projectId)) }));
+      },
       primaryTitleFor: (projectId) => scoped(bundle.titles, projectId).find((t) => t.isPrimary) ?? null,
       seoFor: (projectId) => bundle.seo.find((s) => s.projectId === projectId) ?? emptySeo(projectId),
       saveSeo: (seo) =>
@@ -248,8 +348,10 @@ export function PackagingProvider({ children }: { children: React.ReactNode }) {
           ...b,
           items: b.items.map((i) => (i.id === id && i.projectId === projectId ? { ...i, status, updatedAt: stamp() } : i)),
         })),
-      removeItem: (projectId, id) =>
-        setBundle((b) => ({ ...b, items: b.items.filter((i) => !(i.id === id && i.projectId === projectId)) })),
+      removeItem: (projectId, id) => {
+        tombstones.current.items.push(id);
+        return setBundle((b) => ({ ...b, items: b.items.filter((i) => !(i.id === id && i.projectId === projectId)) }));
+      },
       exportBundle: () => {
         const { concepts, variants, titles, seo, packs, items } = bundle;
         return {

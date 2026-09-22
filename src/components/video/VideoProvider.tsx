@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   Composition,
   CompositionSnapshot,
@@ -15,6 +15,8 @@ import {
   type VideoBundle,
 } from "@/src/lib/video/storage";
 import { InfoLine } from "@/src/components/ui/Toast";
+import { useBackend } from "@/src/components/shell/BackendStatus";
+import { pullBundle, pushBundle, mergeById } from "@/src/lib/sync";
 
 let seq = 0;
 function nextId(prefix: string): string {
@@ -66,17 +68,56 @@ function readBundle(): VideoBundle {
   }
 }
 
+function mergeCompositions(
+  local: import("@/src/lib/video/types").Composition[],
+  remote: import("@/src/lib/video/types").Composition[],
+): import("@/src/lib/video/types").Composition[] {
+  const merged = new Map<string, import("@/src/lib/video/types").Composition>();
+  for (const c of local) merged.set(c.projectId, c);
+  for (const c of remote) merged.set(c.projectId, c);
+  return [...merged.values()];
+}
+
 export function VideoProvider({ children }: { children: React.ReactNode }) {
+  const { mode } = useBackend();
+  const cloud = mode === "cloud";
   const [bundle, setBundle] = useState<VideoBundle>(emptyVideoBundle());
   const [ready, setReady] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [histories, setHistories] = useState<Record<string, HistoryState>>({});
+  const tombstones = useRef<{ requests: string[]; compositions: string[] }>({ requests: [], compositions: [] });
 
   useEffect(() => {
+    let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time sync with the external storage system.
-    setBundle(readBundle());
-    setReady(true);
-  }, []);
+    void (async () => {
+      if (cloud) {
+        try {
+          const remote = await pullBundle("video", true);
+          if (!cancelled && remote) {
+            const incoming = parseVideoBundle(remote);
+            setBundle((local) => ({
+              version: 1,
+              compositions: mergeCompositions(local.compositions, incoming.compositions),
+              snapshots: mergeById(local.snapshots, incoming.snapshots),
+              requests: mergeById(local.requests, incoming.requests),
+            }));
+            setReady(true);
+            return;
+          }
+        } catch {
+          // Fall through to device storage.
+        }
+      }
+      if (!cancelled) {
+        setBundle(readBundle());
+        setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cloud]);
 
   useEffect(() => {
     if (!ready) return;
@@ -87,7 +128,20 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
-  }, [bundle, ready]);
+    if (!cloud) return;
+    const timer = window.setTimeout(() => {
+      const tomb = {
+        deletedRequestIds: [...new Set(tombstones.current.requests)],
+        deletedCompositions: [...new Set(tombstones.current.compositions)],
+      };
+      void pushBundle("video", true, { ...bundle, ...tomb }).then((result) => {
+        if (result) tombstones.current = { requests: [], compositions: [] };
+      }).catch(() => {
+        // Offline: local mirror holds; tombstones retry on the next push.
+      });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [bundle, ready, cloud]);
 
   /** Meaningful-change commit with undo history (not per-keystroke). */
   const commit = useCallback((projectId: string, prev: TimelineClip[], next: TimelineClip[]) => {
@@ -198,7 +252,10 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
         setBundle((b) => ({ ...b, requests: [full, ...b.requests].slice(0, 20) }));
         return full;
       },
-      removeRequest: (id) => setBundle((b) => ({ ...b, requests: b.requests.filter((r) => r.id !== id) })),
+      removeRequest: (id) => {
+        tombstones.current.requests.push(id);
+        return setBundle((b) => ({ ...b, requests: b.requests.filter((r) => r.id !== id) }));
+      },
     };
   }, [bundle, ready, savedAt, histories, commit]);
 

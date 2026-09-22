@@ -2,12 +2,35 @@ import { z } from "zod";
 
 /**
  * Server-only environment validation.
- * Provider credentials must NEVER carry a NEXT_PUBLIC_ prefix.
+ * Only NEXT_PUBLIC_APP_URL may reach the browser — enforced by name below.
  * Import only from server code (route handlers / server components / workers).
  */
 
 const serverSchema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
+  NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+
+  // CloudNivo backend (all server-only; user supplies real values per environment)
+  CLOUDNIVO_URL: z.string().url().default("https://www.cloudnivo.org"),
+  CLOUDNIVO_API_URL: z.string().url().default("https://api.cloudnivo.org"),
+  CLOUDNIVO_PROJECT_ID: z.string().optional(),
+  CLOUDNIVO_PROJECT_URL: z.string().url().optional(),
+  CLOUDNIVO_PUBLIC_KEY: z.string().optional(),
+  CLOUDNIVO_SECRET_KEY: z.string().optional(),
+  CLOUDNIVO_AGENT_TOKEN: z.string().optional(),
+  CLOUDNIVO_DATABASE_URL: z.string().optional(),
+  CLOUDNIVO_STORAGE_URL: z.string().url().optional(),
+  CLOUDNIVO_BUCKET: z.string().default("business-data"),
+
+  // Security (required for auth routes; validated lazily at startup of those routes)
+  JWT_SECRET: z.string().optional(),
+  ENCRYPTION_KEY: z.string().optional(),
+
+  // Backend options
+  MEDIA_INLINE_LIMIT: z.coerce.number().int().positive().default(5242880),
+  API_ALLOWED_ORIGINS: z.string().optional(),
+
+  // Deferred integrations (later phases; server-only)
   TEXT_PROVIDER: z.string().optional(),
   TEXT_API_KEY: z.string().optional(),
   IMAGE_PROVIDER: z.string().optional(),
@@ -23,10 +46,6 @@ const serverSchema = z.object({
   RESEARCH_PROVIDER: z.string().optional(),
   RESEARCH_API_KEY: z.string().optional(),
   YOUTUBE_API_KEY: z.string().optional(),
-  DATABASE_URL: z.string().optional(),
-  REDIS_URL: z.string().optional(),
-  STORAGE_ENDPOINT: z.string().optional(),
-  STORAGE_BUCKET: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;
@@ -48,9 +67,24 @@ export function getServerEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
   return parsed.data;
 }
 
+/** Backend availability without leaking values. */
+export function backendStatus(env: ServerEnv): {
+  database: boolean;
+  storage: boolean;
+  auth: boolean;
+  email: boolean;
+} {
+  return {
+    database: Boolean(env.CLOUDNIVO_DATABASE_URL),
+    storage: Boolean(env.CLOUDNIVO_STORAGE_URL && env.CLOUDNIVO_SECRET_KEY),
+    auth: Boolean(env.CLOUDNIVO_DATABASE_URL && env.JWT_SECRET),
+    email: false, // No email provider yet — requests store tokens, nothing is sent.
+  };
+}
+
 /** Guard: refuse to expose any server secret key name to the browser. */
 export function assertServerOnly(key: string): void {
-  if (key.startsWith("NEXT_PUBLIC_")) {
+  if (key.startsWith("NEXT_PUBLIC_") && key !== "NEXT_PUBLIC_APP_URL") {
     throw new Error(
       `Refusing to expose "${key}" to the browser. Provider credentials must be server-only.`,
     );

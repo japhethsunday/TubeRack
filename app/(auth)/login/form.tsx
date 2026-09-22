@@ -8,6 +8,7 @@ import { AuthBoundaryNotice } from "@/src/components/auth/AuthBoundaryNotice";
 import { AccountStateBanner } from "@/src/components/auth/AccountStateBanner";
 import { fieldErrors } from "@/src/components/auth/form";
 import { loginSchema } from "@/src/lib/auth/validation";
+import { api, ApiError } from "@/src/lib/api";
 import { Input } from "@/src/components/ui/fields";
 import { Checkbox } from "@/src/components/ui/choices";
 import { Button } from "@/src/components/ui/Button";
@@ -17,11 +18,13 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setFormError(null);
     const parsed = loginSchema.safeParse({ email, password });
     if (!parsed.success) {
       setErrors(fieldErrors(parsed.error));
@@ -30,11 +33,27 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
     }
     setErrors({});
     setLoading(true);
-    // Local validation only — no network call exists until Phase 11.
-    window.setTimeout(() => {
+    try {
+      await api.post("/api/v1/auth/login", { email, password });
+      // Full navigation so the new session cookie is read on the next page.
+      // No next/navigation dependency: keeps server-rendered tests working.
+      if (typeof window !== "undefined") {
+        window.location.assign(returnTo);
+      } else {
+        setDone(true);
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.isUnavailable()) {
+        // No backend: fall through to the honest boundary notice.
+        setDone(true);
+      } else if (error instanceof ApiError) {
+        setFormError(error.code === "UNAUTHORIZED" ? "Email or password is incorrect." : error.message);
+      } else {
+        setFormError("Something went wrong. Nothing was changed.");
+      }
+    } finally {
       setLoading(false);
-      setDone(true);
-    }, 400);
+    }
   }
 
   return (
@@ -93,9 +112,14 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
               onChange={(e) => setRemember(e.target.checked)}
             />
             <p className="mt-1 text-xs text-muted-text">
-              Applies once server sessions exist (Phase 11).
+              Applies to server sessions when the backend is connected (Phase 11).
             </p>
           </div>
+          {formError && (
+            <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              {formError}
+            </p>
+          )}
           <Button type="submit" loading={loading} className="w-full">
             Sign in
           </Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AnalyticsSnapshot,
   ChannelSignal,
@@ -15,6 +15,8 @@ import {
   type AnalyticsBundle,
 } from "@/src/lib/analytics/storage";
 import { InfoLine } from "@/src/components/ui/Toast";
+import { useBackend } from "@/src/components/shell/BackendStatus";
+import { pullBundle, pushBundle, mergeById } from "@/src/lib/sync";
 
 let seq = 0;
 function nextId(prefix: string): string {
@@ -70,14 +72,49 @@ function readBundle(): AnalyticsBundle {
 }
 
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+  const { mode } = useBackend();
+  const cloud = mode === "cloud";
   const [bundle, setBundle] = useState<AnalyticsBundle>(emptyAnalyticsBundle());
   const [ready, setReady] = useState(false);
+  const tombstones = useRef<{ entries: string[]; retention: string[]; signals: string[]; snapshots: string[] }>({
+    entries: [],
+    retention: [],
+    signals: [],
+    snapshots: [],
+  });
 
   useEffect(() => {
+    let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time sync with the external storage system.
-    setBundle(readBundle());
-    setReady(true);
-  }, []);
+    void (async () => {
+      if (cloud) {
+        try {
+          const remote = await pullBundle("analytics", true);
+          if (!cancelled && remote) {
+            const incoming = parseAnalyticsBundle(remote);
+            setBundle((local) => ({
+              version: 1,
+              entries: mergeById(local.entries, incoming.entries),
+              retention: mergeById(local.retention, incoming.retention),
+              signals: mergeById(local.signals, incoming.signals),
+              snapshots: mergeById(local.snapshots, incoming.snapshots),
+            }));
+            setReady(true);
+            return;
+          }
+        } catch {
+          // Fall through to device storage.
+        }
+      }
+      if (!cancelled) {
+        setBundle(readBundle());
+        setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cloud]);
 
   useEffect(() => {
     if (!ready) return;
@@ -86,7 +123,22 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
-  }, [bundle, ready]);
+    if (!cloud) return;
+    const timer = window.setTimeout(() => {
+      const tomb = {
+        deletedEntryIds: [...new Set(tombstones.current.entries)],
+        deletedRetentionIds: [...new Set(tombstones.current.retention)],
+        deletedSignalIds: [...new Set(tombstones.current.signals)],
+        deletedSnapshotIds: [...new Set(tombstones.current.snapshots)],
+      };
+      void pushBundle("analytics", true, { ...bundle, ...tomb }).then((result) => {
+        if (result) tombstones.current = { entries: [], retention: [], signals: [], snapshots: [] };
+      }).catch(() => {
+        // Offline: local mirror holds; tombstones retry on the next push.
+      });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [bundle, ready, cloud]);
 
   const value = useMemo<AnalyticsContextValue>(() => {
     const touch = <T extends { id: string }>(rows: T[], id: string, patch: Partial<T>): T[] =>
@@ -104,14 +156,20 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       },
       updateEntry: (id, patch) =>
         setBundle((b) => ({ ...b, entries: touch(b.entries, id, { ...patch, updatedAt: stamp() }) })),
-      removeEntry: (id) => setBundle((b) => ({ ...b, entries: b.entries.filter((e) => e.id !== id) })),
+      removeEntry: (id) => {
+        tombstones.current.entries.push(id);
+        return setBundle((b) => ({ ...b, entries: b.entries.filter((e) => e.id !== id) }));
+      },
       entriesFor: (projectId) => bundle.entries.filter((e) => e.projectId === projectId),
       addRetentionNote: (input) => {
         const note: RetentionNote = { ...input, id: nextId("ret"), createdAt: stamp() };
         setBundle((b) => ({ ...b, retention: [note, ...b.retention].slice(0, 500) }));
         return note;
       },
-      removeRetentionNote: (id) => setBundle((b) => ({ ...b, retention: b.retention.filter((r) => r.id !== id) })),
+      removeRetentionNote: (id) => {
+        tombstones.current.retention.push(id);
+        return setBundle((b) => ({ ...b, retention: b.retention.filter((r) => r.id !== id) }));
+      },
       retentionFor: (projectId) => bundle.retention.filter((r) => r.projectId === projectId),
       saveSignal: (input) => {
         const signal: ChannelSignal = { ...input, id: nextId("sig"), status: "active", createdAt: stamp() };
@@ -119,14 +177,20 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         return signal;
       },
       archiveSignal: (id) => setBundle((b) => ({ ...b, signals: touch(b.signals, id, { status: "archived" }) })),
-      removeSignal: (id) => setBundle((b) => ({ ...b, signals: b.signals.filter((s) => s.id !== id) })),
+      removeSignal: (id) => {
+        tombstones.current.signals.push(id);
+        return setBundle((b) => ({ ...b, signals: b.signals.filter((s) => s.id !== id) }));
+      },
       activeSignals: bundle.signals.filter((s) => s.status === "active"),
       saveSnapshot: (name, rangeDays, totals, entryCount) => {
         const snapshot: AnalyticsSnapshot = { id: nextId("snap"), name: name.trim() || `Snapshot ${bundle.snapshots.length + 1}`, at: new Date().toISOString(), rangeDays, entryCount, totals, createdAt: stamp() };
         setBundle((b) => ({ ...b, snapshots: [snapshot, ...b.snapshots].slice(0, 50) }));
         return snapshot;
       },
-      removeSnapshot: (id) => setBundle((b) => ({ ...b, snapshots: b.snapshots.filter((s) => s.id !== id) })),
+      removeSnapshot: (id) => {
+        tombstones.current.snapshots.push(id);
+        return setBundle((b) => ({ ...b, snapshots: b.snapshots.filter((s) => s.id !== id) }));
+      },
       exportBundle: () => bundle,
       importBundle: (data) => {
         const incoming = parseAnalyticsBundle(data);

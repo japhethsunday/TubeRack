@@ -29,6 +29,8 @@ import {
   setIntelItemStatus,
   setOpportunityStatus,
 } from "@/src/lib/intelligence/shelf";
+import { useBackend } from "@/src/components/shell/BackendStatus";
+import { pullBundle, pushBundle, mergeMaps } from "@/src/lib/sync";
 
 const bundleSchema = z.object({
   version: z.literal(1),
@@ -36,6 +38,15 @@ const bundleSchema = z.object({
   intel: z.record(z.string(), z.unknown()),
   opportunities: z.array(z.unknown()),
 });
+
+function mergeOpportunities(local: Opportunity[], remote: Opportunity[]): Opportunity[] {
+  const merged = new Map<string, Opportunity>();
+  for (const o of local) merged.set(o.id, o);
+  for (const o of remote) {
+    if (o && typeof o.id === "string" && typeof o.title === "string") merged.set(o.id, o as Opportunity);
+  }
+  return [...merged.values()];
+}
 
 export interface IntelBundle {
   version: 1;
@@ -111,14 +122,52 @@ export function useIntel(): IntelContextValue {
 }
 
 export function IntelProvider({ children }: { children: React.ReactNode }) {
+  const { mode } = useBackend();
+  const cloud = mode === "cloud";
   const [bundle, setBundle] = useState<IntelBundle>(emptyIntelBundle());
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time sync with the external storage system.
-    setBundle(readIntel());
-    setReady(true);
-  }, []);
+    void (async () => {
+      if (cloud) {
+        try {
+          const remote = await pullBundle("intel", true);
+          if (!cancelled && remote) {
+            const parsed = bundleSchema.safeParse(remote);
+            if (parsed.success) {
+              const dna: Record<string, ChannelDNA> = {};
+              for (const [k, v] of Object.entries(parsed.data.dna)) {
+                try {
+                  dna[k] = parseDNA(v);
+                } catch {
+                  // Drop corrupt DNA entries.
+                }
+              }
+              setBundle((local) => ({
+                version: 1,
+                dna: mergeMaps(local.dna, dna),
+                intel: mergeMaps(local.intel, parsed.data.intel as Record<string, ProjectIntel>),
+                opportunities: mergeOpportunities(local.opportunities, parsed.data.opportunities as Opportunity[]),
+              }));
+              setReady(true);
+              return;
+            }
+          }
+        } catch {
+          // Fall through to device storage.
+        }
+      }
+      if (!cancelled) {
+        setBundle(readIntel());
+        setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cloud]);
 
   useEffect(() => {
     if (!ready) return;
@@ -127,7 +176,14 @@ export function IntelProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
-  }, [bundle, ready]);
+    if (!cloud) return;
+    const timer = window.setTimeout(() => {
+      void pushBundle("intel", true, { ...bundle, deletedOpportunityIds: [] }).catch(() => {
+        // Offline: local mirror holds.
+      });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [bundle, ready, cloud]);
 
   const patchIntel = useCallback(
     (projectId: string, fn: (i: ProjectIntel) => ProjectIntel) =>

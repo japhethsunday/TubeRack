@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ActivityKind,
   Channel,
@@ -30,6 +30,8 @@ import {
   type WorkspaceBundle,
 } from "@/src/lib/projects/storage";
 import { InfoLine } from "@/src/components/ui/Toast";
+import { useBackend } from "@/src/components/shell/BackendStatus";
+import { pullBundle, pushBundle } from "@/src/lib/sync";
 
 interface ProjectsContextValue {
   ready: boolean;
@@ -99,19 +101,40 @@ interface Snapshot {
 }
 
 export function ProjectsProvider({ children }: { children: React.ReactNode }) {
+  const { mode } = useBackend();
+  const cloud = mode === "cloud";
   const [snapshot, setSnapshot] = useState<Snapshot>(() => ({
     bundle: emptyBundle(),
     recents: [],
     ready: false,
   }));
   const [activeChannelId, setActiveChannelId] = useState("all");
+  // Explicit deletes propagate on the next cloud push, then clear.
+  const tombstones = useRef<{ projects: string[]; channels: string[] }>({ projects: [], channels: [] });
 
-  // Post-mount hydration from device storage. Server has no localStorage,
-  // so this cannot be a lazy initializer without a hydration mismatch.
+  // Post-mount hydration: cloud first (validated), device fallback.
+  // Server has no localStorage, so this cannot be a lazy initializer.
   useEffect(() => {
+    let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time sync with the external storage system.
-    setSnapshot({ bundle: readStorage(), recents: readRecents(), ready: true });
-  }, []);
+    void (async () => {
+      if (cloud) {
+        try {
+          const remote = await pullBundle("workspace", true);
+          if (!cancelled && remote) {
+            setSnapshot({ bundle: parseBundle(remote), recents: readRecents(), ready: true });
+            return;
+          }
+        } catch {
+          // Fall through to device storage.
+        }
+      }
+      if (!cancelled) setSnapshot({ bundle: readStorage(), recents: readRecents(), ready: true });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cloud]);
 
   const bundle = snapshot.bundle;
   const ready = snapshot.ready;
@@ -136,7 +159,22 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
-  }, [bundle, ready]);
+    if (!cloud) return;
+    const timer = window.setTimeout(() => {
+      const tomb = { deletedProjectIds: tombstones.current.projects, deletedChannelIds: tombstones.current.channels };
+      void pushBundle("workspace", true, {
+        projects: bundle.projects,
+        channels: bundle.channels,
+        events: bundle.events.slice(0, 200),
+        ...tomb,
+      }).then((result) => {
+        if (result) tombstones.current = { projects: [], channels: [] };
+      }).catch(() => {
+        // Offline: local mirror holds; tombstones retry on the next push.
+      });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [bundle, ready, cloud]);
 
   const mutate = useCallback(
     (fn: (b: WorkspaceBundle) => WorkspaceBundle) => setBundle((b) => fn(b)),
@@ -226,6 +264,7 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         mutate((b) => {
           const project = b.projects.find((p) => p.id === id);
           if (!project) return b;
+          tombstones.current.projects.push(id);
           const event = buildEvent("project.deleted", project.name, "Permanently deleted from this device.", {
             category: "system",
           });

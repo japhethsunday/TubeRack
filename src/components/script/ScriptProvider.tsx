@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { LoopItem, Scene, Script, ScriptSection } from "@/src/lib/script/types";
 import {
   addLoop as addLoopOp,
@@ -16,6 +16,8 @@ import {
   type ScriptBundle,
 } from "@/src/lib/script/storage";
 import { InfoLine } from "@/src/components/ui/Toast";
+import { useBackend } from "@/src/components/shell/BackendStatus";
+import { pullBundle, pushBundle, mergeMaps } from "@/src/lib/sync";
 
 interface ScriptContextValue {
   ready: boolean;
@@ -57,15 +59,44 @@ function readBundle(): ScriptBundle {
 }
 
 export function ScriptProvider({ children }: { children: React.ReactNode }) {
+  const { mode } = useBackend();
+  const cloud = mode === "cloud";
   const [bundle, setBundle] = useState<ScriptBundle>(emptyScriptBundle());
   const [ready, setReady] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const tombstones = useRef<{ scripts: string[] }>({ scripts: [] });
 
   useEffect(() => {
+    let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time sync with the external storage system.
-    setBundle(readBundle());
-    setReady(true);
-  }, []);
+    void (async () => {
+      if (cloud) {
+        try {
+          const remote = await pullBundle("scripts", true);
+          if (!cancelled && remote) {
+            const incoming = parseScriptBundle(remote);
+            setBundle((local) => ({
+              version: 1,
+              scripts: mergeMaps(local.scripts, incoming.scripts),
+              boards: mergeMaps(local.boards, incoming.boards),
+              loops: mergeMaps(local.loops, incoming.loops),
+            }));
+            setReady(true);
+            return;
+          }
+        } catch {
+          // Fall through to device storage.
+        }
+      }
+      if (!cancelled) {
+        setBundle(readBundle());
+        setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cloud]);
 
   useEffect(() => {
     if (!ready) return;
@@ -76,7 +107,17 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
-  }, [bundle, ready]);
+    if (!cloud) return;
+    const timer = window.setTimeout(() => {
+      const tomb = { deletedScripts: [...new Set(tombstones.current.scripts)] };
+      void pushBundle("scripts", true, { ...bundle, ...tomb }).then((result) => {
+        if (result) tombstones.current = { scripts: [] };
+      }).catch(() => {
+        // Offline: local mirror holds; tombstones retry on the next push.
+      });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [bundle, ready, cloud]);
 
   const patchScript = useCallback(
     (projectId: string, fn: (s: Script) => Script) =>
@@ -97,6 +138,8 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
         setBundle((b) => ({ ...b, scripts: { ...b.scripts, [script.projectId]: script } })),
       removeScript: (projectId) =>
         setBundle((b) => {
+          if (!b.scripts[projectId]) return b;
+          tombstones.current.scripts.push(projectId);
           const scripts = { ...b.scripts };
           delete scripts[projectId];
           return { ...b, scripts };
