@@ -46,5 +46,22 @@ export interface ImageProvider {
   generateImage(request: ImageRequest): Promise<ImageResponse>;
 }
 
+export interface TtsRequest {
+  text: string;
+  voice?: string;
+}
+
+export interface TtsResponse {
+  audioBase64: string;
+  mimeType: string;
+  model: string;
+}
+
+export interface TtsProvider {
+  readonly capability: "tts";
+  readonly name: string;
+  synthesizeSpeech(request: TtsRequest): Promise<TtsResponse>;
+}
+
 /** Union of provider contracts the gateway can route. Extend per capability in later phases. */
-export type AIProvider = TextProvider | ImageProvider;
+export type AIProvider = TextProvider | ImageProvider | TtsProvider;

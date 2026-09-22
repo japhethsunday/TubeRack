@@ -1,11 +1,12 @@
 import type { ProjectStage } from "@/src/types/domain";
 import type { IntelligenceTaskType } from "@/src/lib/intelligence/tasks";
+import { currentGeminiModel, runIntelligenceTask } from "@/src/server/ai/gemini";
 
 /**
- * Future provider path: AI Gateway → Text Model → Intelligence Task.
- * No provider is configured before Phase 11, so every call throws the
- * explicit boundary error. The UI runs deterministic local analyzers
- * instead and labels them "Local analysis" — never provider output.
+ * AI Gateway → Gemini → Intelligence Task.
+ * Without GEMINI_API_KEY every call throws the explicit boundary error and
+ * the UI runs deterministic local analyzers instead, labeled
+ * "Local analysis" — never provider output.
  */
 export class IntelligenceNotConfiguredError extends Error {
   readonly code = "INTELLIGENCE_NOT_CONFIGURED";
@@ -25,13 +26,20 @@ export interface IntelligenceRequest {
   context: Record<string, unknown>;
 }
 
-export async function requestIntelligence(request: IntelligenceRequest): Promise<never> {
-  throw new IntelligenceNotConfiguredError(request.task);
+export interface IntelligenceResponse {
+  task: string;
+  text: string;
+  model: string;
 }
 
-/** Resolved model info for Phase 11 usage records. Until then, unset. */
+/** Routes through Gemini when configured; otherwise the boundary error. */
+export async function requestIntelligence(request: IntelligenceRequest): Promise<IntelligenceResponse> {
+  return runIntelligenceTask(request);
+}
+
+/** Resolved model info for Phase 11 usage records. Null until configured. */
 export function currentModelInfo(): { provider: string; model: string } | null {
-  return null;
+  return currentGeminiModel();
 }
 
 /** Research source contract (Phase 6 expands collection; this is the shape). */

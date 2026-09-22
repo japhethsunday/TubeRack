@@ -46,6 +46,13 @@ const serverSchema = z.object({
   RESEARCH_PROVIDER: z.string().optional(),
   RESEARCH_API_KEY: z.string().optional(),
   YOUTUBE_API_KEY: z.string().optional(),
+
+  // Google Gemini (server-only primary AI provider: text, intelligence, image, TTS)
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_TEXT_MODEL: z.string().default("gemini-3.6-flash"),
+  GEMINI_IMAGE_MODEL: z.string().default("gemini-3.1-flash-image"),
+  GEMINI_TTS_MODEL: z.string().default("gemini-2.5-flash-preview-tts"),
+  GEMINI_TTS_VOICE: z.string().default("Kore"),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;
