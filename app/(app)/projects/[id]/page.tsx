@@ -299,6 +299,12 @@ export default function ProjectOverviewPage() {
           <h2 className="text-sm font-semibold">Manage</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
+              href={`/studio/package?project=${project.id}`}
+              className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Packaging Studio
+            </Link>
+            <Link
               href={`/studio/media?project=${project.id}`}
               className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
             >

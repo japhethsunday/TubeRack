@@ -1,4 +1,4 @@
-# Decisions (Phases 1–8)
+# Decisions (Phases 1–9)
 
 1. Greenfield Next.js App Router, not a clone of any benchmark. TubeGen is a
    capability benchmark only.
@@ -43,3 +43,7 @@
     preview (never a fake render); history tracks structural edits while
     typing autosaves; export health is ready/review/blocked with fixes;
     render requests save parameters only — no percentages, no fake jobs.
+16. Phase 9: packaging metrics are never invented — keywords carry real
+    counts, chapters carry real timestamps, quality checks are real math
+    (contrast, scaled readability), thumbnails export as real SVG/PNG, and
+    approval explicitly never publishes.

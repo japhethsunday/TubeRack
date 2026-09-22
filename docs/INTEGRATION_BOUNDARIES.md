@@ -9,6 +9,8 @@ or render an "Awaiting integration" state. Faking success is a defect.
 | Intelligence reasoning | Deterministic local heuristics labeled “Local analysis”; `requestIntelligence` throws | Phase 11 |
 | Image/video/TTS/music providers | On-device drafts + saved request drafts; capability matrix gates UI | Phase 11 |
 | Video rendering + workers | Live DOM preview + saved render requests with full parameters; no execution | Phase 11 |
+| Publishing APIs + social connections | Platform packs assemble exact payloads; nothing uploads | Later phase |
+| Search/analytics data | Reviews use local structure only; volumes/rankings never shown | Phase 10–11 |
 | Object storage + server validation | Session bytes + magic-byte client checks; re-upload after reload | Phase 11 |
 | Script section generation (rewrite/tone/expand) | Assembled request shown; execution throws/waits | Phase 11 |
 | Script/board cloud sync + autosave | Device-local (`tuberack.scripts.v1`) with UI disclosure | Phase 11 |
