@@ -46,6 +46,7 @@ const serverSchema = z.object({
   RESEARCH_PROVIDER: z.string().optional(),
   RESEARCH_API_KEY: z.string().optional(),
   YOUTUBE_API_KEY: z.string().optional(),
+  YOUTUBE_FALLBACK_BASE: z.string().optional(),
 
   // Google Gemini (server-only primary AI provider: text, intelligence, image, TTS)
   GEMINI_API_KEY: z.string().optional(),

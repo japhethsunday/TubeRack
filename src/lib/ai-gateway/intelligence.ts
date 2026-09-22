@@ -62,6 +62,8 @@ export interface PlatformSnapshot {
   fetchedAt: string;
   metrics?: Record<string, number>;
   metricsProvenance?: string;
+  /** True when the primary API was unavailable and a fallback source served. */
+  degraded?: boolean;
 }
 
 export type { ProjectStage };
