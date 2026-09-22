@@ -13,6 +13,8 @@ import { Card } from "@/src/components/ui/Card";
 import { Badge } from "@/src/components/ui/Badge";
 import { Progress } from "@/src/components/ui/feedback";
 import { LoadingState } from "@/src/components/ui/feedback";
+import { useAnalytics } from "@/src/components/analytics/AnalyticsProvider";
+import { sum, formatCompact } from "@/src/lib/analytics/metrics";
 
 const QUICK_ACTIONS = [
   { href: "/intelligence/lab", icon: FlaskConical, label: "Analyze an idea", blurb: "Angles & evidence" },
@@ -176,20 +178,50 @@ export default function DashboardPage() {
           <section aria-label="Performance snapshot" className="rounded-xl border border-border bg-surface p-5 sm:p-6">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Performance snapshot</h2>
-              <Badge tone="preview">Phase 10</Badge>
+              <Badge tone="preview">Manual + local</Badge>
             </div>
             <p className="mt-1 text-sm text-muted-text">
-              Real watch-time and retention feed back into strategy here.
+              Self-reported logs and local production feed the learning loop.
             </p>
             <div className="mt-4">
-              <EmptyState
-                title="No channel connected"
-                body="Connect YouTube in a later phase to see performance. Charts are never fabricated."
-              />
+              <PerformanceSnapshot />
             </div>
           </section>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PerformanceSnapshot() {
+  const { ready, entries, activeSignals } = useAnalytics();
+  if (!ready) return <p className="text-sm text-muted-text">Loading…</p>;
+  const views = sum(entries, (e) => e.views);
+  return (
+    <div className="space-y-3">
+      <dl className="grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-lg bg-muted/50 p-2.5">
+          <dt className="text-[11px] text-muted-text">Logged views</dt>
+          <dd className="text-lg font-semibold tabular-nums">{formatCompact(views)}</dd>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-2.5">
+          <dt className="text-[11px] text-muted-text">Log entries</dt>
+          <dd className="text-lg font-semibold tabular-nums">{entries.length}</dd>
+        </div>
+        <div className="rounded-lg bg-muted/50 p-2.5">
+          <dt className="text-[11px] text-muted-text">Signals</dt>
+          <dd className="text-lg font-semibold tabular-nums">{activeSignals.length}</dd>
+        </div>
+      </dl>
+      {entries.length === 0 && (
+        <p className="text-xs text-muted-text">
+          No channel connected and nothing logged — log platform numbers by hand or wait for Phase 11 ingestion. Charts are never fabricated.
+        </p>
+      )}
+      <Link href="/analytics" className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90">
+        Open Analytics
+        <ArrowRight className="ml-1 size-4" aria-hidden="true" />
+      </Link>
     </div>
   );
 }

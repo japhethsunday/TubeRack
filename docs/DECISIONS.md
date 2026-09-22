@@ -1,4 +1,4 @@
-# Decisions (Phases 1–9)
+# Decisions (Phases 1–10)
 
 1. Greenfield Next.js App Router, not a clone of any benchmark. TubeGen is a
    capability benchmark only.
@@ -47,3 +47,6 @@
     counts, chapters carry real timestamps, quality checks are real math
     (contrast, scaled readability), thumbnails export as real SVG/PNG, and
     approval explicitly never publishes.
+17. Phase 10: analytics without ingestion means manual entries (provenance:
+    manual) + local production metrics + gated local interpretations —
+    never platform numbers, never causal claims, never live implications.

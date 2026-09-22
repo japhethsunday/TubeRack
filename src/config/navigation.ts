@@ -194,9 +194,9 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         slug: "analytics",
         label: "Analytics",
-        href: "/dashboard",
+        href: "/analytics",
         icon: ChartLine,
-        status: "planned",
+        status: "live",
         phase: "Phase 10",
         blurb: "Performance, feedback loop.",
       },

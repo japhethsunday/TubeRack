@@ -15,6 +15,7 @@ import {
 } from "@/src/components/intelligence/output";
 import { analyzeIdea, suggestAngles, IDEA_METHODOLOGY, type DimensionResult, type Angle } from "@/src/lib/intelligence/idea";
 import { assembleContext } from "@/src/lib/intelligence/context";
+import { useAnalytics } from "@/src/components/analytics/AnalyticsProvider";
 import { Textarea, Input } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
 import { Badge } from "@/src/components/ui/Badge";
@@ -33,6 +34,7 @@ function Lab() {
   const params = useSearchParams();
   const { projects, channelName } = useProjects();
   const { dnaFor, saveOpportunity } = useIntel();
+  const { activeSignals } = useAnalytics();
   const [projectId, setProjectId] = useState<string | null>(params.get("project"));
   const [idea, setIdea] = useState(params.get("idea") ?? "");
   const [audience, setAudience] = useState("");
@@ -85,6 +87,36 @@ function Lab() {
 
       <ProjectAttach projectId={projectId} onChange={setProjectId} />
       {project && <DnaStrip channelId={project.channelId} channelName={channelName(project.channelId)} />}
+
+      {activeSignals.length > 0 && (
+        <section aria-label="Channel intelligence signals" className="rounded-xl border border-info/30 bg-info/5 p-4">
+          <h2 className="text-sm font-semibold">
+            Channel Intelligence ({activeSignals.length} signal{activeSignals.length === 1 ? "" : "s"}) — the learning loop, live
+          </h2>
+          <p className="mt-0.5 text-xs text-muted-text">
+            Saved from Analytics observations. Start an idea from any signal — its evidence travels with you.
+          </p>
+          <ul className="mt-2 grid gap-2 md:grid-cols-2" aria-label="Active signals">
+            {activeSignals.slice(0, 4).map((s) => (
+              <li key={s.id} className="rounded-lg border border-border bg-surface p-3 text-sm">
+                <p className="font-medium">{s.title}</p>
+                <p className="mt-0.5 line-clamp-2 text-xs text-muted-text">{s.evidence}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIdea(s.title);
+                    setAngles(null);
+                    setAnalysis(null);
+                  }}
+                  className="mt-1.5 text-xs font-medium underline"
+                >
+                  Start idea from this signal
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-4 rounded-xl border border-border bg-surface p-5">

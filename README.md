@@ -5,20 +5,19 @@ idea → research → strategy → script → storyboard → visuals → voice �
 music → video → thumbnail → SEO → repurposing → publishing →
 analytics → improvement.
 
-## Status: Phase 9 — Thumbnail, SEO & Repurposing
+## Status: Phase 10 — Analytics & Creator Intelligence
 
-Packaging studio: thumbnail concepts/variants with real SVG/PNG export,
-title pairing, SEO workspace with real timestamps and counts, platform
-packs, and deterministic repurposing with consistency flags. Publishing
-and analytics arrive later.
-See `docs/PHASE_9.md` and `docs/INTEGRATION_BOUNDARIES.md`.
+Learning loop on local + self-reported data: manual performance logging,
+retention notes, gated insights, channel signals feeding Idea Lab, CSV
+export. Platform ingestion arrives in Phase 11.
+See `docs/PHASE_10.md` and `docs/INTEGRATION_BOUNDARIES.md`.
 
 ## Develop
 
 ```bash
 npm install
 npm run dev     # http://localhost:3000
-npm test        # 116 tests: packaging, video, media, script, intelligence, projects, auth
+npm test        # 125 tests: analytics, packaging, video, media, script, intelligence, projects
 npm run typecheck
 npm run lint
 npm run build
@@ -38,6 +37,7 @@ npm run build
 - `/studio/media` — library, scene needs, image/voice/music/SFX drafts, uploads, queue
 - `/studio/video` — timeline composition, live preview, export validation
 - `/studio/package` — thumbnail, titles, SEO, platforms, repurposing
+- `/analytics` — manual logs, retention notes, gated insights, signals, alerts, reports
 - `/activity` — filterable event feed
 - `/design` — component/token/pattern gallery
 - `/login`, `/signup`, `/forgot-password`, `/reset-password`,

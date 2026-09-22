@@ -1,9 +1,8 @@
-# TubeRack Architecture (Phases 1–9)
+# TubeRack Architecture (Phases 1–10)
 
-Greenfield repo. Phases 1–8 built contracts, design system, auth UX,
-device-local workspace, deterministic intelligence, script/story/video
-studios, and on-device media. Phase 9 added packaging (thumbnail, SEO,
-repurposing). Publishing, analytics, and backend remain.
+Greenfield repo. Phases 1–9 built the full production frontend; Phase 10
+added the analytics learning loop on local + manual data. Ingestion and
+cloud remain Phase 11.
 
 ## Stack
 
@@ -69,6 +68,9 @@ repurposing). Publishing, analytics, and backend remain.
   activity, preview, design, settings
 - `src/config/navigation.ts` — single nav source of truth (live/preview/
   planned); `src/config/preview.ts` + `identity.ts` — explicitly static fixtures
+- `src/lib/analytics/` — contracts, calculations, chart math, insights,
+  alerts, CSV; `src/components/analytics/` — provider, charts, workspace
+  panels; `app/(app)/analytics/` — hub with 6 tabs
 - Intelligence is local-first: deterministic heuristics with disclosed
   methodology stand in for provider reasoning; structures (context, DNA,
   briefs, versions) are provider-ready.
