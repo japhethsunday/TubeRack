@@ -22,6 +22,7 @@ import { useToast } from "@/src/components/ui/Toast";
 import { AIGenerationPanel } from "@/src/components/patterns/AIGenerationPanel";
 import { AssetGrid, type MediaAsset } from "@/src/components/patterns/media";
 import { ProjectProgress } from "@/src/components/patterns/ProjectProgress";
+import { AccountStateBanner } from "@/src/components/auth/AccountStateBanner";
 import { PREVIEW_PROGRESS } from "@/src/config/preview";
 import { lightPalette, typeClasses, TYPE_VARIANTS } from "@/src/design/tokens";
 
@@ -249,6 +250,13 @@ export default function DesignPage() {
           <div className="rounded-xl border border-border bg-surface p-5">
             <ProjectProgress items={PREVIEW_PROGRESS} />
           </div>
+        </div>
+      </Section>
+
+      <Section title="Account states" description="Banners for verification, sessions, and suspension — see /settings and /login for context.">
+        <div className="grid gap-3">
+          <AccountStateBanner state="unverified" actionHref="/verify-email" actionLabel="Verify email" />
+          <AccountStateBanner state="session-expired" actionHref="/login" actionLabel="Sign in again" />
         </div>
       </Section>
 

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { NAV_SECTIONS, ALL_NAV_ITEMS, SEARCHABLE_ROUTES } from "@/src/config/navigation";
+import { NAV_SECTIONS, ALL_NAV_ITEMS, SEARCHABLE_ROUTES, AUTH_PAGES, COMMAND_INDEX } from "@/src/config/navigation";
 
 describe("navigation config", () => {
   it("keeps slugs unique and statuses valid", () => {
@@ -30,5 +30,14 @@ describe("navigation config", () => {
         `${item.slug} must land on the preview workspace`,
       );
     }
+  });
+
+  it("indexes auth pages for search without putting them in the sidebar", () => {
+    assert.ok(AUTH_PAGES.some((i) => i.href === "/login"));
+    assert.ok(AUTH_PAGES.some((i) => i.href === "/signup"));
+    assert.ok(AUTH_PAGES.some((i) => i.href === "/onboarding"));
+    assert.ok(!ALL_NAV_ITEMS.some((i) => i.href === "/login"));
+    assert.ok(COMMAND_INDEX.length > SEARCHABLE_ROUTES.length);
+    assert.ok(!COMMAND_INDEX.some((i) => i.status === "planned"));
   });
 });

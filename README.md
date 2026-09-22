@@ -5,19 +5,18 @@ idea → research → strategy → script → storyboard → visuals → voice �
 music → video → thumbnail → SEO → repurposing → publishing →
 analytics → improvement.
 
-## Status: Phase 2 — Brand, Design System & UX
+## Status: Phase 3 — Authentication & Account Experience
 
-Reusable visual + UX foundation on top of Phase 1 contracts. See
-`docs/PHASE_2.md` for the completion record and
-`docs/INTEGRATION_BOUNDARIES.md` for what is explicitly deferred
-(no backend, auth, providers, rendering, or billing yet).
+Complete auth/account frontend on top of Phase 1–2. Valid input ends in an
+explicit Phase 11 boundary — no sessions, emails, or storage exist yet.
+See `docs/PHASE_3.md` and `docs/INTEGRATION_BOUNDARIES.md`.
 
 ## Develop
 
 ```bash
 npm install
 npm run dev     # http://localhost:3000
-npm test        # 30 tests: domain + tokens + navigation + components
+npm test        # 56 tests: domain, tokens, navigation, auth, components
 npm run typecheck
 npm run lint
 npm run build
@@ -30,6 +29,10 @@ npm run build
 - `/projects` — index + link to the preview workspace
 - `/projects/preview` — 11 stage tabs, progress, editor layout (static preview data)
 - `/design` — component/token/pattern gallery
+- `/login`, `/signup`, `/forgot-password`, `/reset-password`,
+  `/verify-email`, `/onboarding` — auth UX, validated locally, Phase 11 boundary
+- `/settings` — profile, preferences, notifications, security, sessions,
+  workspace, billing, data (preview-only)
 - `/api/health` — liveness probe
 - `/api/version` — static build metadata
 

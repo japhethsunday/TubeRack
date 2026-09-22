@@ -1,4 +1,4 @@
-# Decisions (Phases 1–2)
+# Decisions (Phases 1–3)
 
 1. Greenfield Next.js App Router, not a clone of any benchmark. TubeGen is a
    capability benchmark only.
@@ -19,3 +19,7 @@
    Preview fixtures live in `src/config/preview.ts` and must be labeled
    "Preview" wherever rendered. Component tests server-render
    (`react-dom/server`) — no browser harness until E2E is warranted.
+10. Phase 3: valid auth input ends in a boundary notice, never fake success;
+    forgot-password copy is account-agnostic; returnTo accepts same-origin
+    paths only; logout discloses the missing session instead of performing
+    one; preferences stay local and say so (theme excepted — it is real).

@@ -7,6 +7,7 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { Drawer } from "@/src/components/ui/overlays";
 import { EmptyState } from "@/src/components/ui/states";
 import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
+import { UserMenu } from "@/src/components/shell/UserMenu";
 import { CommandMenu } from "@/src/components/ui/search";
 import { Tooltip } from "@/src/components/ui/Tooltip";
 
@@ -90,28 +91,14 @@ export function Header({ onMenu }: { onMenu: () => void }) {
             </li>
             <li>
               <span className="block rounded-lg border border-border p-3 opacity-60" aria-disabled="true">
-                <span className="font-medium">Support inbox — Phase 3</span>
-                <span className="block text-muted-text">Account-linked help arrives with authentication.</span>
+                <span className="font-medium">Support inbox — Phase 11</span>
+                <span className="block text-muted-text">Account-linked help arrives with the backend.</span>
               </span>
             </li>
           </ul>
         </Drawer>
       )}
-      {drawer === "account" && (
-        <Drawer title="Account" description="Signed-in account controls arrive with Phase 3." onClose={() => setDrawer("none")}>
-          <div className="flex items-center gap-3 rounded-lg border border-border p-3">
-            <Avatar name="Preview User" />
-            <div>
-              <p className="text-sm font-medium">Preview User</p>
-              <p className="text-xs text-muted-text">preview@example.com — not a real session</p>
-            </div>
-          </div>
-          <p className="mt-3 text-sm text-muted-text">
-            Workspace switching, members, and settings ship with authentication
-            (Phase 3) and billing (Phase 10).
-          </p>
-        </Drawer>
-      )}
+      {drawer === "account" && <UserMenu onClose={() => setDrawer("none")} />}
     </>
   );
 }

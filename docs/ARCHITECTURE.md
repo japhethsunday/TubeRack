@@ -1,8 +1,7 @@
-# TubeRack Architecture (Phases 1–2)
+# TubeRack Architecture (Phases 1–3)
 
-Greenfield repo. Phase 1 established contracts and quality gates; Phase 2
-added the design system and UX foundation. Backend persistence, auth,
-providers, workers, and rendering land in later phases (backend = Phase 11).
+Greenfield repo. Phases 1–2 built contracts + design system; Phase 3 added
+the auth/account frontend. Enforcement and persistence remain Phase 11.
 
 ## Stack
 
@@ -19,8 +18,11 @@ providers, workers, and rendering land in later phases (backend = Phase 11).
   `global-error`, `api/health`, `api/version`
 - `src/design/tokens.ts` — semantic colors (light/dark), type, spacing,
   radius; mapped to Tailwind utilities in `app/globals.css`
-- `src/config/navigation.ts` — single nav source of truth (live/preview/
-  planned); `src/config/preview.ts` — explicitly static preview fixtures
+- `src/lib/auth/` — validation schemas, strength scorer, error map,
+  session helpers, `AuthNotIntegratedError`; no sessions, no storage
+- `app/(auth)/` — login, signup, forgot/reset password, verify, onboarding
+- `app/(app)/settings/` — profile, preferences, notifications, security,
+  sessions, workspace, billing, data (preview-only until Phase 11)
 - `src/types/domain.ts` — lifecycle stages, job statuses, usage kinds,
   AI capabilities, credit + project contracts
 - `src/lib/env.ts` — server-only env validation (never `NEXT_PUBLIC_*` secrets)
@@ -32,6 +34,10 @@ providers, workers, and rendering land in later phases (backend = Phase 11).
 - `src/components/ui/` — full component system (buttons → dialogs →
   tables → states); `src/components/shell/` — AppShell, sidebar, header;
   `src/components/patterns/` — AI panel, media, progress, editor, dialogs
+- `src/config/navigation.ts` — single nav source of truth (live/preview/
+  planned); `src/config/preview.ts` + `identity.ts` — explicitly static fixtures
+- No auth middleware by decision: a pass-through proxy would imply fake
+  protection (`SESSION_ENFORCEMENT.enforced = false`).
 - `tests/` — unit tests for the above
 - `docs/` — architecture, phase status, decisions, boundaries
 - `docker-compose.yml` — Phase 11 self-host target (not active in Phase 1)

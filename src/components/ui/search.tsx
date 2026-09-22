@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search as SearchIcon, CornerDownLeft } from "lucide-react";
-import { SEARCHABLE_ROUTES } from "@/src/config/navigation";
+import { SEARCHABLE_ROUTES, COMMAND_INDEX } from "@/src/config/navigation";
 import { cx } from "@/src/components/ui/cx";
 
 /** Search input: label, clear action, keyboard focusable. */
@@ -55,8 +55,8 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return SEARCHABLE_ROUTES;
-    return SEARCHABLE_ROUTES.filter(
+    if (!q) return COMMAND_INDEX;
+    return COMMAND_INDEX.filter(
       (r) => r.label.toLowerCase().includes(q) || r.blurb.toLowerCase().includes(q),
     );
   }, [query]);

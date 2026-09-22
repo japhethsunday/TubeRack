@@ -17,6 +17,8 @@ import {
   Settings,
   CreditCard,
   Palette,
+  LogIn,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 
@@ -205,11 +207,11 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         slug: "settings",
         label: "Settings",
-        href: "/dashboard",
+        href: "/settings",
         icon: Settings,
-        status: "planned",
+        status: "live",
         phase: "Phase 3",
-        blurb: "Workspace, account, preferences.",
+        blurb: "Profile, preferences, security, data.",
       },
       {
         slug: "billing",
@@ -230,3 +232,40 @@ export const ALL_NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((s) => s.items);
 export const SEARCHABLE_ROUTES: NavItem[] = ALL_NAV_ITEMS.filter(
   (i) => i.status !== "planned",
 );
+
+/**
+ * Public auth pages: real routes outside the shell, searchable but never in
+ * the sidebar. Enforcement and sessions arrive in Phase 11.
+ */
+export const AUTH_PAGES: NavItem[] = [
+  {
+    slug: "login",
+    label: "Sign in",
+    href: "/login",
+    icon: LogIn,
+    status: "live",
+    phase: "Phase 3",
+    blurb: "Sign in to your workspace.",
+  },
+  {
+    slug: "signup",
+    label: "Create account",
+    href: "/signup",
+    icon: UserPlus,
+    status: "live",
+    phase: "Phase 3",
+    blurb: "One account, every studio.",
+  },
+  {
+    slug: "onboarding",
+    label: "Onboarding",
+    href: "/onboarding",
+    icon: Settings,
+    status: "live",
+    phase: "Phase 3",
+    blurb: "Profile, goals, channel, brand.",
+  },
+];
+
+/** Full command-menu index: shell routes + public auth pages. */
+export const COMMAND_INDEX: NavItem[] = [...SEARCHABLE_ROUTES, ...AUTH_PAGES];
