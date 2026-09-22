@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Pencil, Copy, Archive, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Pencil, Copy, Archive, RotateCcw, Trash2, Brain } from "lucide-react";
 import { useProjects, LocalStorageNote } from "@/src/components/projects/ProjectsProvider";
+import { useIntel } from "@/src/components/intelligence/IntelProvider";
+import { intelCounts } from "@/src/lib/intelligence/shelf";
 import { PipelineProgress } from "@/src/components/projects/PipelineProgress";
 import { continueLabelFor, progressOf } from "@/src/lib/projects/store";
 import { PROJECT_STAGES, type ProjectStage } from "@/src/types/domain";
@@ -54,6 +56,7 @@ export default function ProjectOverviewPage() {
     completeStage,
     touch,
   } = useProjects();
+  const { intelFor } = useIntel();
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
@@ -186,6 +189,63 @@ export default function ProjectOverviewPage() {
           </ul>
         </section>
       </div>
+
+      <section aria-label="Project intelligence" className="rounded-xl border border-border bg-surface p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <Brain className="size-4 text-muted-text" aria-hidden="true" />
+            Project intelligence
+          </h2>
+          <Link
+            href={`/intelligence/lab?project=${project.id}`}
+            className="text-xs font-medium underline"
+          >
+            Open in Idea Lab
+          </Link>
+        </div>
+        {(() => {
+          const counts = intelCounts(intelFor(project.id));
+          const parts = [
+            counts.hasAudience && "Audience profile",
+            counts.hasStrategy && "Strategy brief",
+            counts.titles > 0 && `${counts.titles} title(s)`,
+            counts.hooks > 0 && `${counts.hooks} hook(s)`,
+            counts.retention > 0 && `${counts.retention} retention review(s)`,
+          ].filter(Boolean);
+          return parts.length === 0 ? (
+            <p className="mt-2 text-sm text-muted-text">
+              No intelligence saved yet. Analyze the idea, define the audience,
+              and approve titles and hooks — they collect here for Phase 6.
+            </p>
+          ) : (
+            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Saved intelligence">
+              {parts.map((p) => (
+                <li key={p as string}>
+                  <Badge tone="ok">{p as string}</Badge>
+                </li>
+              ))}
+              {counts.approved > 0 && <li><Badge tone="neutral">{counts.approved} approved</Badge></li>}
+            </ul>
+          );
+        })()}
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          {[
+            ["/intelligence/audience", "Audience"],
+            ["/intelligence/strategy", "Strategy"],
+            ["/intelligence/titles", "Titles"],
+            ["/intelligence/hooks", "Hooks"],
+            ["/intelligence/retention", "Retention"],
+          ].map(([href, label]) => (
+            <Link
+              key={href}
+              href={`${href}?project=${project.id}`}
+              className="rounded-lg border border-border px-2.5 py-1.5 font-medium hover:bg-muted"
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section aria-label="Project summary" className="rounded-xl border border-border bg-surface p-5">

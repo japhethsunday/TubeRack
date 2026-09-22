@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search as SearchIcon, CornerDownLeft, FolderKanban } from "lucide-react";
-import { COMMAND_INDEX, type NavItem } from "@/src/config/navigation";
+import { FULL_COMMAND_INDEX, type NavItem } from "@/src/config/navigation";
 import { cx } from "@/src/components/ui/cx";
 
 /** Search input: label, clear action, keyboard focusable. */
@@ -73,10 +73,10 @@ export function CommandMenu({
   const results: NavItem[] = useMemo(() => {
     const q = query.trim().toLowerCase();
     const routes = q
-      ? COMMAND_INDEX.filter(
+      ? FULL_COMMAND_INDEX.filter(
           (r) => r.label.toLowerCase().includes(q) || r.blurb.toLowerCase().includes(q),
         )
-      : COMMAND_INDEX;
+      : FULL_COMMAND_INDEX;
     if (!q) return routes;
     const hits: NavItem[] = projectHits
       .filter(

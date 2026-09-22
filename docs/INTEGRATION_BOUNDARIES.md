@@ -6,6 +6,7 @@ or render an "Awaiting integration" state. Faking success is a defect.
 | Capability | Status | Real integration phase |
 | --- | --- | --- |
 | Text / image / video / TTS / music / embedding / research providers | Registry + types only, no keys, no calls | Phase 11 |
+| Intelligence reasoning | Deterministic local heuristics labeled “Local analysis”; `requestIntelligence` throws | Phase 11 |
 | YouTube data (official API, quota-aware cache) | Interface only, no requests | Phase 5 + 11 |
 | Auth sessions / enforcement / password storage / tokens | Frontend UX only; `SESSION_ENFORCEMENT.enforced = false`, no middleware | Phase 11 |
 | Email delivery (verification, reset) | Copy + states built; nothing is sent | Phase 11 |

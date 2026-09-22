@@ -1,4 +1,4 @@
-# Decisions (Phases 1–4)
+# Decisions (Phases 1–5)
 
 1. Greenfield Next.js App Router, not a clone of any benchmark. TubeGen is a
    capability benchmark only.
@@ -27,3 +27,7 @@
     zod-validated, UI-disclosed) so management is genuinely functional
     without faking a backend; progress/continue/recency derive from real
     state; activity logs user actions only; import/export is real JSON.
+12. Phase 5: intelligence without providers means deterministic local
+    analysis with disclosed methodology and qualitative ratings — never
+    scores, metrics, or generated claims. TaskRunner reuses one lifecycle
+    for local runs today and provider jobs in Phase 11.

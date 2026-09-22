@@ -86,9 +86,9 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         slug: "intelligence",
         label: "Content Intelligence",
-        href: "/projects/preview?stage=strategy",
+        href: "/intelligence",
         icon: Compass,
-        status: "preview",
+        status: "live",
         phase: "Phase 5",
         blurb: "Opportunities, angles, positioning.",
       },
@@ -98,7 +98,7 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/projects/preview?stage=research",
         icon: FlaskConical,
         status: "preview",
-        phase: "Phase 5",
+        phase: "Phase 6",
         blurb: "Sources, evidence, notes.",
       },
       {
@@ -279,3 +279,76 @@ export const AUTH_PAGES: NavItem[] = [
 
 /** Full command-menu index: shell routes + public auth pages. */
 export const COMMAND_INDEX: NavItem[] = [...SEARCHABLE_ROUTES, ...AUTH_PAGES];
+
+/**
+ * Intelligence deep links for the command menu. Real routes under
+ * /intelligence; kept separate so the sidebar stays hierarchized.
+ */
+export const INTEL_PAGES: NavItem[] = [
+  {
+    slug: "intel-lab",
+    label: "Idea Lab",
+    href: "/intelligence/lab",
+    icon: Compass,
+    status: "live",
+    phase: "Phase 5",
+    blurb: "Analyze ideas, explore angles.",
+  },
+  {
+    slug: "intel-audience",
+    label: "Audience intelligence",
+    href: "/intelligence/audience",
+    icon: Compass,
+    status: "live",
+    phase: "Phase 5",
+    blurb: "Structured audience profiles.",
+  },
+  {
+    slug: "intel-strategy",
+    label: "Strategy engine",
+    href: "/intelligence/strategy",
+    icon: Compass,
+    status: "live",
+    phase: "Phase 5",
+    blurb: "Briefs as structured data.",
+  },
+  {
+    slug: "intel-titles",
+    label: "Title intelligence",
+    href: "/intelligence/titles",
+    icon: Compass,
+    status: "live",
+    phase: "Phase 5",
+    blurb: "Checks, directions, approvals.",
+  },
+  {
+    slug: "intel-hooks",
+    label: "Hook intelligence",
+    href: "/intelligence/hooks",
+    icon: Compass,
+    status: "live",
+    phase: "Phase 5",
+    blurb: "Weak openings, frameworks.",
+  },
+  {
+    slug: "intel-retention",
+    label: "Retention intelligence",
+    href: "/intelligence/retention",
+    icon: Compass,
+    status: "live",
+    phase: "Phase 5",
+    blurb: "Structural outline risks.",
+  },
+  {
+    slug: "intel-gaps",
+    label: "Content gaps",
+    href: "/intelligence/gaps",
+    icon: Compass,
+    status: "live",
+    phase: "Phase 5",
+    blurb: "Catalog vs topic prompts.",
+  },
+];
+
+/** Complete search index: shell + auth + intelligence. */
+export const FULL_COMMAND_INDEX: NavItem[] = [...COMMAND_INDEX, ...INTEL_PAGES];

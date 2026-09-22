@@ -1,8 +1,8 @@
-# TubeRack Architecture (Phases 1–4)
+# TubeRack Architecture (Phases 1–5)
 
-Greenfield repo. Phases 1–3 built contracts, design system, and auth UX.
-Phase 4 added the creator workspace on device-local state. Cloud
-persistence and AI remain later phases (backend = Phase 11).
+Greenfield repo. Phases 1–4 built contracts, design system, auth UX, and a
+device-local workspace. Phase 5 added deterministic content intelligence.
+Provider reasoning and cloud persistence remain Phase 11.
 
 ## Stack
 
@@ -35,6 +35,15 @@ persistence and AI remain later phases (backend = Phase 11).
 - `src/components/ui/` — full component system (buttons → dialogs →
   tables → states); `src/components/shell/` — AppShell, sidebar, header;
   `src/components/patterns/` — AI panel, media, progress, editor, dialogs
+- `src/lib/intelligence/` — task registry, deterministic analyzers
+  (idea/angles, titles, hooks, retention, gaps), audience/strategy profiles,
+  DNA, context assembler, intel shelf ops
+- `src/lib/ai-gateway/intelligence.ts` — future provider path (throws until
+  Phase 11); research + platform contracts
+- `src/components/intelligence/` — provider (DNA/intel/opportunities),
+  TaskRunner lifecycle, structured-output primitives
+- `app/(app)/intelligence/` — hub + lab/audience/strategy/titles/hooks/
+  retention/gaps; project overview links per-studio intel via `?project=`
 - `src/lib/projects/` — project/channel/activity domain, pure store ops,
   zod-validated versioned bundle (`tuberack.workspace.v1`)
 - `src/components/projects/` — provider, cards, toolbar, dialogs, pipeline,
@@ -42,6 +51,9 @@ persistence and AI remain later phases (backend = Phase 11).
   activity, preview, design, settings
 - `src/config/navigation.ts` — single nav source of truth (live/preview/
   planned); `src/config/preview.ts` + `identity.ts` — explicitly static fixtures
+- Intelligence is local-first: deterministic heuristics with disclosed
+  methodology stand in for provider reasoning; structures (context, DNA,
+  briefs, versions) are provider-ready.
 - Device-local first: user-created data persists in the browser with UI
   disclosure; nothing is presented as cloud-backed.
 - No auth middleware by decision: a pass-through proxy would imply fake
