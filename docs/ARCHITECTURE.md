@@ -1,7 +1,8 @@
-# TubeRack Architecture (Phases 1–3)
+# TubeRack Architecture (Phases 1–4)
 
-Greenfield repo. Phases 1–2 built contracts + design system; Phase 3 added
-the auth/account frontend. Enforcement and persistence remain Phase 11.
+Greenfield repo. Phases 1–3 built contracts, design system, and auth UX.
+Phase 4 added the creator workspace on device-local state. Cloud
+persistence and AI remain later phases (backend = Phase 11).
 
 ## Stack
 
@@ -34,8 +35,15 @@ the auth/account frontend. Enforcement and persistence remain Phase 11.
 - `src/components/ui/` — full component system (buttons → dialogs →
   tables → states); `src/components/shell/` — AppShell, sidebar, header;
   `src/components/patterns/` — AI panel, media, progress, editor, dialogs
+- `src/lib/projects/` — project/channel/activity domain, pure store ops,
+  zod-validated versioned bundle (`tuberack.workspace.v1`)
+- `src/components/projects/` — provider, cards, toolbar, dialogs, pipeline,
+  activity feed; `app/(app)/` — dashboard, projects, `projects/[id]`,
+  activity, preview, design, settings
 - `src/config/navigation.ts` — single nav source of truth (live/preview/
   planned); `src/config/preview.ts` + `identity.ts` — explicitly static fixtures
+- Device-local first: user-created data persists in the browser with UI
+  disclosure; nothing is presented as cloud-backed.
 - No auth middleware by decision: a pass-through proxy would imply fake
   protection (`SESSION_ENFORCEMENT.enforced = false`).
 - `tests/` — unit tests for the above

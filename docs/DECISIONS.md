@@ -1,4 +1,4 @@
-# Decisions (Phases 1–3)
+# Decisions (Phases 1–4)
 
 1. Greenfield Next.js App Router, not a clone of any benchmark. TubeGen is a
    capability benchmark only.
@@ -23,3 +23,7 @@
     forgot-password copy is account-agnostic; returnTo accepts same-origin
     paths only; logout discloses the missing session instead of performing
     one; preferences stay local and say so (theme excepted — it is real).
+11. Phase 4: project/channel/activity state is device-local (localStorage,
+    zod-validated, UI-disclosed) so management is genuinely functional
+    without faking a backend; progress/continue/recency derive from real
+    state; activity logs user actions only; import/export is real JSON.

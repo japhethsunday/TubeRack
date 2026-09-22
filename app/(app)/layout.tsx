@@ -1,6 +1,11 @@
 import { AppShell } from "@/src/components/shell/AppShell";
+import { WorkspaceProviders } from "@/app/(app)/providers";
 
-/** Authenticated-app route group shell. No auth yet (Phase 3) — layout only. */
+/** Authenticated-app route group shell with device-local workspace state. */
 export default function AppGroupLayout({ children }: { children: React.ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+  return (
+    <WorkspaceProviders>
+      <AppShell>{children}</AppShell>
+    </WorkspaceProviders>
+  );
 }

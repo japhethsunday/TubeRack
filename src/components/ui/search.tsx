@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search as SearchIcon, CornerDownLeft } from "lucide-react";
-import { SEARCHABLE_ROUTES, COMMAND_INDEX } from "@/src/config/navigation";
+import { Search as SearchIcon, CornerDownLeft, FolderKanban } from "lucide-react";
+import { COMMAND_INDEX, type NavItem } from "@/src/config/navigation";
 import { cx } from "@/src/components/ui/cx";
 
 /** Search input: label, clear action, keyboard focusable. */
@@ -36,8 +36,25 @@ export function Search({
   );
 }
 
-/** ⌘K command menu over real routes only. Arrows + Enter + Escape. */
-export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+export interface ProjectHit {
+  id: string;
+  label: string;
+  blurb: string;
+  href: string;
+}
+
+/** ⌘K command menu over real routes + real local projects. Arrows + Enter + Escape. */
+export function CommandMenu({
+  open,
+  onClose,
+  projectHits = [],
+  onNavigate,
+}: {
+  open: boolean;
+  onClose: () => void;
+  projectHits?: ProjectHit[];
+  onNavigate?: (href: string) => void;
+}) {
   const [query, setQuery] = useState("");
   const [focus, setFocus] = useState(0);
   const [prevOpen, setPrevOpen] = useState(open);
@@ -53,13 +70,30 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
     }
   }
 
-  const results = useMemo(() => {
+  const results: NavItem[] = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return COMMAND_INDEX;
-    return COMMAND_INDEX.filter(
-      (r) => r.label.toLowerCase().includes(q) || r.blurb.toLowerCase().includes(q),
-    );
-  }, [query]);
+    const routes = q
+      ? COMMAND_INDEX.filter(
+          (r) => r.label.toLowerCase().includes(q) || r.blurb.toLowerCase().includes(q),
+        )
+      : COMMAND_INDEX;
+    if (!q) return routes;
+    const hits: NavItem[] = projectHits
+      .filter(
+        (h) => h.label.toLowerCase().includes(q) || h.blurb.toLowerCase().includes(q),
+      )
+      .slice(0, 5)
+      .map((h) => ({
+        slug: `project-${h.id}`,
+        label: h.label,
+        blurb: h.blurb,
+        href: h.href,
+        icon: FolderKanban,
+        status: "live" as const,
+        phase: "Phase 4",
+      }));
+    return [...hits, ...routes];
+  }, [query, projectHits]);
 
   const safeFocus = results.length === 0 ? 0 : focus % results.length;
 
@@ -73,6 +107,7 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
 
   function go(href: string) {
     onClose();
+    onNavigate?.(href);
     router.push(href);
   }
 

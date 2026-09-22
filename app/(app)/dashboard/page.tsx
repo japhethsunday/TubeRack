@@ -1,50 +1,88 @@
+"use client";
+
 import Link from "next/link";
-import { FolderKanban, FlaskConical, PenLine, Clapperboard, Gauge } from "lucide-react";
-import { NewProjectButton } from "@/src/components/patterns/NewProjectDialog";
+import { FlaskConical, PenLine, Clapperboard, ArrowRight } from "lucide-react";
+import { NewProjectButton } from "@/src/components/projects/NewProjectDialog";
+import { LocalStorageNote, useProjects } from "@/src/components/projects/ProjectsProvider";
+import { continueLabelFor, progressOf } from "@/src/lib/projects/store";
+import { stageLabel } from "@/src/lib/projects/storage";
+import { timeAgo } from "@/src/components/projects/time";
+import { ActivityFeed } from "@/src/components/projects/ActivityFeed";
 import { EmptyState } from "@/src/components/ui/states";
 import { Card } from "@/src/components/ui/Card";
 import { Badge } from "@/src/components/ui/Badge";
+import { Progress } from "@/src/components/ui/feedback";
+import { LoadingState } from "@/src/components/ui/feedback";
 
 const QUICK_ACTIONS = [
-  {
-    href: "/projects/preview?stage=research",
-    icon: FlaskConical,
-    label: "Research topic",
-    blurb: "Sources & evidence",
-  },
-  {
-    href: "/projects/preview?stage=script",
-    icon: PenLine,
-    label: "Open Script Studio",
-    blurb: "Hooks & retention",
-  },
-  {
-    href: "/projects/preview?stage=video",
-    icon: Clapperboard,
-    label: "Open Video Studio",
-    blurb: "Timeline & render",
-  },
+  { href: "/projects/preview?stage=research", icon: FlaskConical, label: "Research topic", blurb: "Sources & evidence" },
+  { href: "/projects/preview?stage=script", icon: PenLine, label: "Open Script Studio", blurb: "Hooks & retention" },
+  { href: "/projects/preview?stage=video", icon: Clapperboard, label: "Open Video Studio", blurb: "Timeline & render" },
 ];
 
-/** Creator dashboard (visual foundation): real navigation, honest empty states. */
+/** Creator dashboard: real local state, honest empty states, no fabrication. */
 export default function DashboardPage() {
+  const { ready, projects, events, mostRecent, channelName } = useProjects();
+
+  if (!ready) {
+    return (
+      <div className="mx-auto w-full max-w-6xl">
+        <LoadingState label="Loading workspace" />
+      </div>
+    );
+  }
+
+  const active = projects.filter((p) => p.status !== "archived");
+  const recent = [...active].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 3);
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-text">
-            Preview workspace
+            Workspace
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
-            Good evening, creator
+            {mostRecent ? `Continue: ${mostRecent.name}` : "Good evening, creator"}
           </h1>
           <p className="mt-1 text-sm text-muted-text">
-            Your next video starts here. Pick up where you left off or start
-            something new.
+            {mostRecent
+              ? `${stageLabel(mostRecent.currentStage)} · ${progressOf(mostRecent)}% complete · updated ${timeAgo(mostRecent.updatedAt)}`
+              : "Your next video starts here. Create a project to begin."}
           </p>
         </div>
         <NewProjectButton />
       </div>
+      <LocalStorageNote compact />
+
+      {mostRecent && (
+        <section
+          aria-label="Continue creating"
+          className="rounded-xl border border-primary/30 bg-surface p-5 sm:p-6"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-text">
+                Continue where you left off
+              </p>
+              <h2 className="mt-1 truncate text-lg font-semibold">{mostRecent.name}</h2>
+              <p className="mt-0.5 text-sm text-muted-text">
+                {channelName(mostRecent.channelId)} · {mostRecent.contentType} · {mostRecent.platform}
+              </p>
+              <div className="mt-3 max-w-md">
+                <Progress value={progressOf(mostRecent)} label="Project progress" />
+              </div>
+            </div>
+            <Link
+              href={`/projects/${mostRecent.id}`}
+              className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              {continueLabelFor(mostRecent)}
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          </div>
+        </section>
+      )}
 
       <section aria-label="Quick actions">
         <ul className="grid gap-3 sm:grid-cols-3">
@@ -69,36 +107,64 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <Card title="Recent projects" body="Jump back into active work.">
+          <Card title="Recent projects" body={recent.length > 0 ? "Jump back into active work." : "Projects you touch appear here."}>
             <div className="mt-4">
-              <EmptyState
-                icon={FolderKanban}
-                title="No projects yet"
-                body="Projects bundle research, script, visuals, voice, and publishing into one pipeline. Create your first to see it here."
-                action={<NewProjectButton label="Create project" />}
-              />
+              {recent.length === 0 ? (
+                <EmptyState
+                  title="No projects yet"
+                  body="Projects bundle research, script, visuals, voice, and publishing into one pipeline. Everything you create is stored on this device."
+                  action={<NewProjectButton label="Create project" />}
+                />
+              ) : (
+                <ul className="divide-y divide-border" aria-label="Recent projects">
+                  {recent.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+                      <div className="min-w-0">
+                        <Link href={`/projects/${p.id}`} className="block truncate text-sm font-medium hover:underline">
+                          {p.name}
+                        </Link>
+                        <p className="text-xs text-muted-text">
+                          {stageLabel(p.currentStage)} · {progressOf(p)}% · {timeAgo(p.updatedAt)}
+                        </p>
+                      </div>
+                      <Link
+                        href={`/projects/${p.id}`}
+                        className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                      >
+                        Open
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </Card>
-          <Card title="Recent activity" body="Renders, generations, comments, and publishes.">
-            <div className="mt-4">
-              <EmptyState
-                title="Nothing happened yet"
-                body="Activity appears here once background workers and collaboration ship in later phases."
-              />
+          <Card title="Production activity" body={events.length > 0 ? "Latest workspace events." : "Creations, edits, and stage completions log here."}>
+            <div className="mt-2">
+              {events.length === 0 ? (
+                <EmptyState
+                  title="Nothing happened yet"
+                  body="Activity is recorded only when you act — never generated."
+                />
+              ) : (
+                <>
+                  <ActivityFeed events={events} limit={5} />
+                  <Link href="/activity" className="mt-2 inline-flex items-center gap-1 text-sm font-medium hover:underline">
+                    View all activity <ArrowRight className="size-4" aria-hidden="true" />
+                  </Link>
+                </>
+              )}
             </div>
           </Card>
         </div>
         <div className="space-y-4">
           <section aria-label="Usage and credits" className="rounded-xl border border-border bg-surface p-5 sm:p-6">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="flex items-center gap-2 text-sm font-semibold">
-                <Gauge className="size-4 text-muted-text" aria-hidden="true" />
-                Usage & credits
-              </h2>
+              <h2 className="text-sm font-semibold">Usage & credits</h2>
               <Badge tone="preview">Phase 10–11</Badge>
             </div>
             <p className="mt-1 text-sm text-muted-text">
-              Every generation, render, and research run is metered here.
+              Every generation, render, and research run will be metered here.
             </p>
             <div className="mt-4">
               <EmptyState

@@ -19,6 +19,7 @@ import {
   Palette,
   LogIn,
   UserPlus,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 
@@ -67,6 +68,15 @@ export const NAV_SECTIONS: NavSection[] = [
         status: "live",
         phase: "Phase 2",
         blurb: "All content projects.",
+      },
+      {
+        slug: "activity",
+        label: "Activity",
+        href: "/activity",
+        icon: Activity,
+        status: "live",
+        phase: "Phase 4",
+        blurb: "Workspace and project events.",
       },
     ],
   },

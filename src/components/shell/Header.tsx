@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
 import { UserMenu } from "@/src/components/shell/UserMenu";
 import { CommandMenu } from "@/src/components/ui/search";
 import { Tooltip } from "@/src/components/ui/Tooltip";
+import { useProjectsOptional } from "@/src/components/projects/ProjectsProvider";
 
 /**
  * Application header: menu (mobile), search trigger, theme, notifications,
@@ -18,6 +19,13 @@ import { Tooltip } from "@/src/components/ui/Tooltip";
 export function Header({ onMenu }: { onMenu: () => void }) {
   const [palette, setPalette] = useState(false);
   const [drawer, setDrawer] = useState<"none" | "notifications" | "help" | "account">("none");
+  const workspace = useProjectsOptional();
+  const projectHits = (workspace?.projects ?? []).map((p) => ({
+    id: p.id,
+    label: p.name,
+    blurb: `${p.topic} · ${p.status}`.slice(0, 80),
+    href: `/projects/${p.id}`,
+  }));
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -70,7 +78,15 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         </div>
       </div>
 
-      <CommandMenu open={palette} onClose={() => setPalette(false)} />
+      <CommandMenu
+        open={palette}
+        onClose={() => setPalette(false)}
+        projectHits={projectHits}
+        onNavigate={(href) => {
+          const hit = projectHits.find((h) => h.href === href);
+          if (hit) workspace?.recordSearch(hit.label);
+        }}
+      />
 
       {drawer === "notifications" && (
         <Drawer title="Notifications" description="Activity, renders, and mentions land here." onClose={() => setDrawer("none")}>
