@@ -9,6 +9,8 @@ import { EmptyState } from "@/src/components/ui/states";
 import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
 import { BackendBadge } from "@/src/components/shell/BackendStatus";
 import { UserMenu } from "@/src/components/shell/UserMenu";
+import { useSession } from "@/src/components/auth/useSession";
+import Link from "next/link";
 import { CommandMenu } from "@/src/components/ui/search";
 import { Tooltip } from "@/src/components/ui/Tooltip";
 import { useProjectsOptional } from "@/src/components/projects/ProjectsProvider";
@@ -21,6 +23,8 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   const [palette, setPalette] = useState(false);
   const [drawer, setDrawer] = useState<"none" | "notifications" | "help" | "account">("none");
   const workspace = useProjectsOptional();
+  const session = useSession();
+  const displayName = session.user?.name || session.user?.email || "Account";
   const projectHits = (workspace?.projects ?? []).map((p) => ({
     id: p.id,
     label: p.name,
@@ -58,10 +62,11 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         <span className="sm:hidden" aria-hidden="true" />
         <div className="ml-auto flex items-center gap-1">
           <BackendBadge />
-          <span className="hidden items-center gap-2 rounded-lg px-2 md:flex">
-            <Avatar name="Preview Workspace" size="sm" />
-            <span className="max-w-32 truncate text-sm font-medium">Preview workspace</span>
-          </span>
+          {session.status === "signed-in" && (
+            <span className="hidden items-center gap-2 rounded-lg px-2 md:flex">
+              <span className="max-w-40 truncate text-sm font-medium">{displayName}</span>
+            </span>
+          )}
           <ThemeToggle />
           <Tooltip tip="Notifications">
             <IconButton icon={Bell} label="Notifications" onClick={() => setDrawer("notifications")} />
@@ -69,14 +74,25 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           <Tooltip tip="Help and support">
             <IconButton icon={CircleHelp} label="Help and support" onClick={() => setDrawer("help")} />
           </Tooltip>
-          <button
-            type="button"
-            onClick={() => setDrawer("account")}
-            aria-label="Account menu: preview user"
-            className="rounded-full p-0.5 hover:bg-muted"
-          >
-            <Avatar name="Preview User" size="sm" />
-          </button>
+          {session.status === "signed-out" ? (
+            <span className="ml-1 flex items-center gap-1.5">
+              <Link href="/login" className="hidden h-9 items-center rounded-lg px-3 text-sm font-medium hover:bg-muted sm:inline-flex">
+                Sign in
+              </Link>
+              <Link href="/signup" className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90">
+                Get started
+              </Link>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDrawer("account")}
+              aria-label={`Account menu: ${displayName}`}
+              className="rounded-full p-0.5 hover:bg-muted"
+            >
+              <Avatar name={session.user?.name || "Account"} size="sm" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -116,7 +132,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           </ul>
         </Drawer>
       )}
-      {drawer === "account" && <UserMenu onClose={() => setDrawer("none")} />}
+      {drawer === "account" && <UserMenu user={session.user} onClose={() => setDrawer("none")} />}
     </>
   );
 }

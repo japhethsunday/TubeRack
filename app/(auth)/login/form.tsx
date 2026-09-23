@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { AuthLayout } from "@/src/components/auth/AuthLayout";
 import { PasswordField } from "@/src/components/auth/PasswordField";
 import { AuthBoundaryNotice } from "@/src/components/auth/AuthBoundaryNotice";
@@ -21,6 +22,7 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
   const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [shake, setShake] = useState(0);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,6 +31,7 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
     if (!parsed.success) {
       setErrors(fieldErrors(parsed.error));
       setDone(false);
+      setShake((n) => n + 1);
       return;
     }
     setErrors({});
@@ -48,6 +51,7 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
         setDone(true);
       } else if (error instanceof ApiError) {
         setFormError(error.code === "UNAUTHORIZED" ? "Email or password is incorrect." : error.message);
+        setShake((n) => n + 1);
       } else {
         setFormError("Something went wrong. Nothing was changed.");
       }
@@ -59,11 +63,11 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
   return (
     <AuthLayout
       title="Welcome back"
-      subtitle="Sign in to your workspace."
+      subtitle="Sign in to pick up where you left off."
       footer={
         <>
           New to TubeRack?{" "}
-          <Link href="/signup" className="font-medium text-foreground underline">
+          <Link href="/signup" className="font-medium text-foreground underline underline-offset-4">
             Create an account
           </Link>
         </>
@@ -81,7 +85,8 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
           returnTo={returnTo}
         />
       ) : (
-        <form onSubmit={submit} noValidate className="space-y-4">
+        <form key={shake} onSubmit={submit} noValidate className={`space-y-4 ${shake > 0 ? "auth-shake" : ""}`}>
+          <div className="auth-rise" style={{ animationDelay: "240ms" }}>
           <Input
             label="Email"
             type="email"
@@ -91,7 +96,8 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
             error={errors.email}
             placeholder="you@studio.com"
           />
-          <div>
+          </div>
+          <div className="auth-rise" style={{ animationDelay: "300ms" }}>
             <PasswordField
               label="Password"
               autoComplete="current-password"
@@ -105,24 +111,24 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
               </Link>
             </p>
           </div>
-          <div>
+          <div className="auth-rise" style={{ animationDelay: "360ms" }}>
             <Checkbox
               label="Stay signed in for 30 days"
               checked={remember}
               onChange={(e) => setRemember(e.target.checked)}
             />
-            <p className="mt-1 text-xs text-muted-text">
-              Applies to server sessions when the backend is connected (Phase 11).
-            </p>
           </div>
           {formError && (
             <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
               {formError}
             </p>
           )}
-          <Button type="submit" loading={loading} className="w-full">
-            Sign in
-          </Button>
+          <div className="auth-rise" style={{ animationDelay: "420ms" }}>
+            <Button type="submit" loading={loading} className="auth-sheen group h-11 w-full">
+              {loading ? "Signing in…" : "Sign in"}
+              {!loading && <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />}
+            </Button>
+          </div>
         </form>
       )}
     </AuthLayout>

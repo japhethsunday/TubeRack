@@ -124,3 +124,65 @@ body {
 .anim-pan-up > svg { width: 100%; height: 100%; display: block; }
 .anim-pan-down { animation: kb-pan-y 10s ease-in-out infinite alternate; }
 .anim-pan-down > svg { width: 100%; height: 100%; display: block; }
+
+/* ---------- Auth screens: brand panel motion + staged form entry ---------- */
+@keyframes auth-blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(8%, -6%) scale(1.12); }
+  66% { transform: translate(-6%, 8%) scale(0.92); }
+}
+@keyframes auth-float {
+  0%, 100% { transform: translateY(0) rotate(var(--tilt, 0deg)); }
+  50% { transform: translateY(-12px) rotate(var(--tilt, 0deg)); }
+}
+@keyframes auth-rise {
+  from { opacity: 0; transform: translateY(14px); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@keyframes auth-word {
+  0% { opacity: 0; transform: translateY(60%); filter: blur(6px); }
+  12%, 88% { opacity: 1; transform: translateY(0); filter: blur(0); }
+  100% { opacity: 0; transform: translateY(-60%); filter: blur(6px); }
+}
+@keyframes auth-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes auth-sheen {
+  from { transform: translateX(-120%) skewX(-20deg); }
+  to { transform: translateX(220%) skewX(-20deg); }
+}
+@keyframes auth-progress {
+  0% { width: 8%; }
+  60% { width: 86%; }
+  100% { width: 100%; }
+}
+@keyframes auth-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.auth-blob { animation: auth-blob 18s ease-in-out infinite; }
+.auth-float { animation: auth-float 6s ease-in-out infinite; }
+.auth-rise { animation: auth-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.auth-word { animation: auth-word 2.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.auth-marquee { animation: auth-marquee 32s linear infinite; }
+.auth-progress { animation: auth-progress 3.2s ease-in-out infinite; }
+.auth-shake { animation: auth-shake 0.4s ease-in-out; }
+.auth-sheen { position: relative; overflow: hidden; }
+.auth-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: auth-sheen 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.auth-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}

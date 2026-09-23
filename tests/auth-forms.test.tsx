@@ -16,12 +16,12 @@ import { ACCOUNT_STATES } from "@/src/lib/auth/session";
 
 /** Server-render auth/account tests: labels, associations, honest states. */
 describe("auth screens", () => {
-  it("login form labels fields, links recovery, notes session boundary", () => {
+  it("login form labels fields, links recovery, links sign-up", () => {
     const html = renderToStaticMarkup(<LoginForm returnTo="/dashboard" expired={false} />);
     assert.ok(html.includes("Welcome back"));
     assert.ok(html.includes("Forgot password?"));
     assert.ok(html.includes("Stay signed in for 30 days"));
-    assert.ok(html.includes("Phase 11"));
+    assert.ok(html.includes("/signup"));
   });
 
   it("login surfaces the expired-session state from a param", () => {
