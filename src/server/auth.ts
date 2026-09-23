@@ -17,7 +17,7 @@ export interface SessionUser {
 
 function requireAuthReady(): void {
   const env = getServerEnv();
-  if (!env.CLOUDNIVO_DATABASE_URL || !env.JWT_SECRET) {
+  if (!env.DATABASE_URL || !env.JWT_SECRET) {
     throw backendUnavailable("Authentication backend");
   }
 }

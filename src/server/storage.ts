@@ -3,7 +3,7 @@ import { getDb } from "@/src/server/db";
 import { internalError } from "@/src/server/errors";
 
 /**
- * Object storage adapter for the configured CloudNivo bucket.
+ * Object storage adapter for the configured Supabase Storage bucket (private).
  * Paths are always built server-side as <workspace>/<project>/<uuid>-<safe-name>
  * so users can never traverse or guess other tenants' objects. Downloads are
  * served through our API with ownership checks — bucket URLs are never
@@ -29,32 +29,36 @@ export function objectKey(workspaceId: string, projectId: string, filename: stri
 }
 
 export function isStorageConfigured(env = getServerEnv()): boolean {
-  return Boolean(env.CLOUDNIVO_STORAGE_URL && env.CLOUDNIVO_SECRET_KEY && env.CLOUDNIVO_PROJECT_ID);
+  return Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
-function storageHeaders(env: ReturnType<typeof getServerEnv>): Record<string, string> {
+function authHeaders(env: ReturnType<typeof getServerEnv>): Record<string, string> {
   return {
-    Authorization: `Bearer ${env.CLOUDNIVO_SECRET_KEY}`,
-    "Content-Type": "application/octet-stream",
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    apikey: env.SUPABASE_SERVICE_ROLE_KEY!,
   };
 }
 
+function objectUrl(env: ReturnType<typeof getServerEnv>, key: string): string {
+  const base = env.SUPABASE_URL!.replace(/\/$/, "");
+  const path = key.split("/").map(encodeURIComponent).join("/");
+  return `${base}/storage/v1/object/${encodeURIComponent(env.SUPABASE_BUCKET)}/${path}`;
+}
+
 /**
- * PUT bytes to the bucket. Throws a generic error on platform mismatch so
- * callers can fall back to inline storage with a clear message.
+ * Upload bytes to the private Supabase bucket. Throws a generic error on
+ * failure so callers can fall back to inline storage with a clear message.
  */
 export async function storagePut(key: string, bytes: Uint8Array, mime: string): Promise<StoragePutResult> {
   const env = getServerEnv();
   if (!isStorageConfigured(env)) throw new Error("Object storage is not configured.");
-  const base = `${env.CLOUDNIVO_STORAGE_URL!.replace(/\/$/, "")}`;
-  const bucket = env.CLOUDNIVO_BUCKET;
-  const url = `${base}/buckets/${encodeURIComponent(bucket)}/objects/${key.split("/").map(encodeURIComponent).join("/")}`;
+  const type = mime || "application/octet-stream";
   let response: Response;
   try {
-    response = await fetch(url, {
-      method: "PUT",
-      headers: { ...storageHeaders(env), "Content-Type": mime || "application/octet-stream" },
-      body: new Blob([bytes as unknown as BlobPart], { type: mime || "application/octet-stream" }),
+    response = await fetch(objectUrl(env, key), {
+      method: "POST",
+      headers: { ...authHeaders(env), "Content-Type": type, "x-upsert": "true" },
+      body: new Blob([bytes as unknown as BlobPart], { type }),
     });
   } catch {
     throw new Error("Object storage is unreachable.");
@@ -68,16 +72,14 @@ export async function storagePut(key: string, bytes: Uint8Array, mime: string): 
 export async function storageGet(key: string): Promise<{ bytes: Uint8Array; mime: string }> {
   const env = getServerEnv();
   if (!isStorageConfigured(env)) throw new Error("Object storage is not configured.");
-  const base = `${env.CLOUDNIVO_STORAGE_URL!.replace(/\/$/, "")}`;
-  const bucket = env.CLOUDNIVO_BUCKET;
-  const url = `${base}/buckets/${encodeURIComponent(bucket)}/objects/${key.split("/").map(encodeURIComponent).join("/")}`;
   let response: Response;
   try {
-    response = await fetch(url, { headers: { Authorization: `Bearer ${env.CLOUDNIVO_SECRET_KEY}` } });
+    response = await fetch(objectUrl(env, key), { headers: authHeaders(env) });
   } catch {
     throw new Error("Object storage is unreachable.");
   }
-  if (response.status === 404) throw new Error("Object not found.");
+  // Supabase answers 400 with "not_found" for missing objects in some versions.
+  if (response.status === 404 || response.status === 400) throw new Error("Object not found.");
   if (!response.ok) throw internalError();
   const buffer = new Uint8Array(await response.arrayBuffer());
   return { bytes: buffer, mime: response.headers.get("content-type") ?? "application/octet-stream" };
@@ -86,13 +88,30 @@ export async function storageGet(key: string): Promise<{ bytes: Uint8Array; mime
 export async function storageDelete(key: string): Promise<void> {
   const env = getServerEnv();
   if (!isStorageConfigured(env)) return;
-  const base = `${env.CLOUDNIVO_STORAGE_URL!.replace(/\/$/, "")}`;
-  const bucket = env.CLOUDNIVO_BUCKET;
-  const url = `${base}/buckets/${encodeURIComponent(bucket)}/objects/${key.split("/").map(encodeURIComponent).join("/")}`;
   try {
-    await fetch(url, { method: "DELETE", headers: { Authorization: `Bearer ${env.CLOUDNIVO_SECRET_KEY}` } });
+    await fetch(objectUrl(env, key), { method: "DELETE", headers: authHeaders(env) });
   } catch {
     // Delete is best-effort; the DB row is the source of truth.
+  }
+}
+
+/** Reachability probe for /system/status: true when the bucket answers with our key. */
+export async function storagePing(): Promise<boolean> {
+  const env = getServerEnv();
+  if (!isStorageConfigured(env)) return false;
+  const base = env.SUPABASE_URL!.replace(/\/$/, "");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(`${base}/storage/v1/bucket/${encodeURIComponent(env.SUPABASE_BUCKET)}`, {
+      headers: authHeaders(env),
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

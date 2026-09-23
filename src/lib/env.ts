@@ -10,17 +10,13 @@ const serverSchema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
 
-  // CloudNivo backend (all server-only; user supplies real values per environment)
-  CLOUDNIVO_URL: z.string().url().default("https://www.cloudnivo.org"),
-  CLOUDNIVO_API_URL: z.string().url().default("https://api.cloudnivo.org"),
-  CLOUDNIVO_PROJECT_ID: z.string().optional(),
-  CLOUDNIVO_PROJECT_URL: z.string().url().optional(),
-  CLOUDNIVO_PUBLIC_KEY: z.string().optional(),
-  CLOUDNIVO_SECRET_KEY: z.string().optional(),
-  CLOUDNIVO_AGENT_TOKEN: z.string().optional(),
-  CLOUDNIVO_DATABASE_URL: z.string().optional(),
-  CLOUDNIVO_STORAGE_URL: z.string().url().optional(),
-  CLOUDNIVO_BUCKET: z.string().default("business-data"),
+  // Supabase backend (all server-only; user supplies real values per environment)
+  // DATABASE_URL: Supabase pooler connection string (Project → Connect).
+  DATABASE_URL: z.string().optional(),
+  SUPABASE_URL: z.string().url().optional(),
+  // service_role key: bypasses RLS, server-only, never NEXT_PUBLIC_.
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SUPABASE_BUCKET: z.string().default("media"),
 
   // Security (required for auth routes; validated lazily at startup of those routes)
   JWT_SECRET: z.string().optional(),
@@ -93,9 +89,9 @@ export function backendStatus(env: ServerEnv): {
   email: boolean;
 } {
   return {
-    database: Boolean(env.CLOUDNIVO_DATABASE_URL),
-    storage: Boolean(env.CLOUDNIVO_STORAGE_URL && env.CLOUDNIVO_SECRET_KEY),
-    auth: Boolean(env.CLOUDNIVO_DATABASE_URL && env.JWT_SECRET),
+    database: Boolean(env.DATABASE_URL),
+    storage: Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY),
+    auth: Boolean(env.DATABASE_URL && env.JWT_SECRET),
     email: false, // No email provider yet — requests store tokens, nothing is sent.
   };
 }

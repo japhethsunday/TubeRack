@@ -79,7 +79,7 @@ describe("job state machine", () => {
   });
 
   it("degrades to BACKEND_UNAVAILABLE without a database (never crashes)", async () => {
-    delete process.env.CLOUDNIVO_DATABASE_URL;
+    delete process.env.DATABASE_URL;
     __resetEnvCache();
     __resetDb();
     for (const call of [
