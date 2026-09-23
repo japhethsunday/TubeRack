@@ -19,8 +19,10 @@ export async function GET() {
     try {
       await db`SELECT 1 AS ok`;
       databaseReachable = true;
-    } catch {
+    } catch (error) {
       databaseReachable = false;
+      // Server log only (no secrets: driver messages never include the password).
+      console.error("db-status: database unreachable:", error instanceof Error ? error.message : String(error));
     }
   }
   if (status.storage) storageReachable = await storagePing();
