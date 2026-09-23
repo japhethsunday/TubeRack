@@ -5,7 +5,8 @@ import { Mic, Plus } from "lucide-react";
 import { providerById, capabilityBlock, PROVIDERS } from "@/src/lib/media/providers";
 import { listSystemVoices, speakText } from "@/src/lib/media/audio";
 import { useMedia, runLocalJob, MediaStorageNote } from "@/src/components/media/MediaProvider";
-import { SpeechPreview } from "@/src/components/media/players";
+import { SpeechPreview, FilePreview } from "@/src/components/media/players";
+import { synthesizeProviderSpeech } from "@/src/lib/ai-client";
 import { Select, Input, Textarea } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
 import { Alert } from "@/src/components/ui/Alert";
@@ -69,7 +70,11 @@ export function VoiceStudio({
   const text = sourceId === "custom" ? customText : (source?.text ?? "");
   const words = text.trim().split(/\s+/).filter(Boolean).length;
   const estSec = estimateSeconds(Math.max(1, words), Math.round(150 * rate));
-  const takes = assetsFor(projectId).filter((a) => a.kind === "voice" && a.source === "local-draft");
+  const takes = assetsFor(projectId).filter(
+    (a) => a.kind === "voice" && (a.source === "local-draft" || a.source === "provider-output"),
+  );
+  const isGemini = provider === "ai-provider";
+  const [genError, setGenError] = useState<string | null>(null);
 
   function currentSettings() {
     return {
@@ -95,8 +100,41 @@ export function VoiceStudio({
     setProfileId(saved.id);
   }
 
+  /** Gemini TTS: real narration audio, stored server-side, saved as a take. */
+  async function saveGeminiTake() {
+    const body = text.trim().slice(0, 5000);
+    setRunning(true);
+    setGenError(null);
+    const asset = addAsset({
+      projectId,
+      sceneIds: [],
+      kind: "voice",
+      source: "provider-output",
+      status: "generating",
+      title: `Gemini take — ${(source?.label ?? "custom").slice(0, 40)}`,
+      payload: "",
+      mime: "audio/wav",
+      durationSec: estSec,
+      tags: ["take", "gemini", GEMINI_VOICES.includes(providerVoice) ? providerVoice : "Kore"],
+      approval: "draft",
+    });
+    registerRerun(asset.id, () => void saveGeminiTake());
+    const outcome = await synthesizeProviderSpeech(body, GEMINI_VOICES.includes(providerVoice) ? providerVoice : undefined);
+    if (outcome.ok) {
+      updateAsset(asset.id, { status: "ready", payload: outcome.data.url, mime: outcome.data.mimeType });
+    } else {
+      updateAsset(asset.id, { status: "failed", error: outcome.message });
+      setGenError(outcome.message);
+    }
+    setRunning(false);
+  }
+
   function saveTake() {
     if (!text.trim() || block) return;
+    if (isGemini) {
+      void saveGeminiTake();
+      return;
+    }
     const settings = currentSettings();
     const flag = { cancelled: false };
     setRunning(true);
@@ -190,7 +228,11 @@ export function VoiceStudio({
               <span className="w-8 text-xs tabular-nums">{pitch.toFixed(2)}</span>
             </label>
           </div>
-          <Input label="Provider voice mapping (Phase 11)" value={providerVoice} onChange={(e) => setProviderVoice(e.target.value)} hint="e.g. elevenlabs:aria — resolved by the backend later." />
+          <Select label="Gemini voice" value={GEMINI_VOICES.includes(providerVoice) ? providerVoice : "Kore"} onChange={(e) => setProviderVoice(e.target.value)} hint="Used when the provider is Gemini (AI).">
+            {GEMINI_VOICES.map((v) => (
+              <option key={v}>{v}</option>
+            ))}
+          </Select>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={saveProfile}>
               <Plus className="size-4" aria-hidden="true" />
@@ -243,8 +285,13 @@ export function VoiceStudio({
             </p>
             <Button onClick={saveTake} disabled={!text.trim() || running || Boolean(block)}>
               <Mic className="size-4" aria-hidden="true" />
-              {running ? "Synthesizing…" : "Preview + save take"}
+              {running ? "Synthesizing…" : isGemini ? "Generate take with Gemini" : "Preview + save take"}
             </Button>
+            {genError && (
+              <Alert tone="warn" title="Gemini could not synthesize">
+                {genError}
+              </Alert>
+            )}
           </div>
         </section>
       </div>
@@ -259,7 +306,15 @@ export function VoiceStudio({
               <li key={t.id} className="rounded-xl border border-border bg-surface p-3">
                 <p className="truncate text-sm font-medium">{t.title}</p>
                 <div className="mt-2">
-                  <TakePreview assetId={t.id} payload={t.payload} title={t.title} />
+                  {t.source === "provider-output" ? (
+                    t.status === "ready" ? (
+                      <FilePreview url={t.payload} mime={t.mime} label={t.title} />
+                    ) : (
+                      <p className="text-xs text-muted-text">{t.status === "failed" ? `Failed: ${t.error ?? "unknown error"}` : "Generating…"}</p>
+                    )
+                  ) : (
+                    <TakePreview assetId={t.id} payload={t.payload} title={t.title} />
+                  )}
                 </div>
               </li>
             ))}
@@ -270,6 +325,8 @@ export function VoiceStudio({
     </div>
   );
 }
+
+const GEMINI_VOICES = ["Kore", "Puck", "Charon", "Fenrir", "Aoede", "Leda", "Orus", "Zephyr"];
 
 interface TakePayload {
   text: string;

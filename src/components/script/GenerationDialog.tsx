@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Wand2 } from "lucide-react";
+import { writeScriptWithProvider } from "@/src/lib/ai-client";
+import { Alert } from "@/src/components/ui/Alert";
 import type { ScriptSection } from "@/src/lib/script/types";
 import { ASSEMBLY_METHOD, assembleScript, type AssemblyInput } from "@/src/lib/script/engine";
 import { COMPLEXITIES, LENGTH_TARGETS, STRUCTURES, TONES, formatNames } from "@/src/lib/script/formats";
@@ -14,8 +16,9 @@ import { MethodologyNote } from "@/src/components/intelligence/output";
 import type { AssembledContext } from "@/src/lib/intelligence/context";
 
 /**
- * Controlled generation: options → local assembly → preview → apply.
- * Manual writing is always one click away; assembly output is starter text.
+ * Controlled generation: options → local assembly or Gemini draft →
+ * preview → apply. Manual writing is always one click away. Gemini fills
+ * the same section skeleton, so structure, scenes, and versions are unchanged.
  */
 export function GenerationDialog({
   assembly,
@@ -37,18 +40,46 @@ export function GenerationDialog({
   const [customWords, setCustomWords] = useState("900");
   const [instruction, setInstruction] = useState("");
   const [preview, setPreview] = useState<ScriptSection[] | null>(null);
+  const [writing, setWriting] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiModel, setAiModel] = useState<string | null>(null);
 
   const targetWords =
     lengthLabel === "Custom" ? Math.max(50, Number.parseInt(customWords, 10) || 900) : (LENGTH_TARGETS.find((l) => l.label === lengthLabel)?.words ?? 900);
 
   function run() {
+    setAiModel(null);
     setPreview(
       assembleScript({ ...assembly, format, tone, complexity, structure, targetWords, instruction }),
     );
   }
 
+  async function writeWithGemini() {
+    const input = { ...assembly, format, tone, complexity, structure, targetWords, instruction };
+    const skeleton = assembleScript(input);
+    setWriting(true);
+    setAiError(null);
+    const outcome = await writeScriptWithProvider({
+      ...input,
+      sections: skeleton.map((s) => ({ type: s.type, heading: s.heading })),
+    });
+    setWriting(false);
+    if (!outcome.ok) {
+      setAiError(outcome.message);
+      return;
+    }
+    setAiModel(outcome.data.model);
+    setPreview(
+      skeleton.map((s, i) => ({
+        ...s,
+        text: outcome.data.texts[i] ?? s.text,
+        aiNote: `Written by Gemini (${outcome.data.model}) from your intelligence context. Review facts before producing.`,
+      })),
+    );
+  }
+
   return (
-    <Modal title="Assemble script draft" description="Local template assembly from your intelligence — starter text to rewrite, not finished copy." onClose={onClose} wide>
+    <Modal title="Generate script draft" description="Write a full draft with Gemini, or assemble a local template from your intelligence." onClose={onClose} wide>
       <div className="grid gap-4 sm:grid-cols-2">
         <Select label="Format" value={format} onChange={(e) => { setFormat(e.target.value); setPreview(null); }}>
           {formats.map((f) => (
@@ -87,20 +118,33 @@ export function GenerationDialog({
         <ContextChips context={context} />
       </div>
 
+      {aiError && !preview && (
+        <div className="mt-4">
+          <Alert tone="warn" title="Gemini could not write the script">
+            {aiError} You can still assemble the local template.
+          </Alert>
+        </div>
+      )}
+
       {!preview ? (
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
             Write manually instead
           </Button>
-          <Button onClick={run}>
+          <Button variant="outline" onClick={run} disabled={writing}>
             <Sparkles className="size-4" aria-hidden="true" />
-            Assemble preview
+            Assemble template
+          </Button>
+          <Button onClick={() => void writeWithGemini()} disabled={writing}>
+            <Wand2 className="size-4" aria-hidden="true" />
+            {writing ? "Writing with Gemini…" : "Write with Gemini"}
           </Button>
         </div>
       ) : (
         <div className="mt-4 space-y-2">
           <p className="text-sm font-medium" role="status">
-            {preview.length} sections · ~{preview.reduce((n, s) => n + countWords(s.text), 0)} starter words. Review before applying.
+            {preview.length} sections · ~{preview.reduce((n, s) => n + countWords(s.text), 0)} words
+            {aiModel ? ` written by Gemini (${aiModel})` : " of starter text"}. Review before applying.
           </p>
           <ul className="max-h-64 space-y-1.5 overflow-y-auto" aria-label="Assembled preview">
             {preview.map((s) => (
@@ -110,7 +154,7 @@ export function GenerationDialog({
               </li>
             ))}
           </ul>
-          <MethodologyNote text={ASSEMBLY_METHOD} />
+          {!aiModel && <MethodologyNote text={ASSEMBLY_METHOD} />}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setPreview(null)}>
               Adjust options

@@ -160,7 +160,7 @@ function Studio() {
     {
       id: "titles",
       label: "Titles",
-      content: <TitlesTab projectId={pid} topic={project.topic} audience={audienceText || "creators"} />,
+      content: <TitlesTab projectId={pid} topic={project.topic} audience={audienceText || "creators"} promise={strategy?.promise ?? ""} scriptText={scriptText} />,
     },
     {
       id: "seo",

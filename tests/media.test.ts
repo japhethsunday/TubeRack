@@ -80,7 +80,9 @@ describe("provider capabilities", () => {
     assert.equal(capabilityBlock("on-device", "tts"), null);
     assert.ok((capabilityBlock("on-device", "video") ?? "").length > 0);
     assert.ok((capabilityBlock("on-device", "reference") ?? "").length > 0);
-    assert.ok((capabilityBlock("ai-provider", "image") ?? "").includes("Phase 11"));
+    assert.equal(capabilityBlock("ai-provider", "image"), null);
+    assert.equal(capabilityBlock("ai-provider", "tts"), null);
+    assert.ok((capabilityBlock("ai-provider", "video") ?? "").length > 0);
     assert.equal(providerById("unknown").id, "on-device");
   });
 });

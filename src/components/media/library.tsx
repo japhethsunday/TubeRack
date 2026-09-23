@@ -61,6 +61,13 @@ export function AssetPreview({ asset, blobUrl }: { asset: MediaAsset; blobUrl: s
     }
     return <FilePreview url={blobUrl} mime={asset.mime} label={asset.title} />;
   }
+  if (asset.source === "provider-output") {
+    if (asset.kind === "image") {
+      // eslint-disable-next-line @next/next/no-img-element -- authenticated app URL; the optimizer cannot forward the session.
+      return <img src={asset.payload} alt={asset.title} className="aspect-video w-full rounded-lg border border-border object-contain bg-black" />;
+    }
+    return <FilePreview url={asset.payload} mime={asset.mime} label={asset.title} />;
+  }
   if (asset.source === "provider-request") {
     return (
       <div className="rounded-lg border border-dashed border-border p-4 text-xs text-muted-text" role="note" aria-label="Provider request, not media">

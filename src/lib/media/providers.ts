@@ -3,8 +3,8 @@ import type { MediaKind } from "@/src/lib/media/types";
 /**
  * Provider capability system. The UI exposes only what the selected
  * provider supports; unsupported controls render as explained boundaries.
- * Real vendor capabilities wire up in Phase 11 — this matrix declares the
- * on-device engine honestly and gates everything else.
+ * "ai-provider" is Google Gemini via the server routes (image + TTS); video,
+ * music, and SFX synthesis stay gated behind request drafts.
  */
 
 export type Capability =
@@ -51,20 +51,25 @@ export const PROVIDERS: ProviderDef[] = [
   },
   {
     id: "ai-provider",
-    label: "AI provider",
-    blurb: "Photoreal image/video, studio TTS, licensed music. Connects in Phase 11.",
-    available: false,
-    unavailableReason: "No AI provider is configured. Requests are saved as drafts with full parameters for Phase 11.",
+    label: "Gemini (AI)",
+    blurb: "Real AI images and studio-quality narration via Google Gemini. Requires sign-in.",
+    available: true,
+    unavailableReason: "",
     capabilities: {
       image: true,
-      video: true,
+      video: false,
       tts: true,
-      music: true,
-      sfx: true,
-      reference: true,
+      music: false,
+      sfx: false,
+      reference: false,
       variations: true,
     },
-    capabilityNotes: {},
+    capabilityNotes: {
+      video: "Gemini does not generate video here yet. Save a request draft with full parameters instead.",
+      music: "Gemini does not generate music. Use on-device drafts or upload licensed tracks.",
+      sfx: "Gemini does not generate sound effects. Use on-device drafts or uploads.",
+      reference: "Reference-image conditioning is not wired yet.",
+    },
   },
 ];
 

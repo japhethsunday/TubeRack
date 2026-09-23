@@ -348,6 +348,15 @@ export const INTEL_PAGES: NavItem[] = [
     phase: "Phase 5",
     blurb: "Catalog vs topic prompts.",
   },
+  {
+    slug: "intel-research",
+    label: "YouTube research",
+    href: "/intelligence/research",
+    icon: Compass,
+    status: "live",
+    phase: "Phase 13",
+    blurb: "Live YouTube search with real view counts.",
+  },
 ];
 
 /** Script + storyboard studio routes for the command menu. */

@@ -9,6 +9,7 @@ import type { PosterAspect } from "@/src/lib/media/svg";
 import { buildVisualPrompt, PROMPT_METHOD, type PromptSection } from "@/src/lib/media/prompts";
 import { useMedia, runLocalJob, MediaStorageNote } from "@/src/components/media/MediaProvider";
 import { DraftImage } from "@/src/components/media/players";
+import { generateProviderImage } from "@/src/lib/ai-client";
 import { MethodologyNote } from "@/src/components/intelligence/output";
 import { Select, Input, Textarea } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
@@ -67,6 +68,8 @@ export function ImageStudio({
   const [progress, setProgress] = useState(0);
   const [runIds, setRunIds] = useState<string[]>([]);
   const cancelRef = useRef({ cancelled: false });
+  const [genError, setGenError] = useState<string | null>(null);
+  const isGemini = provider === "ai-provider";
 
   const scene = scenes.find((s) => s.id === sceneId);
   const promptSections: PromptSection[] = buildVisualPrompt({
@@ -86,7 +89,59 @@ export function ImageStudio({
   const block = capabilityBlock(provider, "image");
   const effectiveSeed = seed ?? seedFromText(`${title}|${sceneId}|${styleId}`);
 
+  function finalPrompt(): string {
+    return promptSections.map((s) => `${s.label}: ${promptEdits[s.label] ?? s.text}`).join("\n");
+  }
+
+  /** Gemini path: real images, one request per variation, stored server-side. */
+  async function launchGemini(count?: number) {
+    const n = Math.min(4, Math.max(1, count ?? variations));
+    cancelRef.current = { cancelled: false };
+    const flag = cancelRef.current;
+    setRunning(true);
+    setRunIds([]);
+    setGenError(null);
+    setProgress(5);
+    const baseTitle = title || scene?.title || "Untitled image";
+    const created: string[] = [];
+    const prompt = finalPrompt();
+    for (let i = 0; i < n; i++) {
+      if (flag.cancelled) break;
+      const asset = addAsset({
+        projectId,
+        sceneIds: [],
+        kind: "image",
+        source: "provider-output",
+        status: "generating",
+        title: n > 1 ? `${baseTitle} (v${i + 1})` : baseTitle,
+        payload: "",
+        mime: "image/png",
+        width: POSTER_DIMS[aspect].width,
+        height: POSTER_DIMS[aspect].height,
+        tags: ["gemini", aspect],
+        approval: "draft",
+      });
+      const variant = i === 0 ? prompt : `${prompt}\nVariation ${i + 1}: a distinctly different composition.`;
+      const outcome = await generateProviderImage(variant, aspect);
+      if (!outcome.ok) {
+        updateAsset(asset.id, { status: "failed", error: outcome.message });
+        setGenError(outcome.message);
+        break;
+      }
+      updateAsset(asset.id, { status: "ready", payload: outcome.data.url });
+      created.push(asset.id);
+      setRunIds([...created]);
+      setProgress(Math.round(((i + 1) / n) * 100));
+    }
+    setRunning(false);
+    setProgress(100);
+  }
+
   function launch(customSeed?: number, count?: number) {
+    if (isGemini) {
+      void launchGemini(count);
+      return;
+    }
     const seedBase = customSeed ?? effectiveSeed;
     const n = Math.min(4, Math.max(1, count ?? variations));
     cancelRef.current = { cancelled: false };
@@ -240,7 +295,7 @@ export function ImageStudio({
 
         {running ? (
           <div className="space-y-2">
-            <Progress value={progress} label="Generating drafts on-device" />
+            <Progress value={progress} label={isGemini ? "Generating with Gemini" : "Generating drafts on-device"} />
             <Button variant="outline" size="sm" onClick={() => { cancelRef.current.cancelled = true; }}>
               Cancel
             </Button>
@@ -248,8 +303,15 @@ export function ImageStudio({
         ) : (
           <Button onClick={() => launch()} disabled={Boolean(block)}>
             <ImagePlus className="size-4" aria-hidden="true" />
-            Generate {variations} draft{variations === 1 ? "" : "s"} — free, on-device
+            {isGemini
+              ? `Generate ${variations} image${variations === 1 ? "" : "s"} with Gemini`
+              : `Generate ${variations} draft${variations === 1 ? "" : "s"} — free, on-device`}
           </Button>
+        )}
+        {genError && (
+          <Alert tone="warn" title="Gemini could not generate">
+            {genError}
+          </Alert>
         )}
         <p className="text-xs text-muted-text">Seeds make drafts reproducible. Variations never replace approved work.</p>
       </div>
@@ -277,9 +339,16 @@ function RunResults({ assetIds, sceneId, onMore }: { assetIds: string[]; sceneId
       <ul className="grid gap-3 sm:grid-cols-2" aria-label="Generated drafts">
         {items.map((a) => (
           <li key={a.id} className="rounded-xl border border-border bg-surface p-3">
-            <DraftImage svg={a.payload} title={a.title} />
+            {a.source === "provider-output" ? (
+              // eslint-disable-next-line @next/next/no-img-element -- authenticated app URL; the optimizer cannot forward the session.
+              <img src={a.payload} alt={a.title} className="aspect-video w-full rounded-lg border border-border bg-black object-contain" />
+            ) : (
+              <DraftImage svg={a.payload} title={a.title} />
+            )}
             <p className="mt-2 truncate text-sm font-medium">{a.title}</p>
-            <p className="text-xs text-muted-text">Seed {a.seed} · {a.width}×{a.height}</p>
+            <p className="text-xs text-muted-text">
+              {a.source === "provider-output" ? "Gemini" : `Seed ${a.seed}`} · {a.width}×{a.height}
+            </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {a.approval !== "approved" ? (
                 <button type="button" onClick={() => setApproval(a.id, "approved")} className="h-8 rounded-lg border border-border px-2.5 text-xs font-medium hover:bg-muted">

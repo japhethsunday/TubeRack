@@ -6,7 +6,7 @@ const assetSchema = z.object({
   projectId: z.string(),
   sceneIds: z.array(z.string()),
   kind: z.enum(["image", "video", "voice", "music", "sfx"]),
-  source: z.enum(["local-draft", "upload-session", "provider-request"]),
+  source: z.enum(["local-draft", "upload-session", "provider-request", "provider-output"]),
   status: z.enum(["pending", "preparing", "generating", "processing", "ready", "failed", "cancelled"]),
   title: z.string(),
   payload: z.string(),

@@ -46,12 +46,18 @@ function Hub() {
             Content Intelligence
           </h1>
           <p className="mt-1 max-w-prose text-sm text-muted-text">
-            Local heuristic analysis over your input — structured, editable, and
-            honest about its limits. Provider reasoning connects in Phase 11.
+            Instant local analysis over your input, plus Gemini reasoning and live
+            YouTube research when you are signed in.
           </p>
         </div>
         <div className="flex items-center gap-2">
           {channel.picker}
+          <Link
+            href="/intelligence/research"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted"
+          >
+            YouTube research
+          </Link>
           <Link
             href="/intelligence/lab"
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"

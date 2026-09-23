@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Wand2 } from "lucide-react";
+import { Wand2, Sparkles } from "lucide-react";
+import { writeSeoWithProvider } from "@/src/lib/ai-client";
 import type { Chapter } from "@/src/lib/package/types";
 import {
   extractKeywords,
@@ -40,6 +41,8 @@ export function SeoWorkspace({ projectId, context }: { projectId: string; contex
   const [linkUrl, setLinkUrl] = useState("");
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [built, setBuilt] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const extracted = extractKeywords(context.scriptText);
   const review = reviewSeo({
@@ -72,6 +75,38 @@ export function SeoWorkspace({ projectId, context }: { projectId: string; contex
         hashtags: d.hashtags,
         links,
       }),
+    }));
+    setBuilt(true);
+  }
+
+  async function writeWithGemini() {
+    setAiBusy(true);
+    setAiError(null);
+    const chapters = draft.chapters
+      .map((c) => `${Math.floor(c.timeSec / 60)}:${String(Math.floor(c.timeSec % 60)).padStart(2, "0")} ${c.title}`)
+      .join("\n");
+    const outcome = await writeSeoWithProvider({
+      topic: draft.topic || context.topic,
+      audience: draft.audience || context.audience,
+      promise: context.promise,
+      takeaway: context.takeaway,
+      cta: context.cta,
+      title: context.primaryTitle,
+      script: context.scriptText,
+      chapters,
+    });
+    setAiBusy(false);
+    if (!outcome.ok) {
+      setAiError(outcome.message);
+      return;
+    }
+    setDraft((d) => ({
+      ...d,
+      topic: d.topic || context.topic,
+      audience: d.audience || context.audience,
+      description: outcome.data.description,
+      tags: outcome.data.tags.length > 0 ? outcome.data.tags : d.tags,
+      hashtags: outcome.data.hashtags.length > 0 ? outcome.data.hashtags : d.hashtags,
     }));
     setBuilt(true);
   }
@@ -155,11 +190,18 @@ export function SeoWorkspace({ projectId, context }: { projectId: string; contex
         <div className="rounded-xl border border-border bg-surface p-5">
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-sm font-semibold">Description</h4>
-            <Button size="sm" variant="outline" onClick={assemble}>
-              <Wand2 className="size-4" aria-hidden="true" />
-              Assemble draft
-            </Button>
+            <span className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={assemble}>
+                <Wand2 className="size-4" aria-hidden="true" />
+                Assemble draft
+              </Button>
+              <Button size="sm" onClick={() => void writeWithGemini()} disabled={aiBusy}>
+                <Sparkles className="size-4" aria-hidden="true" />
+                {aiBusy ? "Writing…" : "Write with Gemini"}
+              </Button>
+            </span>
           </div>
+          {aiError && <p role="alert" className="mt-2 text-xs text-destructive">Gemini unavailable: {aiError}</p>}
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             <Input label="Link label" value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} placeholder="Template" />
             <Input label="Link URL" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://…" />

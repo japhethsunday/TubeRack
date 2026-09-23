@@ -7,7 +7,8 @@
 
 export type MediaKind = "image" | "video" | "voice" | "music" | "sfx";
 
-export type MediaSource = "local-draft" | "upload-session" | "provider-request";
+/** provider-output: real media from a provider (payload is a stored-file URL). */
+export type MediaSource = "local-draft" | "upload-session" | "provider-request" | "provider-output";
 
 export type MediaStatus =
   | "pending"
