@@ -12,9 +12,9 @@ export { stripThinking } from "@/src/server/ai/chat-compat";
 export const NVIDIA_TEXT_MODELS = [
   "nvidia/nemotron-3-super-120b-a12b",
   "z-ai/glm-5.3",
-  "mistralai/mistral-nemotron",
   "nvidia/nemotron-3-ultra-550b-a55b",
   "google/gemma-4-31b-it",
+  "mistralai/mistral-nemotron",
   "nvidia/nemotron-3.5-lightning-30b-a3b",
   "z-ai/glm-5.3-flash",
   "openai/gpt-oss-20b",
