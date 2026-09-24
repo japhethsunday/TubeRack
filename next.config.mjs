@@ -18,8 +18,13 @@ const nextConfig = {
           "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "font-src 'self' https://fonts.gstatic.com data:",
-          "img-src 'self' data: blob:",
-          "connect-src 'self'",
+          // Supabase signed URLs (generated media/uploads) and YouTube thumbnails.
+          "img-src 'self' data: blob: https://*.supabase.co https://i.ytimg.com https://*.ytimg.com https://yt3.ggpht.com https://*.googleusercontent.com",
+          "media-src 'self' blob: data: https://*.supabase.co",
+          // Browser → Supabase signed upload URLs.
+          "connect-src 'self' https://*.supabase.co",
+          // In-app YouTube player (privacy-enhanced domain).
+          "frame-src https://www.youtube-nocookie.com https://www.youtube.com",
           "frame-ancestors 'none'",
           "base-uri 'self'",
           "form-action 'self'",

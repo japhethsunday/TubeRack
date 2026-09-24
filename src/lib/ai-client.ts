@@ -140,3 +140,41 @@ export function transcribeWithProvider(file: string) {
     api.post<{ text: string; segments: { startSec: number; endSec: number; text: string }[]; model: string }>("/api/v1/ai/transcribe", { file }),
   );
 }
+
+export interface VideoDetails {
+  id: string;
+  title: string;
+  description: string;
+  publishedAt: string;
+  thumbnail: string;
+  tags: string[];
+  categoryId: string;
+  defaultLanguage: string;
+  durationSec: number | null;
+  definition: string;
+  captions: boolean;
+  licensedContent: boolean;
+  madeForKids: boolean | null;
+  embeddable: boolean;
+  topics: string[];
+  stats: { views?: number; likes?: number; comments?: number };
+  channel: {
+    id: string;
+    title: string;
+    description: string;
+    thumbnail: string;
+    customUrl: string;
+    country: string;
+    publishedAt: string;
+    subscribers?: number;
+    subscribersHidden: boolean;
+    totalViews?: number;
+    videoCount?: number;
+  } | null;
+  comments: { author: string; authorImage: string; text: string; likes: number; publishedAt: string; replies: number }[];
+  commentsDisabled: boolean;
+}
+
+export function fetchYouTubeDetails(id: string) {
+  return attempt(() => api.get<VideoDetails>(`/api/v1/youtube/details?id=${encodeURIComponent(id)}`));
+}

@@ -19,6 +19,8 @@ import { Select, Input } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
 import { Alert } from "@/src/components/ui/Alert";
 import { EmptyState } from "@/src/components/ui/states";
+import { DownloadButton } from "@/src/components/ui/DownloadButton";
+import { downloadBlob, audioBufferToWav, safeFileName } from "@/src/lib/download";
 
 /** Session-only render cache: buffers re-render on demand after reload. */
 const bufferCache = new Map<string, { buffer: AudioBuffer; context: AudioContext }>();
@@ -167,7 +169,10 @@ function TrackRow({ assetId, payload, title, recipeLabel }: { assetId: string; p
       </p>
       <div className="mt-2">
         {render ? (
-          <BufferPreview buffer={render.buffer} context={render.context} label={title} />
+          <div className="space-y-2">
+            <BufferPreview buffer={render.buffer} context={render.context} label={title} />
+            <DownloadButton size="xs" label="Download WAV" onDownload={() => downloadBlob(audioBufferToWav(render.buffer), safeFileName(title, "wav"))} />
+          </div>
         ) : (
           <Button
             size="sm"
@@ -276,6 +281,7 @@ export function SfxStudio({
           ))}
         </ul>
         <BufferPreview buffer={render?.buffer ?? null} context={render?.context ?? null} label={renderLabel} />
+        {render && <DownloadButton size="xs" label="Download WAV" onDownload={() => downloadBlob(audioBufferToWav(render.buffer), safeFileName(renderLabel, "wav"))} />}
         <p className="text-xs text-muted-text">Placement happens on the Video Studio timeline — here effects are previewed, saved, and assigned to scenes.</p>
       </div>
       <div className="space-y-3">

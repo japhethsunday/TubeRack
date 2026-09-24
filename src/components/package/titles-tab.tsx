@@ -12,6 +12,8 @@ import { Button } from "@/src/components/ui/Button";
 import { Badge } from "@/src/components/ui/Badge";
 import { EmptyState } from "@/src/components/ui/states";
 import type { PackTitle } from "@/src/lib/package/types";
+import { DownloadButton } from "@/src/components/ui/DownloadButton";
+import { downloadText, safeFileName } from "@/src/lib/download";
 
 /** Title packaging: variations, compare, primary, intel reuse. */
 export function TitlesTab({
@@ -93,6 +95,13 @@ export function TitlesTab({
           <Alert tone="warn" title="Gemini unavailable">
             {aiError}
           </Alert>
+        )}
+        {aiTitles && (
+          <DownloadButton
+            size="xs"
+            label="Download titles"
+            onDownload={() => downloadText(aiTitles.map((t) => `${t.text}  [${t.category}]`).join("\n"), safeFileName(`${topic} titles`, "txt"))}
+          />
         )}
         {aiTitles && (
           <ul className="space-y-1.5" aria-label="Gemini title suggestions">

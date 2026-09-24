@@ -19,6 +19,8 @@ import { Input, Textarea, Select } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
 import { Badge } from "@/src/components/ui/Badge";
 import { LocalStorageNote } from "@/src/components/projects/ProjectsProvider";
+import { DownloadButton } from "@/src/components/ui/DownloadButton";
+import { downloadText, safeFileName } from "@/src/lib/download";
 
 export interface SeoContext {
   promise: string;
@@ -229,6 +231,25 @@ export function SeoWorkspace({ projectId, context }: { projectId: string; contex
           )}
           <Textarea label="Description (fully editable)" rows={10} value={draft.description} onChange={(e) => set("description", e.target.value)} />
           {built && <p role="status" className="mt-1 text-xs text-success">Draft assembled — edit everything before approving.</p>}
+          {draft.description.trim() && (
+            <div className="mt-2">
+              <DownloadButton
+                size="xs"
+                label="Download SEO package"
+                onDownload={() =>
+                  downloadText(
+                    [
+                      `TITLE\n${context.primaryTitle}`,
+                      `DESCRIPTION\n${draft.description}`,
+                      `TAGS\n${draft.tags.join(", ")}`,
+                      `HASHTAGS\n${draft.hashtags.join(" ")}`,
+                    ].join("\n\n"),
+                    safeFileName(`${draft.topic || context.topic} seo`, "txt"),
+                  )
+                }
+              />
+            </div>
+          )}
         </div>
 
         <div className="rounded-xl border border-border bg-surface p-5">

@@ -13,6 +13,7 @@ import { Alert } from "@/src/components/ui/Alert";
 import { Badge } from "@/src/components/ui/Badge";
 import { EmptyState } from "@/src/components/ui/states";
 import { countWords, estimateSeconds } from "@/src/lib/script/measure";
+import { AssetDownload } from "@/src/components/media/AssetDownload";
 
 export interface TextSource {
   id: string;
@@ -308,7 +309,10 @@ export function VoiceStudio({
                 <div className="mt-2">
                   {t.source === "provider-output" ? (
                     t.status === "ready" ? (
-                      <FilePreview url={t.payload} mime={t.mime} label={t.title} />
+                      <div className="space-y-2">
+                        <FilePreview url={t.payload} mime={t.mime} label={t.title} />
+                        <AssetDownload asset={t} />
+                      </div>
                     ) : (
                       <p className="text-xs text-muted-text">{t.status === "failed" ? `Failed: ${t.error ?? "unknown error"}` : "Generating…"}</p>
                     )

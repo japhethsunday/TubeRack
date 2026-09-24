@@ -16,6 +16,7 @@ import { Button } from "@/src/components/ui/Button";
 import { Progress } from "@/src/components/ui/feedback";
 import { Alert } from "@/src/components/ui/Alert";
 import { Badge } from "@/src/components/ui/Badge";
+import { AssetDownload } from "@/src/components/media/AssetDownload";
 
 export interface SceneRef {
   id: string;
@@ -350,6 +351,7 @@ function RunResults({ assetIds, sceneId, onMore }: { assetIds: string[]; sceneId
               {a.source === "provider-output" ? "Gemini" : `Seed ${a.seed}`} · {a.width}×{a.height}
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
+              <AssetDownload asset={a} />
               {a.approval !== "approved" ? (
                 <button type="button" onClick={() => setApproval(a.id, "approved")} className="h-8 rounded-lg border border-border px-2.5 text-xs font-medium hover:bg-muted">
                   Approve

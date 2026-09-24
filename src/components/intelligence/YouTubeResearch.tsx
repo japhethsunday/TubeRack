@@ -7,6 +7,7 @@ import { Input } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
 import { Badge } from "@/src/components/ui/Badge";
 import { Alert } from "@/src/components/ui/Alert";
+import { VideoDetailsPanel } from "@/src/components/intelligence/VideoDetailsPanel";
 
 /** YouTube returns HTML-escaped titles (&#39; &amp;); decode as text, never as markup. */
 export function decodeEntities(value: string): string {
@@ -35,6 +36,7 @@ export function YouTubeResearch({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState<Set<string>>(new Set());
+  const [openId, setOpenId] = useState<string | null>(null);
 
   async function run(event?: React.FormEvent) {
     event?.preventDefault();
@@ -72,18 +74,16 @@ export function YouTubeResearch({
           {results.map((r) => (
             <li key={r.videoId} className="flex gap-3 rounded-lg border border-border bg-surface p-2.5">
               {r.thumbnail && (
-                // eslint-disable-next-line @next/next/no-img-element -- remote YouTube thumbnail; no optimizer domain configured.
-                <img src={r.thumbnail} alt="" className="aspect-video w-32 shrink-0 rounded-md object-cover" loading="lazy" />
+                <button type="button" onClick={() => setOpenId(r.videoId)} aria-label={`Open details: ${decodeEntities(r.title)}`} className="group relative shrink-0 overflow-hidden rounded-md">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- remote YouTube thumbnail; no optimizer domain configured. */}
+                  <img src={r.thumbnail} alt="" className="aspect-video w-32 object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-[10px] font-semibold text-white opacity-0 transition-all duration-300 group-hover:bg-black/40 group-hover:opacity-100">View details</span>
+                </button>
               )}
               <div className="min-w-0 flex-1">
-                <a
-                  href={`https://www.youtube.com/watch?v=${r.videoId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="line-clamp-2 text-sm font-medium hover:underline"
-                >
+                <button type="button" onClick={() => setOpenId(r.videoId)} className="line-clamp-2 text-left text-sm font-medium hover:text-violet-600 dark:hover:text-violet-300">
                   {decodeEntities(r.title)}
-                </a>
+                </button>
                 <p className="mt-0.5 truncate text-xs text-muted-text">
                   {r.channelTitle}
                   {r.publishedAt ? ` · ${new Date(r.publishedAt).toLocaleDateString()}` : ""}
@@ -119,6 +119,35 @@ export function YouTubeResearch({
             </li>
           ))}
         </ul>
+      )}
+      {openId && (
+        <VideoDetailsPanel
+          videoId={openId}
+          onClose={() => setOpenId(null)}
+          addLabel={addLabel}
+          onAdd={
+            onAdd
+              ? (d) => {
+                  const r = results?.find((x) => x.videoId === d.id);
+                  onAdd(
+                    r ?? {
+                      videoId: d.id,
+                      title: d.title,
+                      channelTitle: d.channel?.title ?? "",
+                      channelId: d.channel?.id ?? "",
+                      publishedAt: d.publishedAt,
+                      description: d.description,
+                      thumbnail: d.thumbnail,
+                      views: d.stats.views,
+                      likes: d.stats.likes,
+                      comments: d.stats.comments,
+                    },
+                  );
+                  setAdded((prev) => new Set(prev).add(d.id));
+                }
+              : undefined
+          }
+        />
       )}
       <p className="text-xs text-muted-text">Live data from the YouTube Data API. Requires sign-in; each search uses API quota.</p>
     </section>

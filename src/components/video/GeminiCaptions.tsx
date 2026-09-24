@@ -7,6 +7,8 @@ import { captionsFromSegments } from "@/src/lib/video/build";
 import { Button } from "@/src/components/ui/Button";
 import type { TimelineClip } from "@/src/lib/video/types";
 import type { MediaAsset } from "@/src/lib/media/types";
+import { DownloadButton } from "@/src/components/ui/DownloadButton";
+import { downloadText, safeFileName } from "@/src/lib/download";
 
 /**
  * Word-timed captions from a real voice take: Gemini transcribes the stored
@@ -24,6 +26,7 @@ export function GeminiCaptions({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [last, setLast] = useState<{ name: string; segments: { startSec: number; endSec: number; text: string }[] } | null>(null);
 
   const voiceClips = clips.filter((c) => {
     if (c.kind !== "voice" || !c.assetId) return false;
@@ -47,6 +50,7 @@ export function GeminiCaptions({
     const kept = clips.filter((c) => !(c.kind === "captions" && c.startSec >= start && c.startSec < end));
     const added = captionsFromSegments(outcome.data.segments, start);
     onCaptions([...kept, ...added]);
+    setLast({ name: clip.name, segments: outcome.data.segments });
     setMessage({ ok: true, text: `Added ${added.length} caption line(s) from “${clip.name}”.` });
   }
 
@@ -66,6 +70,9 @@ export function GeminiCaptions({
           ))}
         </div>
       )}
+      {last && (
+        <DownloadButton size="xs" label="Download captions (.srt)" onDownload={() => downloadText(toSrt(last.segments), safeFileName(`${last.name} captions`, "srt"), "application/x-subrip")} />
+      )}
       {message && (
         <p role="status" className={`text-xs ${message.ok ? "text-success" : "text-destructive"}`}>
           {message.text}
@@ -73,4 +80,16 @@ export function GeminiCaptions({
       )}
     </section>
   );
+}
+
+/** SubRip subtitles from timed segments. */
+export function toSrt(segments: { startSec: number; endSec: number; text: string }[]): string {
+  const ts = (sec: number) => {
+    const ms = Math.max(0, Math.round(sec * 1000));
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},${String(ms % 1000).padStart(3, "0")}`;
+  };
+  return segments.map((s, i) => `${i + 1}\n${ts(s.startSec)} --> ${ts(s.endSec)}\n${s.text}\n`).join("\n");
 }

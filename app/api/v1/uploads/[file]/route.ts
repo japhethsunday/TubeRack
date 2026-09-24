@@ -18,9 +18,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ file
     const user = await requireUser();
     const workspaceId = await defaultWorkspace(user);
     await requireMembership(workspaceId, user, "viewer");
+    const requested = new URL(request.url).searchParams.get("download");
+    const downloadAs = requested ? requested.replace(/[^\w.\- ]+/g, "").slice(0, 100) || file : undefined;
     let url: string;
     try {
-      url = await storageSignedUrl(`${workspaceId}/uploads/${file}`);
+      url = await storageSignedUrl(`${workspaceId}/uploads/${file}`, 3600, downloadAs);
     } catch {
       throw notFound("File");
     }

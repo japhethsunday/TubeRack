@@ -427,3 +427,135 @@ export function parseVideoId(input: string): string | null {
     return null;
   }
 }
+
+export interface VideoDetails {
+  id: string;
+  title: string;
+  description: string;
+  publishedAt: string;
+  thumbnail: string;
+  tags: string[];
+  categoryId: string;
+  defaultLanguage: string;
+  durationSec: number | null;
+  definition: string;
+  captions: boolean;
+  licensedContent: boolean;
+  madeForKids: boolean | null;
+  embeddable: boolean;
+  topics: string[];
+  stats: { views?: number; likes?: number; comments?: number };
+  channel: {
+    id: string;
+    title: string;
+    description: string;
+    thumbnail: string;
+    customUrl: string;
+    country: string;
+    publishedAt: string;
+    subscribers?: number;
+    subscribersHidden: boolean;
+    totalViews?: number;
+    videoCount?: number;
+  } | null;
+  comments: { author: string; authorImage: string; text: string; likes: number; publishedAt: string; replies: number }[];
+  commentsDisabled: boolean;
+}
+
+/** ISO-8601 duration (PT1H2M3S) → seconds. */
+export function parseIsoDuration(value: string): number | null {
+  const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(value ?? "");
+  if (!m) return null;
+  const [, d, h, min, s] = m.map((x) => Number(x ?? 0));
+  return d * 86400 + h * 3600 + min * 60 + s;
+}
+
+const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+/**
+ * Everything the Data API exposes about one video, its channel, and top
+ * comments (~3 quota units). Nothing is estimated; missing fields stay empty.
+ */
+export async function fetchVideoDetails(videoId: string): Promise<VideoDetails> {
+  if (!VIDEO_ID.test(videoId)) throw new Error("YouTube request failed: invalid video id.");
+  const key = requireKey();
+  const payload = await callApi("/videos", { part: "snippet,statistics,contentDetails,status,topicDetails", id: videoId }, key);
+  const item = (Array.isArray(payload.items) ? payload.items[0] : undefined) as Record<string, unknown> | undefined;
+  if (!item) throw new Error("YouTube request failed: video not found or private.");
+  const sn = (item.snippet ?? {}) as Record<string, unknown>;
+  const st = (item.statistics ?? {}) as Record<string, unknown>;
+  const cd = (item.contentDetails ?? {}) as Record<string, unknown>;
+  const status = (item.status ?? {}) as Record<string, unknown>;
+  const topics = ((item.topicDetails ?? {}) as { topicCategories?: string[] }).topicCategories ?? [];
+  const thumbs = (sn.thumbnails ?? {}) as Record<string, { url?: string }>;
+  const channelId = str(sn.channelId);
+
+  const [channelRes, commentsRes] = await Promise.allSettled([
+    channelId ? callApi("/channels", { part: "snippet,statistics", id: channelId }, key) : Promise.resolve({} as Record<string, unknown>),
+    callApi("/commentThreads", { part: "snippet", videoId, maxResults: "12", order: "relevance", textFormat: "plainText" }, key),
+  ]);
+
+  let channel: VideoDetails["channel"] = null;
+  if (channelRes.status === "fulfilled") {
+    const ch = (Array.isArray(channelRes.value.items) ? channelRes.value.items[0] : undefined) as Record<string, unknown> | undefined;
+    if (ch) {
+      const cs = (ch.snippet ?? {}) as Record<string, unknown>;
+      const cstat = (ch.statistics ?? {}) as Record<string, unknown>;
+      const cthumb = (cs.thumbnails ?? {}) as Record<string, { url?: string }>;
+      channel = {
+        id: channelId,
+        title: str(cs.title),
+        description: str(cs.description),
+        thumbnail: cthumb.medium?.url ?? cthumb.default?.url ?? "",
+        customUrl: str(cs.customUrl),
+        country: str(cs.country),
+        publishedAt: str(cs.publishedAt),
+        subscribers: cstat.hiddenSubscriberCount ? undefined : toNumber(cstat.subscriberCount),
+        subscribersHidden: Boolean(cstat.hiddenSubscriberCount),
+        totalViews: toNumber(cstat.viewCount),
+        videoCount: toNumber(cstat.videoCount),
+      };
+    }
+  }
+
+  let comments: VideoDetails["comments"] = [];
+  let commentsDisabled = false;
+  if (commentsRes.status === "fulfilled") {
+    comments = ((Array.isArray(commentsRes.value.items) ? commentsRes.value.items : []) as Record<string, unknown>[]).map((t) => {
+      const ts = (t.snippet ?? {}) as Record<string, unknown>;
+      const top = ((ts.topLevelComment ?? {}) as { snippet?: Record<string, unknown> }).snippet ?? {};
+      return {
+        author: str(top.authorDisplayName),
+        authorImage: str(top.authorProfileImageUrl),
+        text: str(top.textDisplay).slice(0, 2000),
+        likes: toNumber(top.likeCount) ?? 0,
+        publishedAt: str(top.publishedAt),
+        replies: toNumber(ts.totalReplyCount) ?? 0,
+      };
+    });
+  } else {
+    commentsDisabled = /commentsDisabled|disabled comments/i.test(String(commentsRes.reason));
+  }
+
+  return {
+    id: videoId,
+    title: str(sn.title),
+    description: str(sn.description),
+    publishedAt: str(sn.publishedAt),
+    thumbnail: thumbs.maxres?.url ?? thumbs.high?.url ?? thumbs.medium?.url ?? "",
+    tags: Array.isArray(sn.tags) ? (sn.tags as unknown[]).filter((t): t is string => typeof t === "string").slice(0, 60) : [],
+    categoryId: str(sn.categoryId),
+    defaultLanguage: str(sn.defaultLanguage) || str(sn.defaultAudioLanguage),
+    durationSec: parseIsoDuration(str(cd.duration)),
+    definition: str(cd.definition),
+    captions: str(cd.caption) === "true",
+    licensedContent: Boolean(cd.licensedContent),
+    madeForKids: typeof status.madeForKids === "boolean" ? status.madeForKids : null,
+    embeddable: status.embeddable !== false,
+    topics: topics.map((t) => decodeURIComponent(t.split("/").pop() ?? "").replace(/_/g, " ")).filter(Boolean),
+    stats: { views: toNumber(st.viewCount), likes: toNumber(st.likeCount), comments: toNumber(st.commentCount) },
+    channel,
+    comments,
+    commentsDisabled,
+  };
+}

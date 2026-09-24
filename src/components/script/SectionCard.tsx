@@ -22,6 +22,8 @@ import { Input, Textarea } from "@/src/components/ui/fields";
 import { Badge } from "@/src/components/ui/Badge";
 import { rewriteSectionWithProvider } from "@/src/lib/ai-client";
 import { cx } from "@/src/components/ui/cx";
+import { DownloadButton } from "@/src/components/ui/DownloadButton";
+import { downloadText, safeFileName } from "@/src/lib/download";
 
 /**
  * One script section: editor, metadata, tools, notes, refs, claims.
@@ -264,6 +266,9 @@ export function SectionCard({
                 <Wand2 className="size-4" aria-hidden="true" />
                 {rewriteDraft !== null ? "Try again" : "Rewrite"}
               </Button>
+              {rewriteDraft !== null && (
+                <DownloadButton label="Download" onDownload={() => downloadText(rewriteDraft, safeFileName(`${section.heading} rewrite`, "txt"))} />
+              )}
               {rewriteDraft !== null && (
                 <Button
                   onClick={() => {

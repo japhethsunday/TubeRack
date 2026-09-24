@@ -142,7 +142,7 @@ export async function storageSignedUpload(key: string): Promise<string> {
 }
 
 /** Short-lived signed download link (served after an ownership check). */
-export async function storageSignedUrl(key: string, expiresIn = 3600): Promise<string> {
+export async function storageSignedUrl(key: string, expiresIn = 3600, downloadAs?: string): Promise<string> {
   const env = getServerEnv();
   if (!isStorageConfigured(env)) throw new Error("Object storage is not configured.");
   const base = env.SUPABASE_URL!.replace(/\/$/, "");
@@ -157,5 +157,7 @@ export async function storageSignedUrl(key: string, expiresIn = 3600): Promise<s
   const body = (await response.json()) as { signedURL?: string; signedUrl?: string };
   const signed = body.signedURL ?? body.signedUrl;
   if (!signed) throw internalError();
-  return `${base}/storage/v1${signed}`;
+  const url = `${base}/storage/v1${signed}`;
+  // Supabase: &download=<name> sets Content-Disposition: attachment.
+  return downloadAs ? `${url}${url.includes("?") ? "&" : "?"}download=${encodeURIComponent(downloadAs)}` : url;
 }

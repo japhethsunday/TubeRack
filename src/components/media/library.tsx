@@ -10,6 +10,7 @@ import { EmptyState } from "@/src/components/ui/states";
 import { Dropdown } from "@/src/components/ui/Dropdown";
 import { Search } from "@/src/components/ui/search";
 import { cx } from "@/src/components/ui/cx";
+import { AssetDownload } from "@/src/components/media/AssetDownload";
 
 const STATUS_META: Record<MediaStatus, { label: string; tone: "neutral" | "ok" | "warn" | "bad" | "info" }> = {
   pending: { label: "Pending", tone: "neutral" },
@@ -153,6 +154,7 @@ export function AssetCard({
           <span className="flex shrink-0 flex-col items-end gap-1">
             <StatusBadge status={asset.status} />
             <ApprovalBadge approval={asset.approval} />
+            <AssetDownload asset={asset} blobUrl={blobUrlFor(asset.id)} />
           </span>
         </div>
 

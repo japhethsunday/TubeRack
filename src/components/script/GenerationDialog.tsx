@@ -14,6 +14,8 @@ import { Input, Textarea, Select } from "@/src/components/ui/fields";
 import { ContextChips } from "@/src/components/intelligence/output";
 import { MethodologyNote } from "@/src/components/intelligence/output";
 import type { AssembledContext } from "@/src/lib/intelligence/context";
+import { DownloadButton } from "@/src/components/ui/DownloadButton";
+import { downloadText, safeFileName } from "@/src/lib/download";
 
 /**
  * Controlled generation: options → local assembly or Gemini draft →
@@ -156,6 +158,16 @@ export function GenerationDialog({
           </ul>
           {!aiModel && <MethodologyNote text={ASSEMBLY_METHOD} />}
           <div className="flex justify-end gap-2">
+            <DownloadButton
+              label="Download draft"
+              onDownload={() =>
+                downloadText(
+                  preview.map((s) => `## ${s.heading}\n\n${s.text}`).join("\n\n"),
+                  safeFileName(`script ${format}`, "md"),
+                  "text/markdown",
+                )
+              }
+            />
             <Button variant="outline" onClick={() => setPreview(null)}>
               Adjust options
             </Button>

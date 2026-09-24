@@ -8,6 +8,8 @@ import { Button } from "@/src/components/ui/Button";
 import { Progress } from "@/src/components/ui/feedback";
 import { Badge } from "@/src/components/ui/Badge";
 import { runProviderIntelligence, type ProviderOutcome, type IntelligenceResult } from "@/src/lib/ai-client";
+import { DownloadButton } from "@/src/components/ui/DownloadButton";
+import { downloadText, safeFileName } from "@/src/lib/download";
 
 const PHASE_LABEL: Record<GenerationStatus, string> = {
   idle: "Ready",
@@ -144,11 +146,19 @@ export function TaskRunner<T>({
           </p>
           {ai?.ok && (
             <section aria-label="Gemini analysis" className="space-y-2 rounded-lg border border-border bg-muted p-4">
-              <h3 className="flex items-center gap-2 text-sm font-semibold">
-                <Sparkles className="size-4 text-primary" aria-hidden="true" />
-                Gemini analysis
-                <span className="text-xs font-normal text-muted-text">{ai.data.model}</span>
-              </h3>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2 text-sm font-semibold">
+                  <Sparkles className="size-4 text-primary" aria-hidden="true" />
+                  Gemini analysis
+                  <span className="text-xs font-normal text-muted-text">{ai.data.model}</span>
+                </h3>
+                <DownloadButton
+                  size="xs"
+                  onDownload={() =>
+                    downloadText(`# ${def.label}\n\nInput: ${contextSummary}\n\n${ai.data.text}\n`, safeFileName(`${def.label} ${new Date().toISOString().slice(0, 10)}`, "md"), "text/markdown")
+                  }
+                />
+              </div>
               <div className="whitespace-pre-wrap text-sm leading-relaxed">{ai.data.text}</div>
             </section>
           )}
