@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { scanNiche } from "@/src/server/youtube/client";
-import { expandNiches, isGeminiConfigured, type NicheCandidate } from "@/src/server/ai/gemini";
+import { expandNiches, isTextConfigured, type NicheCandidate } from "@/src/server/ai/gemini";
 import { nicheMetrics, nicheScores, type NicheMetrics, type NicheScores, type NicheVideoSample } from "@/src/lib/niche/score";
 import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } from "@/src/server/ai/guard";
 import { toErrorResponse, validationError } from "@/src/server/errors";
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     let candidates: NicheCandidate[];
     let model: string | null = null;
     if (input.mode === "expand") {
-      if (!isGeminiConfigured()) throw validationError("Niche ideas aren't available right now. Switch to “Scan exactly this niche”.");
+      if (!isTextConfigured()) throw validationError("Niche ideas aren't available right now. Switch to “Scan exactly this niche”.");
       const expanded = await expandNiches({ seed: input.seed, audience: input.audience, count: input.count });
       candidates = expanded.niches;
       model = expanded.model;

@@ -4,7 +4,7 @@ import { getDb } from "@/src/server/db";
 import { requireWorkspace } from "@/src/server/workspace";
 import { marketProfile } from "@/src/server/market/store";
 import { channelUploads, handleTaken, resolveChannel } from "@/src/server/youtube/client";
-import { isGeminiConfigured, writeChannelPlan } from "@/src/server/ai/gemini";
+import { isTextConfigured, writeChannelPlan } from "@/src/server/ai/gemini";
 import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } from "@/src/server/ai/guard";
 import { CATEGORIES, guessCategory, type CategoryId } from "@/src/lib/market/signals";
 import { median } from "@/src/lib/niche/score";
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
   try {
     caller = await guardProviderCall();
     const input = await parseBody(request, body);
-    if (!isGeminiConfigured()) throw validationError("The Channel Creator isn't available right now.");
+    if (!isTextConfigured()) throw validationError("The Channel Creator isn't available right now.");
     const db = getDb();
     if (!db) throw backendUnavailable("Database");
     const query = input.query || input.niche;

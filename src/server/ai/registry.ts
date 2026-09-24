@@ -35,6 +35,16 @@ export function describeProviders(): ProviderDescriptor[] {
       detail: isGeminiConfigured(env) ? "GEMINI_API_KEY is set." : "Set GEMINI_API_KEY to enable.",
     },
     {
+      provider: "nvidia",
+      type: "cloud",
+      capabilities: ["text", "intelligence"],
+      models: env.NVIDIA_TEXT_MODELS ? env.NVIDIA_TEXT_MODELS.split(",").map((m) => m.trim()).filter(Boolean) : ["build.nvidia.com catalog"],
+      local: false,
+      gpuRequired: false,
+      configured: Boolean(env.NVIDIA_API_KEY),
+      detail: env.NVIDIA_API_KEY ? "NVIDIA_API_KEY is set; used when Gemini is busy or unavailable." : "Set NVIDIA_API_KEY to add NVIDIA-hosted models as backup.",
+    },
+    {
       provider: "youtube",
       type: "cloud",
       capabilities: ["ingestion", "research"],

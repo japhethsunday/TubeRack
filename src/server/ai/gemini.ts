@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPlan } from "@/src/lib/channel/plan";
 import { stripMarkdown } from "@/src/lib/text/markdown";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
+import { isNvidiaConfigured, nvidiaGenerateText } from "@/src/server/ai/nvidia";
 import { getServerEnv } from "@/src/lib/env";
 import { getGateway, type AIGateway } from "@/src/lib/ai-gateway/registry";
 import {
@@ -37,6 +38,11 @@ export interface GeminiModels {
 /** Presence check without leaking values. */
 export function isGeminiConfigured(env = getServerEnv()): boolean {
   return Boolean(env.GEMINI_API_KEY);
+}
+
+/** Text features work with Gemini, NVIDIA, or both. */
+export function isTextConfigured(env = getServerEnv()): boolean {
+  return Boolean(env.GEMINI_API_KEY) || isNvidiaConfigured(env);
 }
 
 /** Resolved model names (env overrides, safe defaults). */
@@ -176,6 +182,15 @@ export class GeminiTextProvider implements TextProvider {
     const prompt = request.prompt.trim();
     if (!prompt) throw new Error("Text generation failed: prompt cannot be empty.");
     const env = getServerEnv();
+    const nvidia = isNvidiaConfigured(env);
+    // Only NVIDIA set up: use it directly.
+    if (!env.GEMINI_API_KEY && nvidia) {
+      try {
+        return await nvidiaGenerateText({ ...request, prompt });
+      } catch (error) {
+        throw providerError("text generation", error);
+      }
+    }
     const model = env.GEMINI_TEXT_MODEL || DEFAULT_TEXT_MODEL;
     // Floor of 256: reasoning models spend output budget on thought tokens,
     // so tiny caps would return empty text.
@@ -200,13 +215,25 @@ export class GeminiTextProvider implements TextProvider {
         if (!text) throw new Error("empty response");
         return { text, model: m };
       };
-      const first = await withModelFallback(model, FALLBACK_MODELS.text, call);
+      // With NVIDIA as backup, give Gemini less time before handing over.
+      const budget = nvidia ? { budgetMs: 100_000, attemptMs: 60_000 } : {};
+      const first = await withModelFallback(model, FALLBACK_MODELS.text, call, budget);
       if (!request.json || extractJsonObject(first.text)) return first;
       // One automatic retry when the JSON came back unreadable.
-      const second = await withModelFallback(first.model, FALLBACK_MODELS.text, call);
-      return extractJsonObject(second.text) ? second : first;
+      const second = await withModelFallback(first.model, FALLBACK_MODELS.text, call, budget);
+      if (extractJsonObject(second.text)) return second;
+      if (nvidia) return await nvidiaGenerateText({ ...request, prompt }).catch(() => first);
+      return first;
     } catch (error) {
-      if (error instanceof ProviderNotConfiguredError) throw error;
+      if (error instanceof ProviderNotConfiguredError && !nvidia) throw error;
+      // Gemini busy, slow, out of quota or failing: hand over to NVIDIA's models.
+      if (nvidia) {
+        try {
+          return await nvidiaGenerateText({ ...request, prompt });
+        } catch (nvidiaError) {
+          console.error("[nvidia] fallback failed:", nvidiaError instanceof Error ? nvidiaError.message.slice(0, 300) : nvidiaError);
+        }
+      }
       throw providerError("text generation", error);
     }
   }
@@ -418,7 +445,7 @@ export interface IntelligenceResponse {
  * keeps running deterministic local analyzers labeled "Local analysis".
  */
 export async function runIntelligenceTask(request: IntelligenceRequest): Promise<IntelligenceResponse> {
-  if (!isGeminiConfigured()) throw new IntelligenceNotConfiguredError(request.task);
+  if (!isTextConfigured()) throw new IntelligenceNotConfiguredError(request.task);
   const label = TASK_LABELS[request.task] ?? `Perform the "${request.task}" analysis.`;
   const context = JSON.stringify(request.context ?? {}).slice(0, 8000);
   const provider = new GeminiTextProvider();
@@ -458,7 +485,7 @@ export interface ScriptWriteRequest {
  * JSON shape (never silently pads missing sections).
  */
 export async function writeScriptSections(req: ScriptWriteRequest): Promise<{ texts: string[]; model: string }> {
-  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
+  if (!isTextConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   const perSection = Math.max(40, Math.round(req.targetWords / Math.max(1, req.sections.length)));
   const brief = {
     topic: req.topic,
@@ -511,7 +538,7 @@ export async function writePackaging(
   kind: "titles" | "seo",
   context: { topic: string; audience: string; promise: string; takeaway: string; cta: string; title: string; script: string; chapters: string },
 ): Promise<{ titles?: { text: string; category: string }[]; description?: string; tags?: string[]; hashtags?: string[]; model: string }> {
-  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
+  if (!isTextConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   const brief = JSON.stringify({ ...context, script: context.script.slice(0, 5000) });
   const rules = "Never invent statistics, rankings, or view counts. No clickbait that the video does not deliver.";
   if (kind === "titles") {
@@ -553,7 +580,7 @@ export async function rewriteSection(input: {
   instruction: string;
   topic: string;
 }): Promise<{ text: string; model: string }> {
-  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
+  if (!isTextConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   const { text, model } = await new GeminiTextProvider().generateText({
     prompt: [
       "You are an expert YouTube scriptwriter. Rewrite the script section below as spoken narration.",

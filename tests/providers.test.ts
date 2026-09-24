@@ -16,7 +16,7 @@ afterEach(() => {
 describe("provider registry", () => {
   it("describes the cloud providers with presence only (no secrets)", () => {
     const providers = describeProviders();
-    assert.deepEqual(providers.map((p) => p.provider), ["gemini", "youtube", "resend"]);
+    assert.deepEqual(providers.map((p) => p.provider), ["gemini", "nvidia", "youtube", "resend"]);
     const json = JSON.stringify(providers);
     assert.ok(!/sk-|AIza|re_[A-Za-z0-9]|BEGIN|SECRET/i.test(json));
     for (const p of providers) {

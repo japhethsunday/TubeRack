@@ -63,6 +63,11 @@ const serverSchema = z.object({
   GEMINI_IMAGE_MODEL: z.string().optional(),
   GEMINI_TTS_MODEL: z.string().optional(),
   GEMINI_TTS_VOICE: z.string().optional(),
+
+  // NVIDIA hosted models (build.nvidia.com): extra text models used when Gemini is busy or unavailable
+  NVIDIA_API_KEY: z.string().optional(),
+  // Optional comma-separated override of the NVIDIA model order
+  NVIDIA_TEXT_MODELS: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;
