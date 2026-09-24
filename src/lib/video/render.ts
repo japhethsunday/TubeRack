@@ -1,13 +1,13 @@
 "use client";
 
-import type { Composition, TimelineClip, TextStyle } from "@/src/lib/video/types";
+import type { Composition, TimelineClip } from "@/src/lib/video/types";
 import { renderMusic, renderSfx, musicRecipe, type MusicMood, type SfxType } from "@/src/lib/media/audio";
+import { drawComposition, sourceTime, transitionState, type VisualSource } from "@/src/lib/video/compositor";
 
 /**
- * Browser renderer: plays the composition onto a canvas in real time and
- * records it (with a mixed audio track) through MediaRecorder. What you see
- * in the preview is what gets encoded — same visuals, motion, text layers,
- * captions, voice, music, and sound effects.
+ * Exporter: plays the composition through the shared frame compositor onto
+ * a canvas in real time and records it — with every audio source mixed,
+ * including the original sound of video clips — via MediaRecorder.
  */
 
 export interface RenderAsset {
@@ -16,9 +16,11 @@ export interface RenderAsset {
   payload: string;
   mime: string;
   title: string;
-  /** Object URL for session uploads (null when the bytes are gone). */
+  /** Object URL for device-stored uploads (null when the bytes are unavailable). */
   blobUrl: string | null;
 }
+
+export type ExportQuality = "draft" | "standard" | "high" | "max";
 
 export interface RenderOptions {
   comp: Composition;
@@ -26,8 +28,12 @@ export interface RenderOptions {
   width: number;
   height: number;
   fps: number;
+  quality?: ExportQuality;
+  audioKbps?: number;
+  /** Export only [from, to) of the timeline. */
+  range?: { from: number; to: number };
   assetFor: (id: string | undefined) => RenderAsset | null;
-  onProgress: (p: { phase: "preparing" | "rendering" | "finalizing"; ratio: number; message: string }) => void;
+  onProgress: (p: { phase: "preparing" | "rendering" | "finalizing"; ratio: number; message: string; elapsedSec?: number; etaSec?: number }) => void;
   signal?: AbortSignal;
 }
 
@@ -35,9 +41,19 @@ export interface RenderResult {
   blob: Blob;
   mime: string;
   warnings: string[];
+  width: number;
+  height: number;
+  fps: number;
+  durationSec: number;
 }
 
 export class RenderError extends Error {}
+
+const BITS_PER_PIXEL: Record<ExportQuality, number> = { draft: 0.06, standard: 0.1, high: 0.15, max: 0.22 };
+
+export function estimateBitrate(width: number, height: number, fps: number, quality: ExportQuality = "high"): number {
+  return Math.round(width * height * fps * BITS_PER_PIXEL[quality]);
+}
 
 /** Best container the browser can record; YouTube accepts MP4 and WebM. */
 export function pickRecorderMime(): string | null {
@@ -60,7 +76,7 @@ export function renderSupport(): { ok: boolean; reason?: string } {
   return { ok: true };
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -70,11 +86,11 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function loadVideo(src: string): Promise<HTMLVideoElement> {
+export function loadVideo(src: string, muted = true): Promise<HTMLVideoElement> {
   return new Promise((resolve, reject) => {
     const v = document.createElement("video");
     v.crossOrigin = "anonymous";
-    v.muted = true;
+    v.muted = muted;
     v.playsInline = true;
     v.preload = "auto";
     v.onloadeddata = () => resolve(v);
@@ -83,145 +99,77 @@ function loadVideo(src: string): Promise<HTMLVideoElement> {
   });
 }
 
+/** URL to load an asset's bytes from, or null. */
+export function assetUrl(a: RenderAsset | null, kind: string): string | null {
+  if (!a) return null;
+  if (a.source === "local-draft" && kind === "image" && a.payload.startsWith("<svg")) {
+    return URL.createObjectURL(new Blob([a.payload], { type: "image/svg+xml" }));
+  }
+  if (a.source === "provider-output") return a.payload || null;
+  return a.blobUrl;
+}
+
 async function decode(ctx: BaseAudioContext, url: string): Promise<AudioBuffer> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`audio fetch failed (${res.status})`);
   return ctx.decodeAudioData(await res.arrayBuffer());
 }
 
-/** Ken Burns style motion, matching the preview's CSS keyframes. */
-function motionTransform(motion: string | undefined, p: number): { scale: number; dx: number; dy: number } {
-  const e = p * p * (3 - 2 * p);
-  switch (motion) {
-    case "kenburns":
-      return { scale: 1 + 0.12 * e, dx: -0.03 * e, dy: -0.02 * e };
-    case "zoom-in":
-      return { scale: 1 + 0.15 * e, dx: 0, dy: 0 };
-    case "zoom-out":
-      return { scale: 1.15 - 0.15 * e, dx: 0, dy: 0 };
-    case "pan-left":
-      return { scale: 1.12, dx: 0.04 - 0.08 * e, dy: 0 };
-    case "pan-right":
-      return { scale: 1.12, dx: -0.04 + 0.08 * e, dy: 0 };
-    case "pan-up":
-      return { scale: 1.12, dx: 0, dy: 0.04 - 0.08 * e };
-    case "pan-down":
-      return { scale: 1.12, dx: 0, dy: -0.04 + 0.08 * e };
-    default:
-      return { scale: 1, dx: 0, dy: 0 };
-  }
+function reversed(ctx: BaseAudioContext, b: AudioBuffer): AudioBuffer {
+  const out = ctx.createBuffer(b.numberOfChannels, b.length, b.sampleRate);
+  for (let ch = 0; ch < b.numberOfChannels; ch++) out.getChannelData(ch).set(Array.from(b.getChannelData(ch)).reverse());
+  return out;
 }
 
-function drawContain(ctx: CanvasRenderingContext2D, src: CanvasImageSource, sw: number, sh: number, W: number, H: number, motion: { scale: number; dx: number; dy: number }, cover: boolean) {
-  const fit = cover ? Math.max(W / sw, H / sh) : Math.min(W / sw, H / sh);
-  const w = sw * fit * motion.scale;
-  const h = sh * fit * motion.scale;
-  ctx.drawImage(src, (W - w) / 2 + motion.dx * W, (H - h) / 2 + motion.dy * H, w, h);
+function fadeGain(c: TimelineClip, t: number): number {
+  const local = t - c.startSec;
+  const out = c.startSec + c.durationSec - t;
+  let g = 1;
+  if (c.fadeInSec > 0) g = Math.min(g, local / c.fadeInSec);
+  if (c.fadeOutSec > 0) g = Math.min(g, out / c.fadeOutSec);
+  return Math.max(0, Math.min(1, g));
 }
 
-function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const lines: string[] = [];
-  for (const para of text.split("\n")) {
-    let line = "";
-    for (const word of para.split(/\s+/)) {
-      const next = line ? `${line} ${word}` : word;
-      if (ctx.measureText(next).width > maxWidth && line) {
-        lines.push(line);
-        line = word;
-      } else line = next;
-    }
-    if (line) lines.push(line);
-  }
-  return lines;
-}
-
-function drawTextBox(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  opts: { fontPx: number; weight: number; font: string; color: string; background: string; align: CanvasTextAlign; y: number; anchor: "top" | "middle" | "bottom"; W: number; opacity: number },
-) {
-  ctx.save();
-  ctx.globalAlpha = opts.opacity;
-  ctx.font = `${opts.weight} ${opts.fontPx}px ${opts.font || "Inter, system-ui, sans-serif"}`;
-  ctx.textBaseline = "middle";
-  const padX = opts.fontPx * 0.5;
-  const padY = opts.fontPx * 0.18;
-  const lineH = opts.fontPx * 1.25;
-  const lines = wrapLines(ctx, text, opts.W * 0.86);
-  const blockH = lines.length * lineH;
-  let top = opts.anchor === "top" ? opts.y : opts.anchor === "middle" ? opts.y - blockH / 2 : opts.y - blockH;
-  for (const line of lines) {
-    const tw = ctx.measureText(line).width;
-    const x = opts.align === "left" ? opts.W * 0.05 : opts.align === "right" ? opts.W * 0.95 - tw : (opts.W - tw) / 2;
-    if (opts.background && opts.background !== "transparent") {
-      ctx.fillStyle = opts.background;
-      const r = opts.fontPx * 0.3;
-      ctx.beginPath();
-      ctx.roundRect(x - padX, top - padY + (lineH - opts.fontPx) / 2 - 2, tw + padX * 2, opts.fontPx + padY * 2 + 4, r);
-      ctx.fill();
-    }
-    ctx.fillStyle = opts.color;
-    ctx.textAlign = "left";
-    ctx.fillText(line, x, top + lineH / 2);
-    top += lineH;
-  }
-  ctx.restore();
-}
-
-function fadeFactor(clip: TimelineClip, t: number): number {
-  const local = t - clip.startSec;
-  const out = clip.startSec + clip.durationSec - t;
-  let f = 1;
-  if (clip.fadeInSec > 0) f = Math.min(f, local / clip.fadeInSec);
-  if (clip.fadeOutSec > 0) f = Math.min(f, out / clip.fadeOutSec);
-  if (clip.transitionIn === "fade" || clip.transitionIn === "crossfade") f = Math.min(f, local / 0.5);
-  if (clip.transitionOut === "fade" || clip.transitionOut === "crossfade") f = Math.min(f, out / 0.5);
-  return Math.max(0, Math.min(1, f));
-}
-
-/** Render the whole composition to a video Blob (takes about as long as the video). */
+/** Render the composition to a video Blob (takes about as long as the range). */
 export async function renderComposition(o: RenderOptions): Promise<RenderResult> {
   const support = renderSupport();
   if (!support.ok) throw new RenderError(support.reason);
   const mime = pickRecorderMime()!;
   const warnings: string[] = [];
-  const W = o.width;
-  const H = o.height;
+  const W = Math.round(o.width / 2) * 2;
+  const H = Math.round(o.height / 2) * 2;
+  const from = Math.max(0, o.range?.from ?? 0);
+  const to = Math.min(o.duration, o.range?.to ?? o.duration);
+  const span = Math.max(0.1, to - from);
   const hidden = new Set(o.comp.tracks.filter((t) => t.hidden).map((t) => t.id));
   const mutedTracks = new Set(o.comp.tracks.filter((t) => t.muted).map((t) => t.id));
-  const clips = o.comp.clips.filter((c) => !hidden.has(c.trackId) && c.startSec < o.duration);
+  const inRange = (c: TimelineClip) => c.startSec < to && c.startSec + c.durationSec > from;
+  const clips = o.comp.clips.filter((c) => !hidden.has(c.trackId) && inRange(c));
+  const assetOf = (c: TimelineClip) => o.assetFor(c.assetId);
 
-  // ---- 1. Load every visual and audio source up front. ----
+  // ---- 1. Load visuals (images per asset, one video element per clip). ----
   o.onProgress({ phase: "preparing", ratio: 0, message: "Loading media…" });
-  const visuals = new Map<string, HTMLImageElement | HTMLVideoElement>();
-  const visualClips = clips.filter((c) => c.kind === "image" || c.kind === "video");
+  const images = new Map<string, HTMLImageElement>();
+  const videos = new Map<string, HTMLVideoElement>();
+  const media = clips.filter((c) => c.kind === "image" || c.kind === "video");
   let loaded = 0;
-  for (const clip of visualClips) {
-    if (!clip.assetId || visuals.has(clip.assetId)) continue;
-    const a = o.assetFor(clip.assetId);
+  for (const clip of media) {
+    if (o.signal?.aborted) throw new RenderError("Export cancelled.");
+    const url = assetUrl(assetOf(clip), clip.kind);
     try {
-      if (!a) throw new Error("missing");
+      if (!url) throw new Error("missing");
       if (clip.kind === "image") {
-        const src =
-          a.source === "local-draft" && a.payload.startsWith("<svg")
-            ? URL.createObjectURL(new Blob([a.payload], { type: "image/svg+xml" }))
-            : a.source === "provider-output"
-              ? a.payload
-              : a.blobUrl;
-        if (!src) throw new Error("bytes unavailable");
-        visuals.set(clip.assetId, await loadImage(src));
+        if (clip.assetId && !images.has(clip.assetId)) images.set(clip.assetId, await loadImage(url));
       } else {
-        const src = a.source === "provider-output" ? a.payload : a.blobUrl;
-        if (!src) throw new Error("bytes unavailable");
-        visuals.set(clip.assetId, await loadVideo(src));
+        videos.set(clip.id, await loadVideo(url, false));
       }
     } catch {
-      warnings.push(`“${clip.name}” couldn't be loaded (re-upload it this session) — a title card is shown instead.`);
+      warnings.push(`“${clip.name}” couldn't be loaded — it was left out. Re-import it and export again.`);
     }
-    o.onProgress({ phase: "preparing", ratio: ++loaded / Math.max(1, visualClips.length) * 0.6, message: "Loading media…" });
-    if (o.signal?.aborted) throw new RenderError("Cancelled.");
+    o.onProgress({ phase: "preparing", ratio: (++loaded / Math.max(1, media.length)) * 0.6, message: "Loading media…" });
   }
 
+  // ---- 2. Audio graph. ----
   const audioCtx = new AudioContext();
   const dest = audioCtx.createMediaStreamDestination();
   const master = audioCtx.createGain();
@@ -230,23 +178,23 @@ export async function renderComposition(o: RenderOptions): Promise<RenderResult>
   const audioClips = clips.filter((c) => (c.kind === "voice" || c.kind === "music" || c.kind === "sfx") && !c.muted && !mutedTracks.has(c.trackId));
   let deviceVoices = 0;
   for (const clip of audioClips) {
-    const a = o.assetFor(clip.assetId);
+    const a = assetOf(clip);
     if (!a) continue;
+    const gain = clip.kind === "music" ? clip.volume * 0.8 : clip.volume;
     try {
-      if (a.source === "provider-output") {
-        scheduled.push({ clip, buffer: await decode(audioCtx, a.payload), loop: clip.kind === "music", gain: clip.kind === "music" ? clip.volume * 0.8 : clip.volume });
-      } else if (a.source === "upload-session") {
-        if (!a.blobUrl) throw new Error("bytes unavailable");
-        scheduled.push({ clip, buffer: await decode(audioCtx, a.blobUrl), loop: clip.kind === "music", gain: clip.kind === "music" ? clip.volume * 0.8 : clip.volume });
+      let buffer: AudioBuffer | null = null;
+      if (a.source === "provider-output" || a.source === "upload-session") {
+        const url = a.source === "provider-output" ? a.payload : a.blobUrl;
+        if (!url) throw new Error("bytes unavailable");
+        buffer = await decode(audioCtx, url);
       } else if (clip.kind === "music") {
         const recipe = JSON.parse(a.payload) as { mood?: MusicMood; seconds?: number };
-        if (recipe.mood) scheduled.push({ clip, buffer: renderMusic(musicRecipe(recipe.mood, recipe.seconds ?? 30)).buffer, loop: true, gain: clip.volume * 0.8 });
+        if (recipe.mood) buffer = renderMusic(musicRecipe(recipe.mood, recipe.seconds ?? 30)).buffer;
       } else if (clip.kind === "sfx") {
         const recipe = JSON.parse(a.payload) as { type?: SfxType };
-        if (recipe.type) scheduled.push({ clip, buffer: renderSfx({ type: recipe.type, seconds: 3 }).buffer, loop: false, gain: clip.volume });
-      } else if (clip.kind === "voice") {
-        deviceVoices++;
-      }
+        if (recipe.type) buffer = renderSfx({ type: recipe.type, seconds: 3 }).buffer;
+      } else if (clip.kind === "voice") deviceVoices++;
+      if (buffer) scheduled.push({ clip, buffer: clip.reverse ? reversed(audioCtx, buffer) : buffer, loop: clip.kind === "music", gain });
     } catch {
       warnings.push(`Audio “${clip.name}” couldn't be loaded and was left out.`);
     }
@@ -254,9 +202,23 @@ export async function renderComposition(o: RenderOptions): Promise<RenderResult>
   if (deviceVoices) {
     warnings.push(`${deviceVoices} voice clip(s) use your device's built-in voice, which browsers can't record. Generate those takes with Gemini in the Voice studio to include them.`);
   }
-  o.onProgress({ phase: "preparing", ratio: 1, message: "Starting render…" });
+  // Original sound of video clips, routed into the mix (never to the speakers).
+  const videoGains = new Map<string, GainNode>();
+  for (const [clipId, el] of videos) {
+    const clip = clips.find((c) => c.id === clipId)!;
+    if (clip.muted || mutedTracks.has(clip.trackId) || clip.volume <= 0) continue;
+    try {
+      const g = audioCtx.createGain();
+      g.gain.value = 0;
+      audioCtx.createMediaElementSource(el).connect(g).connect(master);
+      videoGains.set(clipId, g);
+    } catch {
+      warnings.push(`The sound of “${clip.name}” couldn't be captured.`);
+    }
+  }
+  o.onProgress({ phase: "preparing", ratio: 1, message: "Starting export…" });
 
-  // ---- 2. Canvas + recorder. ----
+  // ---- 3. Canvas + recorder. ----
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -264,121 +226,140 @@ export async function renderComposition(o: RenderOptions): Promise<RenderResult>
   if (!ctx) throw new RenderError("Canvas unavailable.");
   const stream = canvas.captureStream(o.fps);
   for (const track of dest.stream.getAudioTracks()) stream.addTrack(track);
-  const bitrate = Math.round(W * H * o.fps * 0.14); // ~8.7 Mbps at 1080p30
   let recorder: MediaRecorder;
   try {
-    recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bitrate, audioBitsPerSecond: 192_000 });
+    recorder = new MediaRecorder(stream, {
+      mimeType: mime,
+      videoBitsPerSecond: estimateBitrate(W, H, o.fps, o.quality ?? "high"),
+      audioBitsPerSecond: (o.audioKbps ?? 192) * 1000,
+    });
   } catch {
-    throw new RenderError("The browser refused to start recording. If you used images from another site, re-generate or re-upload them.");
+    throw new RenderError("The browser refused to start recording. If media came from another website, re-import it and try again.");
   }
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   const stopped = new Promise<void>((resolve) => (recorder.onstop = () => resolve()));
 
   if (audioCtx.state === "suspended") await audioCtx.resume();
-  const t0 = audioCtx.currentTime + 0.15;
+  // t0 is set once media is pre-rolled, just before recording starts.
+  let t0 = 0;
+  const scheduleAudio = () => {
   for (const s of scheduled) {
+    const clipStart = Math.max(s.clip.startSec, from);
+    const clipEnd = Math.min(s.clip.startSec + s.clip.durationSec, to);
+    if (clipEnd <= clipStart) continue;
+    const speed = s.clip.speed ?? 1;
     const src = audioCtx.createBufferSource();
     src.buffer = s.buffer;
     src.loop = s.loop;
+    src.playbackRate.value = speed;
     const g = audioCtx.createGain();
-    const start = t0 + s.clip.startSec;
-    const end = start + Math.min(s.clip.durationSec, o.duration - s.clip.startSec);
-    g.gain.setValueAtTime(s.clip.fadeInSec > 0 ? 0 : s.gain, start);
-    if (s.clip.fadeInSec > 0) g.gain.linearRampToValueAtTime(s.gain, start + s.clip.fadeInSec);
-    if (s.clip.fadeOutSec > 0) {
-      g.gain.setValueAtTime(s.gain, Math.max(start, end - s.clip.fadeOutSec));
+    const start = t0 + (clipStart - from);
+    const end = t0 + (clipEnd - from);
+    // Offset into the source: in-point plus any part cut off by the range.
+    const offset = (s.clip.inSec ?? 0) + (clipStart - s.clip.startSec) * speed;
+    const fi = s.clip.fadeInSec;
+    const fo = s.clip.fadeOutSec;
+    g.gain.setValueAtTime(fi > 0 ? 0 : s.gain, start);
+    if (fi > 0) g.gain.linearRampToValueAtTime(s.gain, t0 + (s.clip.startSec + fi - from));
+    if (fo > 0) {
+      g.gain.setValueAtTime(s.gain, Math.max(start, end - fo));
       g.gain.linearRampToValueAtTime(0, end);
     }
     src.connect(g).connect(master);
-    src.start(start);
+    src.start(start, s.loop ? offset % Math.max(0.01, s.buffer.duration) : Math.min(offset, s.buffer.duration));
     src.stop(end);
   }
+  };
 
-  const fontScale = W / 672; // the preview box is ~672px wide
-  const drawFrame = (t: number) => {
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, W, H);
-    const active = clips.filter((c) => t >= c.startSec && t < c.startSec + c.durationSec);
-    const visual = active.find((c) => c.kind === "image" || c.kind === "video");
-    if (visual) {
-      const el = visual.assetId ? visuals.get(visual.assetId) : undefined;
-      ctx.save();
-      ctx.globalAlpha = fadeFactor(visual, t);
-      if (el instanceof HTMLVideoElement) {
-        const want = Math.max(0, t - visual.startSec);
-        if (el.paused) void el.play().catch(() => {});
-        if (Math.abs(el.currentTime - want) > 0.35) el.currentTime = Math.min(want, Math.max(0, (el.duration || want) - 0.05));
-        if (el.videoWidth) drawContain(ctx, el, el.videoWidth, el.videoHeight, W, H, { scale: 1, dx: 0, dy: 0 }, false);
-      } else if (el) {
-        const p = Math.min(1, (t - visual.startSec) / Math.max(0.1, Math.min(visual.durationSec, 10)));
-        const isDraft = o.assetFor(visual.assetId)?.source === "local-draft";
-        drawContain(ctx, el, el.naturalWidth || W, el.naturalHeight || H, W, H, motionTransform(visual.motion, p), isDraft);
-      } else {
-        ctx.fillStyle = "#18181b";
-        ctx.fillRect(0, 0, W, H);
-        drawTextBox(ctx, visual.name, { fontPx: 28 * fontScale, weight: 600, font: "", color: "#e4e4e7", background: "transparent", align: "center", y: H / 2, anchor: "middle", W, opacity: 1 });
+  const syncVideos = (t: number, playing: boolean) => {
+    for (const [clipId, el] of videos) {
+      const clip = clips.find((c) => c.id === clipId)!;
+      const active = t >= clip.startSec && t < clip.startSec + clip.durationSec;
+      const g = videoGains.get(clipId);
+      if (!active) {
+        if (!el.paused) el.pause();
+        if (g) g.gain.value = 0;
+        continue;
       }
-      ctx.restore();
-    }
-    // Pause videos that are no longer on screen.
-    for (const [id, el] of visuals) if (el instanceof HTMLVideoElement && visual?.assetId !== id && !el.paused) el.pause();
-
-    for (const tc of active.filter((c) => c.kind === "text" && c.text)) {
-      const st: Partial<TextStyle> = tc.style ?? {};
-      const fontPx = Math.max(12, (st.size ?? 32) / 2.4) * fontScale;
-      const pos = st.position ?? "bottom";
-      drawTextBox(ctx, tc.text!, {
-        fontPx,
-        weight: st.weight ?? 600,
-        font: st.font ?? "",
-        color: st.color ?? "#fff",
-        background: st.background ?? "rgba(0,0,0,0.55)",
-        align: (st.align ?? "center") as CanvasTextAlign,
-        y: pos === "top" ? 16 * fontScale : pos === "center" ? H / 2 : H - 64 * fontScale,
-        anchor: pos === "top" ? "top" : pos === "center" ? "middle" : "bottom",
-        W,
-        opacity: (st.opacity ?? 1) * fadeFactor(tc, t),
-      });
-    }
-    const caption = [...active.filter((c) => c.kind === "captions" && c.text)].pop();
-    if (caption) {
-      drawTextBox(ctx, caption.text!, { fontPx: 14 * fontScale, weight: 500, font: "", color: "#fff", background: "rgba(0,0,0,0.7)", align: "center", y: H - 16 * fontScale, anchor: "bottom", W, opacity: 1 });
+      const want = sourceTime(clip, t, el.duration || undefined);
+      if (clip.reverse) {
+        // Browsers can't play backwards: step the frame each tick.
+        if (!el.paused) el.pause();
+        el.currentTime = want;
+      } else {
+        el.playbackRate = Math.min(4, Math.max(0.25, clip.speed ?? 1));
+        if (Math.abs(el.currentTime - want) > 0.3) el.currentTime = want;
+        if (playing && el.paused) void el.play().catch(() => {});
+      }
+      if (g) g.gain.value = clip.reverse ? 0 : clip.volume * fadeGain(clip, t) * transitionState(clip, t).alpha;
     }
   };
 
-  // ---- 3. Real-time playback into the recorder. ----
-  drawFrame(0);
+  const draw = (t: number) =>
+    drawComposition(ctx, o.comp, t, W, H, {
+      sourceFor: (c) => (c.kind === "video" ? (videos.get(c.id) as VisualSource | undefined) ?? null : c.assetId ? images.get(c.assetId) ?? null : null),
+      isDraft: (c) => assetOf(c)?.source === "local-draft",
+    });
+
+  // Pre-roll: seek videos to their first frame, then start clock + recorder together.
+  syncVideos(from, false);
+  await new Promise((r) => setTimeout(r, 250));
+  draw(from);
+  t0 = audioCtx.currentTime + 0.05;
+  scheduleAudio();
+
+  // ---- 4. Real-time playback into the recorder. ----
   recorder.start(1000);
-  await new Promise<void>((resolve, reject) => {
-    const frameMs = 1000 / o.fps;
-    const tick = () => {
-      if (o.signal?.aborted) {
-        reject(new RenderError("Cancelled."));
-        return;
-      }
-      const t = audioCtx.currentTime - t0;
-      if (t >= o.duration) {
-        resolve();
-        return;
-      }
-      drawFrame(Math.max(0, t));
-      o.onProgress({ phase: "rendering", ratio: Math.max(0, t) / o.duration, message: "Rendering video…" });
-      // setTimeout keeps rendering even when the tab is in the background (rAF would stall).
-      window.setTimeout(tick, frameMs / 2);
-    };
-    tick();
-  }).finally(() => {
-    for (const el of visuals.values()) if (el instanceof HTMLVideoElement) el.pause();
-  });
+  const wall = performance.now();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const frameMs = 1000 / o.fps;
+      const tick = () => {
+        if (o.signal?.aborted) {
+          reject(new RenderError("Export cancelled."));
+          return;
+        }
+        const elapsed = audioCtx.currentTime - t0;
+        const t = from + Math.max(0, elapsed);
+        if (elapsed >= span) {
+          resolve();
+          return;
+        }
+        syncVideos(t, true);
+        draw(t);
+        const ratio = Math.max(0, elapsed) / span;
+        const secs = (performance.now() - wall) / 1000;
+        o.onProgress({ phase: "rendering", ratio, message: "Exporting…", elapsedSec: secs, etaSec: ratio > 0.02 ? secs / ratio - secs : undefined });
+        // setTimeout (not rAF) keeps exporting while the tab is in the background.
+        window.setTimeout(tick, frameMs / 2);
+      };
+      tick();
+    });
+  } catch (error) {
+    try {
+      recorder.stop();
+    } catch {
+      // already stopped
+    }
+    stream.getTracks().forEach((t) => t.stop());
+    for (const el of videos.values()) el.pause();
+    void audioCtx.close();
+    throw error;
+  }
 
   o.onProgress({ phase: "finalizing", ratio: 1, message: "Finalizing file…" });
+  for (const el of videos.values()) el.pause();
   recorder.stop();
   await stopped;
   stream.getTracks().forEach((t) => t.stop());
   void audioCtx.close();
+  for (const el of videos.values()) {
+    el.removeAttribute("src");
+    el.load();
+  }
   const type = mime.split(";")[0];
   const blob = new Blob(chunks, { type });
-  if (blob.size < 1000) throw new RenderError("The render produced an empty file. Keep this tab open while rendering and try again.");
-  return { blob, mime: type, warnings };
+  if (blob.size < 1000) throw new RenderError("The export produced an empty file. Keep this tab open while exporting and try again.");
+  return { blob, mime: type, warnings, width: W, height: H, fps: o.fps, durationSec: span };
 }

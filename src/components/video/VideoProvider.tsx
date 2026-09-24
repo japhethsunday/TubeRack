@@ -153,12 +153,14 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
         [projectId]: { past: [...current.past.slice(-49), prev], future: [] },
       };
     });
-    setBundle((b) => ({
-      ...b,
-      compositions: b.compositions.map((c) =>
-        c.projectId === projectId ? { ...c, clips: next, updatedAt: new Date().toISOString() } : c,
-      ),
-    }));
+    setBundle((b) => {
+      const at = new Date().toISOString();
+      // First edit on a new project creates its composition.
+      if (!b.compositions.some((c) => c.projectId === projectId)) {
+        return { ...b, compositions: [...b.compositions, { ...emptyComposition(projectId), clips: next, updatedAt: at }] };
+      }
+      return { ...b, compositions: b.compositions.map((c) => (c.projectId === projectId ? { ...c, clips: next, updatedAt: at } : c)) };
+    });
   }, []);
 
   const value = useMemo<VideoContextValue>(() => {

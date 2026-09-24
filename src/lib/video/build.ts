@@ -30,6 +30,13 @@ const TRACK_DEFS: { kind: TimelineClip["kind"]; label: string }[] = [
   { kind: "captions", label: "Captions" },
 ];
 
+/** A new, uniquely-named track of a kind (V2, A2, T2…). */
+export function newTrack(kind: TimelineClip["kind"], existing: TimelineTrack[]): TimelineTrack {
+  const label = TRACK_DEFS.find((t) => t.kind === kind)?.label ?? kind;
+  const n = existing.filter((t) => t.kind === kind).length + 1;
+  return { id: nextId(`track_${kind}`), kind, label: `${label} ${n}`, muted: false, hidden: false };
+}
+
 export function defaultTracks(): TimelineTrack[] {
   return TRACK_DEFS.map((t) => ({
     id: `track_${t.kind}`,
@@ -214,15 +221,17 @@ export function validateComposition(comp: Composition, scenes: Scene[], assets: 
   const issues: ValidationIssue[] = [];
   const byId = new Map(assets.map((a) => [a.id, a]));
 
-  if (scenes.length === 0) {
-    issues.push({ severity: "block", message: "No scenes on the board.", fix: "Build scenes in the Storyboard first." });
+  if (comp.clips.length === 0) {
+    issues.push({ severity: "block", message: "Timeline is empty.", fix: "Import a video, or auto-build from storyboard scenes." });
     return issues;
   }
-  if (comp.clips.length === 0) {
-    issues.push({ severity: "block", message: "Timeline is empty.", fix: "Auto-build from scenes or add clips manually." });
+  if (!comp.clips.some((c) => c.kind === "image" || c.kind === "video" || c.kind === "text")) {
+    issues.push({ severity: "block", message: "Nothing visible on the timeline.", fix: "Add a video, image, or text clip." });
   }
 
-  for (const seg of sceneSegments(scenes)) {
+  // Storyboard checks only apply when the timeline was built from scenes.
+  const sceneBuilt = comp.clips.some((c) => c.sceneId);
+  for (const seg of sceneBuilt ? sceneSegments(scenes) : []) {
     const sceneClips = comp.clips.filter((c) => c.sceneId === seg.sceneId);
     const hasVisual = sceneClips.some((c) => c.kind === "image" || c.kind === "video");
     if (!hasVisual) {
@@ -273,8 +282,6 @@ export function validateComposition(comp: Composition, scenes: Scene[], assets: 
       issues.push({ severity: "block", message: `Clip “${clip.name}” points at a deleted asset.`, fix: "Remove or relink the clip." });
     } else if (asset.source === "provider-request") {
       issues.push({ severity: "block", message: `Clip “${clip.name}” uses a provider request, not media.`, fix: "Replace with a draft or upload — requests submit in Phase 11." });
-    } else if (asset.source === "upload-session") {
-      issues.push({ severity: "warn", message: `Clip “${clip.name}” uses a session upload.`, fix: "Re-upload if bytes expired; storage persists in Phase 11." });
     }
     if (clip.durationSec <= 0 || clip.startSec < 0) {
       issues.push({ severity: "block", message: `Clip “${clip.name}” has an invalid range.`, fix: "Adjust start/duration in the inspector." });

@@ -106,11 +106,24 @@ export interface PublishSource {
   health: HealthState;
   blockingIssues: string[];
   assetFor: (id: string | undefined) => RenderAsset | null;
+  /** Export size used when publishing renders the timeline itself. */
+  render?: { width: number; height: number; fps: number };
+}
+
+export interface Prerendered {
+  blob: Blob;
+  mime: string;
 }
 
 /** Header button + latest published state for the current project. */
-export function PublishButton({ source }: { source: PublishSource }) {
+export function PublishButton({ source, prerendered, openSignal }: { source: PublishSource; prerendered?: Prerendered | null; openSignal?: number }) {
   const [open, setOpen] = useState(false);
+  // Opening from the Export panel bumps openSignal.
+  const [lastSignal, setLastSignal] = useState(openSignal ?? 0);
+  if ((openSignal ?? 0) !== lastSignal) {
+    setLastSignal(openSignal ?? 0);
+    if (openSignal) setOpen(true);
+  }
   const [latest, setLatest] = useState<PublishRecord | null>(null);
 
   useEffect(() => {
@@ -133,12 +146,12 @@ export function PublishButton({ source }: { source: PublishSource }) {
       <Button size="sm" onClick={() => setOpen(true)}>
         <MonitorPlay className="size-4" aria-hidden="true" /> Publish to YouTube
       </Button>
-      {open && <PublishDialog source={source} onClose={() => setOpen(false)} />}
+      {open && <PublishDialog source={source} prerendered={prerendered ?? null} onClose={() => setOpen(false)} />}
     </>
   );
 }
 
-function PublishDialog({ source, onClose }: { source: PublishSource; onClose: () => void }) {
+function PublishDialog({ source, prerendered, onClose }: { source: PublishSource; prerendered: Prerendered | null; onClose: () => void }) {
   const pack = usePackaging();
   const seo = pack.seoFor(source.projectId);
   const primary = pack.primaryTitleFor(source.projectId);
@@ -209,7 +222,7 @@ function PublishDialog({ source, onClose }: { source: PublishSource; onClose: ()
     stepsRef.current = steps;
   }, [steps]);
 
-  const renderBlocked = !file && source.health === "blocked";
+  const renderBlocked = !file && !prerendered && source.health === "blocked";
   const scheduleProblem = privacy === "public" || schedule ? scheduleError(schedule) : null;
 
   function validate(): string | null {
@@ -217,7 +230,7 @@ function PublishDialog({ source, onClose }: { source: PublishSource; onClose: ()
     if (description.length > YT_DESCRIPTION_MAX) return `Description is over ${YT_DESCRIPTION_MAX} characters.`;
     if (scheduleProblem) return scheduleProblem;
     if (renderBlocked) return "The timeline has blocking issues (see the Export tab). Fix them, or choose a finished video file instead.";
-    if (!file && !renderSupport().ok) return renderSupport().reason ?? "Rendering isn't supported in this browser.";
+    if (!file && !prerendered && !renderSupport().ok) return renderSupport().reason ?? "Rendering isn't supported in this browser.";
     return null;
   }
 
@@ -246,6 +259,11 @@ function PublishDialog({ source, onClose }: { source: PublishSource; onClose: ()
       let state: StepState = "pending";
       let detail = "";
       if (id === "render" && file) [state, detail] = ["skipped", "Using your video file"];
+      if (id === "render" && !file && prerendered) {
+        run.current.blob = prerendered.blob;
+        run.current.mime = prerendered.mime;
+        [state, detail] = ["done", `Using your export · ${fmtMb(prerendered.blob.size)}`];
+      }
       if (id === "thumbnail" && !(includeThumb && variant)) [state, detail] = ["skipped", variant ? "Turned off" : "No thumbnail in Packaging — YouTube will pick one"];
       if (id === "playlist" && !wantPlaylist) [state, detail] = ["skipped", "No playlist selected"];
       if (id === "captions" && !(includeCaptions && vtt)) [state, detail] = ["skipped", vtt ? "Turned off" : "No captions on the timeline"];
@@ -278,9 +296,9 @@ function PublishDialog({ source, onClose }: { source: PublishSource; onClose: ()
             const out = await renderComposition({
               comp: source.comp,
               duration: source.duration,
-              width: source.comp.canvas.width,
-              height: source.comp.canvas.height,
-              fps: source.fps,
+              width: source.render?.width ?? source.comp.canvas.width,
+              height: source.render?.height ?? source.comp.canvas.height,
+              fps: source.render?.fps ?? source.fps,
               assetFor: source.assetFor,
               signal: ac.signal,
               onProgress: (p) => setStep("render", { progress: Math.round(p.ratio * 100), detail: p.message }),
@@ -494,7 +512,9 @@ function PublishDialog({ source, onClose }: { source: PublishSource; onClose: ()
 
           <div className="rounded-lg border border-border p-3 text-sm">
             <p className="flex items-center gap-2 font-medium"><Film className="size-4" aria-hidden="true" /> Video</p>
-            {file ? (
+            {prerendered && !file ? (
+              <p className="mt-1 text-muted-text">Your finished export ({fmtMb(prerendered.blob.size)}) is uploaded directly — no download needed.</p>
+            ) : file ? (
               <p className="mt-1 text-muted-text">{file.name} · {fmtMb(file.size)} <button type="button" className="ml-2 text-primary hover:underline" onClick={() => setFile(null)}>Render from timeline instead</button></p>
             ) : (
               <p className="mt-1 text-muted-text">

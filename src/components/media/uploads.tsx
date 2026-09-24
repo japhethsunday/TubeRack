@@ -18,7 +18,7 @@ function kindLabel(kind: UploadKind): string {
 
 /** Real upload intake: magic-byte validation, metadata extraction, session bytes. */
 export function UploadZone({ projectId }: { projectId: string }) {
-  const { addAsset, putBlob } = useMedia();
+  const { addAsset, putBlob, persistBlob } = useMedia();
   const session = useSession();
 
   /** PUT bytes to the signed storage URL with real progress. */
@@ -113,7 +113,7 @@ export function UploadZone({ projectId }: { projectId: string }) {
         patch(id, { status: "cancelled" });
         return;
       }
-      addAsset({
+      const created = addAsset({
         projectId,
         sceneIds: [],
         kind: found.kind === "audio" ? "music" : found.kind,
@@ -129,6 +129,8 @@ export function UploadZone({ projectId }: { projectId: string }) {
         tags: ["upload", found.kind],
         approval: "draft",
       });
+      // Device copy under the asset's own id so it survives reloads.
+      if (!storedUrl) await persistBlob(created.id, file).catch(() => putBlob(created.id, file));
       patch(id, { progress: 100, status: "ready" });
     } catch (e) {
       patch(id, { status: "failed", error: e instanceof Error ? e.message : "Upload failed." });

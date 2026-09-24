@@ -36,7 +36,47 @@ export interface TimelineClip {
   transitionOut?: string;
   effectIds?: string[];
   style?: TextStyle;
+  /** Where playback starts inside the source media (seconds) — non-destructive trim. */
+  inSec?: number;
+  /** Playback speed multiplier (0.25–4). Timeline duration is independent. */
+  speed?: number;
+  /** Reverse playback (audio + images; video reverse is baked on export). */
+  reverse?: boolean;
+  transform?: ClipTransform;
+  /** Crop as fractions of each edge (0–0.45). */
+  crop?: { top: number; right: number; bottom: number; left: number };
+  filters?: ClipFilters;
+  /** Layer opacity 0–1 (multiplied with fades). */
+  opacity?: number;
+  /** How media fills the frame. */
+  fit?: "contain" | "cover" | "fill";
+  /** Text entrance animation. */
+  textAnim?: "none" | "fade" | "slide-up" | "pop" | "typewriter" | "wipe";
 }
+
+export interface ClipTransform {
+  /** Offset from centre as a fraction of frame width/height (-1..1). */
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number; // degrees
+  flipH: boolean;
+  flipV: boolean;
+}
+
+export interface ClipFilters {
+  brightness: number; // % (100 = unchanged)
+  contrast: number;
+  saturation: number;
+  hue: number; // degrees
+  blur: number; // px at 1080p
+  grayscale: number; // %
+  sepia: number; // %
+  vignette: number; // 0–100
+}
+
+export const NEUTRAL_FILTERS: ClipFilters = { brightness: 100, contrast: 100, saturation: 100, hue: 0, blur: 0, grayscale: 0, sepia: 0, vignette: 0 };
+export const IDENTITY_TRANSFORM: ClipTransform = { x: 0, y: 0, scale: 1, rotation: 0, flipH: false, flipV: false };
 
 export interface TextStyle {
   font: string;
@@ -54,6 +94,8 @@ export interface CanvasSettings {
   aspect: string;
   width: number;
   height: number;
+  /** Frame background behind all layers. */
+  background?: string;
 }
 
 export interface Composition {

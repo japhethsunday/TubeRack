@@ -131,9 +131,15 @@ describe("video build", () => {
   it("validates with actionable issues and honest health", () => {
     const scenes = [scene({ id: "sc1", narration: "This narration runs long with many words filling plenty of time today for a full voiceover take with room to spare" })];
     const empty = validateComposition({ ...emptyComposition("p1"), clips: [] }, scenes, []);
-    assert.ok(empty.some((i) => i.severity === "block" && i.message.includes("no visual")));
-    assert.ok(empty.some((i) => i.severity === "warn" && i.message.includes("no voice")));
+    assert.ok(empty.some((i) => i.severity === "block" && i.message.includes("Timeline is empty")));
     assert.equal(healthOf(empty), "blocked");
+    // Scene-built timelines still get storyboard checks.
+    const sceneBuilt = validateComposition({ ...emptyComposition("p1"), clips: [clip({ id: "v", kind: "voice", trackId: "track_voice", sceneId: "other" })] }, scenes, []);
+    assert.ok(sceneBuilt.some((i) => i.severity === "block" && i.message.includes("no visual")));
+    assert.ok(sceneBuilt.some((i) => i.severity === "warn" && i.message.includes("no voice")));
+    // Imported-video projects need no storyboard.
+    const imported = validateComposition({ ...emptyComposition("p1"), clips: [clip({ assetId: "m1" })] }, [], [asset({ id: "m1" })]);
+    assert.deepEqual(imported, []);
 
     const bad = validateComposition(
       { ...emptyComposition("p1"), clips: [clip({ assetId: "ghost" }), clip({ id: "c2", trackId: "track_image", kind: "image", name: "Req", assetId: "req", startSec: 0, durationSec: 2 })] },
@@ -204,5 +210,79 @@ describe("video storage", () => {
     assert.deepEqual(parseVideoBundle(JSON.parse(JSON.stringify(bundle))), bundle);
     assert.throws(() => parseVideoBundle({}), /video file/);
     assert.throws(() => parseVideoBundle({ version: 1, compositions: [{ projectId: 1 }], snapshots: [], requests: [] }), /video file/);
+  });
+});
+
+import { pasteClips, rippleDelete, maxDurationFor, trimClip as trim2, splitClipAt as split2 } from "@/src/lib/video/ops";
+import { newTrack as newTrack2, defaultTracks as defaultTracks2 } from "@/src/lib/video/build";
+
+describe("non-destructive editing", () => {
+  it("trims and splits move the source in-point", () => {
+    const base = [clip({ id: "v1", kind: "video", startSec: 10, durationSec: 20, inSec: 5, speed: 2 })];
+    const trimmed = trim2(base, "v1", "start", 3)[0];
+    assert.equal(trimmed.startSec, 13);
+    assert.equal(trimmed.durationSec, 17);
+    assert.equal(trimmed.inSec, 11); // 5 + 3s × 2 speed
+    // Can't trim left past the start of the source.
+    assert.equal(trim2(base, "v1", "start", -100)[0].inSec, 0);
+    const [a, b] = split2(base, "v1", 16);
+    assert.equal(a.durationSec, 6);
+    assert.equal(b.startSec, 16);
+    assert.equal(b.inSec, 17);
+  });
+
+  it("pastes, ripple-deletes, caps duration, and adds tracks", () => {
+    const clips = [clip({ id: "a", startSec: 0, durationSec: 5 }), clip({ id: "b", startSec: 5, durationSec: 5 })];
+    const { clips: out, pastedIds } = pasteClips(clips, clips, 20);
+    assert.equal(out.length, 4);
+    assert.deepEqual(out.filter((c) => pastedIds.includes(c.id)).map((c) => c.startSec), [20, 25]);
+    assert.deepEqual(rippleDelete(clips, "a").map((c) => c.startSec), [0]);
+    assert.equal(maxDurationFor(clip({ kind: "video", inSec: 10, speed: 2 }), 30), 10);
+    assert.equal(maxDurationFor(clip({ kind: "image" }), 30), null);
+    const t = newTrack2("video", defaultTracks2());
+    assert.equal(t.label, "Video 2");
+    assert.notEqual(t.id, "track_video");
+  });
+});
+
+import { sourceTime, transitionState, visualStack, filterString } from "@/src/lib/video/compositor";
+import { NEUTRAL_FILTERS } from "@/src/lib/video/types";
+
+describe("frame compositor", () => {
+  it("maps timeline time to source time with in-point, speed, and reverse", () => {
+    const c = clip({ kind: "video", startSec: 10, durationSec: 4, inSec: 2, speed: 2 });
+    assert.equal(sourceTime(c, 10), 2);
+    assert.equal(sourceTime(c, 11), 4);
+    assert.equal(sourceTime({ ...c, reverse: true }, 10), 10); // starts at the end of the used range
+    assert.equal(sourceTime({ ...c, reverse: true }, 13), 4);
+    assert.ok(sourceTime(c, 13.9, 5) <= 5); // clamped to the source length
+  });
+
+  it("computes fades and transitions", () => {
+    const c = clip({ startSec: 0, durationSec: 4, fadeInSec: 1, fadeOutSec: 0, transitionOut: "slide" });
+    assert.equal(transitionState(c, 0.5).alpha, 0.5);
+    assert.equal(transitionState(c, 2).alpha, 1);
+    assert.ok(transitionState(c, 3.9).dx > 0);
+    assert.ok(transitionState({ ...c, transitionIn: "wipe" }, 0.1).wipe < 1);
+  });
+
+  it("stacks visible layers in track order with captions on top", () => {
+    const comp = {
+      ...emptyComposition("p"),
+      clips: [
+        clip({ id: "cap", kind: "captions", trackId: "track_captions", text: "hi" }),
+        clip({ id: "img", kind: "image", trackId: "track_image" }),
+        clip({ id: "vid", kind: "video", trackId: "track_video" }),
+        clip({ id: "txt", kind: "text", trackId: "track_text", text: "t" }),
+      ],
+    };
+    assert.deepEqual(visualStack(comp, 1).map((c) => c.id), ["vid", "img", "txt", "cap"]);
+    const hidden = { ...comp, tracks: comp.tracks.map((t) => (t.kind === "image" ? { ...t, hidden: true } : t)) };
+    assert.ok(!visualStack(hidden, 1).some((c) => c.id === "img"));
+  });
+
+  it("builds CSS filter strings only for changed values", () => {
+    assert.equal(filterString(NEUTRAL_FILTERS, 1), "none");
+    assert.equal(filterString({ ...NEUTRAL_FILTERS, brightness: 120, grayscale: 100, blur: 4 }, 0.5), "brightness(120%) blur(2.0px) grayscale(100%)");
   });
 });

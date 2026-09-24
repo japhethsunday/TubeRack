@@ -31,6 +31,17 @@ const clipSchema = z.object({
   transitionOut: z.string().optional(),
   effectIds: z.array(z.string()).optional(),
   style: styleSchema.optional(),
+  inSec: z.number().optional(),
+  speed: z.number().optional(),
+  reverse: z.boolean().optional(),
+  transform: z.object({ x: z.number(), y: z.number(), scale: z.number(), rotation: z.number(), flipH: z.boolean(), flipV: z.boolean() }).optional(),
+  crop: z.object({ top: z.number(), right: z.number(), bottom: z.number(), left: z.number() }).optional(),
+  filters: z
+    .object({ brightness: z.number(), contrast: z.number(), saturation: z.number(), hue: z.number(), blur: z.number(), grayscale: z.number(), sepia: z.number(), vignette: z.number() })
+    .optional(),
+  opacity: z.number().optional(),
+  fit: z.enum(["contain", "cover", "fill"]).optional(),
+  textAnim: z.enum(["none", "fade", "slide-up", "pop", "typewriter", "wipe"]).optional(),
 });
 
 const trackSchema = z.object({
@@ -50,6 +61,7 @@ const compositionSchema = z.object({
     aspect: z.string(),
     width: z.number(),
     height: z.number(),
+    background: z.string().optional(),
   }),
   updatedAt: z.string(),
 });

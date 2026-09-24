@@ -8,16 +8,17 @@ import { limiterFor } from "@/src/server/rate-limit";
 import { backendUnavailable, rateLimited, toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 
-const MAX_BYTES = 200 * 1024 * 1024;
+// Matches the storage plan's per-file limit; larger media stays on the device.
+const MAX_BYTES = 50 * 1024 * 1024;
 const EXT: Record<string, string> = {
   "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp",
-  "video/mp4": "mp4", "video/webm": "webm",
+  "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov", "audio/mp4": "m4a",
   "audio/mpeg": "mp3", "audio/wav": "wav", "audio/ogg": "ogg",
 };
 
 const body = z.object({
   mime: z.string().refine((m) => m in EXT, "Unsupported file type."),
-  size: z.number().int().positive().max(MAX_BYTES, "File exceeds the 200 MB maximum."),
+  size: z.number().int().positive().max(MAX_BYTES, "Cloud storage takes files up to 50 MB — larger files are kept on your device."),
 });
 
 /**

@@ -25,9 +25,10 @@ const SIGNATURES: { kind: UploadKind; mime: string; bytes: number[]; mask?: numb
 ];
 
 export const UPLOAD_LIMITS: Record<UploadKind, { bytes: number; label: string }> = {
-  image: { bytes: 10 * 1024 * 1024, label: "10 MB" },
-  video: { bytes: 200 * 1024 * 1024, label: "200 MB" },
-  audio: { bytes: 50 * 1024 * 1024, label: "50 MB" },
+  image: { bytes: 25 * 1024 * 1024, label: "25 MB" },
+  // Large videos are stored on the device (OPFS) and stream from disk.
+  video: { bytes: 20 * 1024 * 1024 * 1024, label: "20 GB" },
+  audio: { bytes: 1024 * 1024 * 1024, label: "1 GB" },
 };
 
 function sniff(header: Uint8Array): ValidatedUpload | null {
@@ -49,6 +50,11 @@ function sniff(header: Uint8Array): ValidatedUpload | null {
       if (sig.mime === "image/webp" && !(header[8] === 0x57 && header[9] === 0x45 && header[10] === 0x42 && header[11] === 0x50)) {
         continue;
       }
+      if (sig.mime === "video/mp4") {
+        const brand = String.fromCharCode(header[8], header[9], header[10], header[11]);
+        if (brand === "qt  ") return { kind: "video", mime: "video/quicktime" };
+        if (brand === "M4A " || brand === "M4B ") return { kind: "audio", mime: "audio/mp4" };
+      }
       return { kind: sig.kind, mime: sig.mime };
     }
   }
@@ -59,7 +65,7 @@ function sniff(header: Uint8Array): ValidatedUpload | null {
 export function validateUpload(header: Uint8Array, size: number): ValidatedUpload {
   const found = sniff(header);
   if (!found) {
-    throw new Error("Unrecognized file type. Supported: PNG, JPEG, GIF, WebP, MP4, WebM, MP3, WAV, OGG — by content, not extension.");
+    throw new Error("Unrecognized file type. Supported: MP4, MOV, WebM, MKV, PNG, JPEG, GIF, WebP, MP3, M4A, WAV, OGG — by content, not extension.");
   }
   const limit = UPLOAD_LIMITS[found.kind];
   if (size > limit.bytes) {

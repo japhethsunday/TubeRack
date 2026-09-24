@@ -1,5 +1,6 @@
 "use client";
 
+import { loadLocal, removeLocal, saveLocal } from "@/src/lib/media/local-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ApprovalState,
@@ -38,6 +39,10 @@ export interface MediaContextValue {
   /** Session-only bytes for uploads (object URLs). Gone on reload — disclosed in UI. */
   blobUrlFor: (id: string) => string | null;
   putBlob: (id: string, blob: Blob) => string;
+  /** Save bytes to this device (survives reloads) and attach them to an asset. */
+  persistBlob: (id: string, blob: Blob, onProgress?: (ratio: number) => void, signal?: AbortSignal) => Promise<string>;
+  /** Bumps when device-stored media finishes loading after a reload. */
+  blobVersion: number;
   voicesFor: (projectId: string) => VoiceProfile[];
   defaultVoiceFor: (projectId: string) => VoiceProfile | null;
   saveVoice: (input: Omit<VoiceProfile, "id" | "createdAt"> & { id?: string }) => VoiceProfile;
@@ -113,6 +118,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const blobs = useRef(new Map<string, { url: string; blob: Blob }>());
   const tombstones = useRef<{ assets: string[] }>({ assets: [] });
+  const [blobVersion, setBlobVersion] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,6 +154,27 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       map.clear();
     };
   }, [cloud]);
+
+  // Re-attach device-stored media (OPFS) after a reload.
+  useEffect(() => {
+    if (!ready) return;
+    const missing = bundle.assets.filter((a) => a.source === "upload-session" && !blobs.current.has(a.id));
+    if (!missing.length) return;
+    let cancelled = false;
+    void (async () => {
+      let found = 0;
+      for (const a of missing) {
+        const file = await loadLocal(a.id);
+        if (cancelled || !file) continue;
+        blobs.current.set(a.id, { url: URL.createObjectURL(file), blob: file });
+        found++;
+      }
+      if (found && !cancelled) setBlobVersion((v) => v + 1);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, bundle.assets]);
 
   useEffect(() => {
     if (!ready) return;
@@ -196,6 +223,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       },
       updateAsset: (id, patch) => touchAsset(id, patch),
       removeAsset: (id) => {
+        void removeLocal(id);
         tombstones.current.assets.push(id);
         return setBundle((b) => ({ ...b, assets: b.assets.filter((a) => a.id !== id) }));
       },
@@ -224,6 +252,17 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         blobs.current.set(id, { url, blob });
         return url;
       },
+      persistBlob: async (id, blob, onProgress, signal) => {
+        await saveLocal(id, blob, onProgress, signal);
+        const file = (await loadLocal(id)) ?? blob;
+        const prev = blobs.current.get(id);
+        if (prev) URL.revokeObjectURL(prev.url);
+        const url = URL.createObjectURL(file);
+        blobs.current.set(id, { url, blob: file });
+        setBlobVersion((v) => v + 1);
+        return url;
+      },
+      blobVersion,
       voicesFor: (projectId) => bundle.voices.filter((v) => v.projectId === projectId),
       defaultVoiceFor: (projectId) =>
         bundle.voices.find((v) => v.projectId === projectId && v.isDefault) ??
@@ -271,7 +310,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         return { assets: incoming.assets.length, voices: incoming.voices.length };
       },
     }),
-    [bundle, ready, touchAsset],
+    [bundle, ready, touchAsset, blobVersion],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
