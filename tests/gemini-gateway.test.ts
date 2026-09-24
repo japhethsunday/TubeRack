@@ -35,9 +35,9 @@ describe("gemini provider", () => {
     process.env.GEMINI_API_KEY = "test-key-not-a-secret";
     __resetEnvCache();
     assert.equal(isGeminiConfigured(), true);
-    assert.deepEqual(currentGeminiModel(), { provider: "gemini", model: "gemini-3.5-pro" });
+    assert.deepEqual(currentGeminiModel(), { provider: "gemini", model: "gemini-pro-latest" });
     assert.deepEqual(getGeminiModels(), {
-      text: "gemini-3.5-pro",
+      text: "gemini-pro-latest",
       image: "gemini-3.1-flash-image",
       tts: "gemini-2.5-flash-preview-tts",
       voice: "Kore",

@@ -48,7 +48,8 @@ import { IntelligenceNotConfiguredError } from "@/src/lib/ai-gateway/intelligenc
  * components, workers, or tests — never from client components.
  */
 
-const DEFAULT_TEXT_MODEL = "gemini-3.5-pro";
+// Pro when the key's plan includes it (a quota-less plan is skipped instantly), else Flash.
+const DEFAULT_TEXT_MODEL = "gemini-pro-latest";
 const DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image";
 const DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 const DEFAULT_TTS_VOICE = "Kore";
@@ -96,7 +97,7 @@ export function getGeminiClient(env = getServerEnv()): GoogleGenAI {
 const FALLBACK_MODELS = {
   // Pro first for quality; Flash families have separate capacity and answer
   // fast when Pro is overloaded or slow. Missing models are skipped fast.
-  text: ["gemini-pro-latest", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-pro", "gemini-2.5-flash"],
+  text: ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-pro", "gemini-2.5-flash"],
   image: ["gemini-3.1-flash-image", "gemini-3-pro-image-preview", "gemini-2.5-flash-image"],
   tts: ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"],
 } as const;

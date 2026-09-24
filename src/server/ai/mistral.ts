@@ -7,7 +7,15 @@ import { chatGenerateText, type ChatProvider } from "@/src/server/ai/chat-compat
  * The key never leaves the server.
  */
 const BASE_URL = "https://api.mistral.ai/v1";
-const DEFAULT_TEXT_MODELS = ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest"];
+// Large is used when the plan includes it; models missing from the account's list are skipped.
+export const MISTRAL_TEXT_MODELS = [
+  "mistral-large-latest",
+  "mistral-medium-latest",
+  "mistral-small-latest",
+  "magistral-medium-latest",
+  "ministral-14b-latest",
+  "ministral-8b-latest",
+];
 const TTS_MODEL = "voxtral-mini-tts-2603";
 const STT_MODEL = "voxtral-mini-latest";
 const DEFAULT_VOICE = "en_paul_neutral";
@@ -23,7 +31,7 @@ function key(env = getServerEnv()): string {
 
 function textProvider(env = getServerEnv()): ChatProvider {
   const custom = env.MISTRAL_TEXT_MODELS?.split(",").map((m) => m.trim()).filter(Boolean);
-  return { name: "Mistral", baseUrl: BASE_URL, key: key(env), models: custom?.length ? custom : DEFAULT_TEXT_MODELS };
+  return { name: "Mistral", baseUrl: BASE_URL, key: key(env), models: custom?.length ? custom : MISTRAL_TEXT_MODELS };
 }
 
 export function mistralGenerateText(request: { prompt: string; maxTokens?: number; json?: boolean }, opts?: { budgetMs?: number; attemptMs?: number }) {

@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { getServerEnv } from "@/src/lib/env";
 import { chatGenerateText, type ChatProvider } from "@/src/server/ai/chat-compat";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
-import { getGeminiClient } from "@/src/server/ai/gemini";
+import { getGeminiClient, GeminiTextProvider, GeminiTtsProvider } from "@/src/server/ai/gemini";
+import { NVIDIA_TEXT_MODELS } from "@/src/server/ai/nvidia";
+import { MISTRAL_TEXT_MODELS } from "@/src/server/ai/mistral";
 import { mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
 
 export const maxDuration = 300;
@@ -15,19 +17,7 @@ export const maxDuration = 300;
  */
 type Check = { provider: string; model: string; test: string; ok: boolean; ms: number; error?: string };
 
-const NVIDIA_MODELS = [
-  "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-  "meta/llama-3.3-70b-instruct",
-  "qwen/qwen3.5-397b-a17b",
-  "mistralai/mistral-large-2-instruct",
-  "deepseek-ai/deepseek-v3.1",
-  "moonshotai/kimi-k2.6",
-  "z-ai/glm-5.1",
-  "google/gemma-3-27b-it",
-  "meta/llama-3.1-70b-instruct",
-  "meta/llama-3.1-8b-instruct",
-];
-const MISTRAL_MODELS = ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest"];
+
 
 let cache: { at: number; report: unknown } | null = null;
 let running: Promise<unknown> | null = null;
@@ -93,10 +83,11 @@ function textChecks(p: Omit<ChatProvider, "models">, providerName: string, model
 async function run() {
   const env = getServerEnv();
   const jobs: (() => Promise<Check>)[] = [];
+  const mistralJobs: (() => Promise<Check>)[] = [];
   const catalogs: Record<string, string[]> = {};
 
   if (env.GEMINI_API_KEY) {
-    for (const model of ["gemini-3.5-pro", "gemini-pro-latest", "gemini-3.6-flash"]) {
+    for (const model of ["gemini-pro-latest", "gemini-3.6-flash", "gemini-flash-latest"]) {
       jobs.push(() =>
         timed("gemini", model, "text", async () => {
           const r = await getGeminiClient(env).models.generateContent({ model, contents: "Write one short sentence about YouTube thumbnails.", config: { maxOutputTokens: 400 } });
@@ -107,8 +98,11 @@ async function run() {
   }
   if (env.MISTRAL_API_KEY) {
     catalogs.mistral = await catalog("https://api.mistral.ai/v1", env.MISTRAL_API_KEY);
-    jobs.push(...textChecks({ name: "Mistral", baseUrl: "https://api.mistral.ai/v1", key: env.MISTRAL_API_KEY }, "mistral", MISTRAL_MODELS));
-    jobs.push(() =>
+    const live = new Set(catalogs.mistral);
+    const wanted = env.MISTRAL_TEXT_MODELS?.split(",").map((m) => m.trim()).filter(Boolean) ?? MISTRAL_TEXT_MODELS;
+    for (const m of wanted.filter((m) => !live.has(m))) jobs.push(async () => ({ provider: "mistral", model: m, test: "listed", ok: false, ms: 0, error: "not in this account's model list (skipped by the app)" }));
+    mistralJobs.push(...textChecks({ name: "Mistral", baseUrl: "https://api.mistral.ai/v1", key: env.MISTRAL_API_KEY }, "mistral", wanted.filter((m) => live.has(m))));
+    mistralJobs.push(() =>
       timed("mistral", "voxtral-mini-tts-2603 + voxtral-mini-latest", "voice+captions", async () => {
         const { pcm, rate } = await mistralSpeechChunk("This is a quick voice test for the TubeRack studio. Captions should follow.");
         if (pcm.length < rate) throw new Error("audio shorter than half a second");
@@ -124,12 +118,33 @@ async function run() {
   if (env.NVIDIA_API_KEY) {
     catalogs.nvidia = await catalog("https://integrate.api.nvidia.com/v1", env.NVIDIA_API_KEY);
     const live = new Set(catalogs.nvidia);
-    const wanted = env.NVIDIA_TEXT_MODELS?.split(",").map((m) => m.trim()).filter(Boolean) ?? NVIDIA_MODELS;
+    const wanted = env.NVIDIA_TEXT_MODELS?.split(",").map((m) => m.trim()).filter(Boolean) ?? NVIDIA_TEXT_MODELS;
     for (const m of wanted.filter((m) => !live.has(m))) jobs.push(async () => ({ provider: "nvidia", model: m, test: "listed", ok: false, ms: 0, error: "not in NVIDIA's live model list" }));
     jobs.push(...textChecks({ name: "NVIDIA", baseUrl: "https://integrate.api.nvidia.com/v1", key: env.NVIDIA_API_KEY }, "nvidia", wanted.filter((m) => live.has(m))));
   }
 
-  const checks = await pool(jobs, 5);
+  // The app's real paths, with every fallback in play.
+  const appJobs: (() => Promise<Check>)[] = [
+    () =>
+      timed("app", "text chain", "script-style text", async () => {
+        const out = await new GeminiTextProvider().generateText({ prompt: "Write a two-sentence YouTube video hook about saving money.", maxTokens: 300 });
+        if (out.text.length < 20) throw new Error("reply too short");
+      }),
+    () =>
+      timed("app", "text chain", "json", async () => {
+        const out = await new GeminiTextProvider().generateText({ prompt: 'Return {"ideas":["…","…","…"]} with three video ideas about home workouts.', maxTokens: 400, json: true });
+        const obj = extractJsonObject(out.text) as { ideas?: unknown } | null;
+        if (!obj || !Array.isArray(obj.ideas)) throw new Error("JSON missing ideas");
+      }),
+    () =>
+      timed("app", "voice chain", "voice-over", async () => {
+        const out = await new GeminiTtsProvider().synthesizeSpeech({ text: "Welcome back to the channel. Today we test the full voice pipeline." });
+        if (out.durationSec < 1) throw new Error("audio too short");
+      }),
+  ];
+  // Mistral's free tier allows about one request per second: run its checks one at a time.
+  const [checks, mistralChecks, appChecks] = await Promise.all([pool(jobs, 4), pool(mistralJobs, 1), pool(appJobs, 1)]);
+  checks.push(...mistralChecks, ...appChecks);
   // Catalog excerpts help pick replacements; chat-capable families only.
   const pick = (ids: string[]) => ids.filter((id) => /instruct|chat|large|medium|small|nemotron|llama|qwen|deepseek|kimi|glm|gemma|mistral|magistral|ministral|gpt-oss/i.test(id)).slice(0, 150);
   return {

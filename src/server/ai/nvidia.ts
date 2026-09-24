@@ -4,21 +4,26 @@ import { chatGenerateText, modelOrder, type ChatProvider } from "@/src/server/ai
 export { stripThinking } from "@/src/server/ai/chat-compat";
 
 /**
- * NVIDIA hosted models (build.nvidia.com). Names NVIDIA no longer serves
- * are skipped automatically (checked against the live model list).
+ * NVIDIA hosted models (build.nvidia.com), taken from the account's live
+ * model list. Names NVIDIA stops serving are skipped automatically.
  */
-const DEFAULT_MODELS = [
-  "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-  "meta/llama-3.3-70b-instruct",
-  "qwen/qwen3.5-397b-a17b",
-  "mistralai/mistral-large-2-instruct",
-  "deepseek-ai/deepseek-v3.1",
-  "moonshotai/kimi-k2.6",
-  "z-ai/glm-5.1",
-  "google/gemma-3-27b-it",
-  "meta/llama-3.1-70b-instruct",
-  "meta/llama-3.1-8b-instruct",
-];
+export const NVIDIA_TEXT_MODELS = [
+  "nvidia/nemotron-3-super-120b-a12b",
+  "deepseek-ai/deepseek-v4.1-flash",
+  "moonshotai/kimi-k3",
+  "z-ai/glm-5.3",
+  "nvidia/nemotron-3-ultra-550b-a55b",
+  "google/gemma-4-31b-it",
+  "mistralai/mistral-nemotron",
+  "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+  "nvidia/llama-3.1-nemotron-70b-instruct",
+  "openai/gpt-oss-20b",
+  "z-ai/glm-5.3-flash",
+  "nvidia/nemotron-3.5-lightning-30b-a3b",
+  "nvidia/nemotron-nano-3-30b-a3b",
+  "mistralai/mistral-large",
+  "microsoft/phi-3.5-moe-instruct",
+]
 
 export function isNvidiaConfigured(env = getServerEnv()): boolean {
   return Boolean(env.NVIDIA_API_KEY);
@@ -27,7 +32,7 @@ export function isNvidiaConfigured(env = getServerEnv()): boolean {
 function provider(env = getServerEnv()): ChatProvider {
   if (!env.NVIDIA_API_KEY) throw new Error("NVIDIA models are not configured.");
   const custom = env.NVIDIA_TEXT_MODELS?.split(",").map((m) => m.trim()).filter(Boolean);
-  return { name: "NVIDIA", baseUrl: "https://integrate.api.nvidia.com/v1", key: env.NVIDIA_API_KEY, models: custom?.length ? custom : DEFAULT_MODELS };
+  return { name: "NVIDIA", baseUrl: "https://integrate.api.nvidia.com/v1", key: env.NVIDIA_API_KEY, models: custom?.length ? custom : NVIDIA_TEXT_MODELS };
 }
 
 export function nvidiaModelOrder(env = getServerEnv()): Promise<string[]> {
