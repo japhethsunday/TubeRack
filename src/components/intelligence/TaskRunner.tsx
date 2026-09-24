@@ -1,5 +1,6 @@
 "use client";
 
+import { Markdown } from "@/src/components/ui/Markdown";
 import { useRef, useState } from "react";
 import { Play, RotateCcw, Ban, CheckCircle2, OctagonX, Sparkles } from "lucide-react";
 import type { GenerationStatus, IntelligenceTaskType } from "@/src/lib/intelligence/tasks";
@@ -159,7 +160,7 @@ export function TaskRunner<T>({
                   }
                 />
               </div>
-              <div className="whitespace-pre-wrap text-sm leading-relaxed">{ai.data.text}</div>
+              <Markdown text={ai.data.text} />
             </section>
           )}
           {ai && !ai.ok && (

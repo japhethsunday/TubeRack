@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { stripMarkdown } from "@/src/lib/text/markdown";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
 import { getServerEnv } from "@/src/lib/env";
 import { getGateway, type AIGateway } from "@/src/lib/ai-gateway/registry";
@@ -412,7 +413,7 @@ export async function writeScriptSections(req: ScriptWriteRequest): Promise<{ te
   if (!Array.isArray(list) || list.length !== req.sections.length || !list.every((t) => typeof t === "string")) {
     throw new Error("Gemini script generation failed: section count did not match. Try again.");
   }
-  return { texts: (list as string[]).map((t) => t.trim()), model };
+  return { texts: (list as string[]).map((t) => stripMarkdown(t)), model };
 }
 
 function parseJsonObject(text: string, what: string): Record<string, unknown> {
@@ -483,7 +484,7 @@ export async function rewriteSection(input: {
     ].join("\n\n"),
     maxTokens: Math.min(4096, Math.round(input.text.split(/\s+/).length * 3) + 512),
   });
-  return { text: text.replace(/^["“]|["”]$/g, "").trim(), model };
+  return { text: stripMarkdown(text.replace(/^["“]|["”]$/g, "").trim()), model };
 }
 
 export interface TimedSegment {

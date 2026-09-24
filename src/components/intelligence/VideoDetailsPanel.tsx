@@ -1,5 +1,6 @@
 "use client";
 
+import { Markdown } from "@/src/components/ui/Markdown";
 import { useEffect, useRef, useState } from "react";
 import { X, Eye, ThumbsUp, MessageSquare, Clock, CalendarDays, Sparkles, Link2, Plus, Users, Film } from "lucide-react";
 import { fetchYouTubeDetails, runProviderIntelligence, type VideoDetails } from "@/src/lib/ai-client";
@@ -253,7 +254,7 @@ export function VideoDetailsPanel({
                   {analysisError ? (
                     <p className="text-sm text-destructive">{analysisError}</p>
                   ) : (
-                    <div className="whitespace-pre-wrap text-sm leading-relaxed">{analysis}</div>
+                    <Markdown text={analysis ?? ""} />
                   )}
                 </section>
               )}

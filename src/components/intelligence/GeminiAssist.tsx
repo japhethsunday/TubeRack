@@ -1,5 +1,6 @@
 "use client";
 
+import { Markdown } from "@/src/components/ui/Markdown";
 import { useState } from "react";
 import { Sparkles, Copy, Check } from "lucide-react";
 import { runProviderIntelligence } from "@/src/lib/ai-client";
@@ -60,7 +61,9 @@ export function GeminiAssist({
       {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       {text && (
         <div className="ui-panel space-y-2">
-          <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-surface p-3 font-sans text-sm leading-relaxed">{text}</pre>
+          <div className="max-h-[32rem] overflow-auto rounded-lg border border-border bg-surface p-4">
+            <Markdown text={text} />
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"

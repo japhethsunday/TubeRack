@@ -12,6 +12,7 @@ import { DownloadButton } from "@/src/components/ui/DownloadButton";
 import { downloadText, safeFileName } from "@/src/lib/download";
 import { VideoDetailsPanel } from "@/src/components/intelligence/VideoDetailsPanel";
 import { cx } from "@/src/components/ui/cx";
+import { renderInline } from "@/src/components/ui/Markdown";
 
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 const SHORTLIST_KEY = "tuberack.niche.shortlist";
@@ -217,8 +218,8 @@ function NicheCard({
             <h4 className="flex items-center gap-1.5 text-sm font-semibold"><Sparkles className="size-4 text-primary" aria-hidden="true" /> Launch plan</h4>
             <DownloadButton onDownload={() => downloadText(reportMarkdown(niche, report), safeFileName(`niche-${niche.name}`, "md"), "text/markdown")} />
           </div>
-          <p className="text-sm">{report.summary}</p>
-          {report.audience && <p className="text-sm text-muted-text"><span className="font-medium text-foreground">Audience: </span>{report.audience}</p>}
+          <p className="text-sm">{renderInline(report.summary, "sum")}</p>
+          {report.audience && <p className="text-sm text-muted-text"><span className="font-medium text-foreground">Audience: </span>{renderInline(report.audience, "aud")}</p>}
           <div className="grid gap-4 md:grid-cols-2">
             <Section title="Content pillars" items={report.pillars} />
             <Section title="Monetization paths" items={report.monetization} />
@@ -249,7 +250,7 @@ function Section({ title, items, ordered }: { title: string; items: string[]; or
     <div>
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-text">{title}</p>
       <List className={cx("mt-1.5 space-y-1 pl-4 text-sm", ordered ? "list-decimal" : "list-disc")}>
-        {items.map((x, i) => <li key={i}>{x}</li>)}
+        {items.map((x, i) => <li key={i}>{renderInline(x, `s${i}`)}</li>)}
       </List>
     </div>
   );
