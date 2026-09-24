@@ -48,3 +48,35 @@ export async function downloadChunked(
   }
   return new Blob(blobs, { type: mime || "application/octet-stream" });
 }
+
+const SINGLE = /^\/api\/v1\/uploads\/[0-9a-f-]{36}\.[a-z0-9]+$/;
+
+/** Download a stored file (single or multi-part) with progress. */
+export async function downloadStored(
+  payload: string,
+  mime: string,
+  onProgress?: (ratio: number) => void,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  if (isChunked(payload)) return downloadChunked(payload, mime, onProgress, signal);
+  if (!SINGLE.test(payload)) throw new Error("Not a stored upload.");
+  const res = await fetch(payload, { credentials: "same-origin", signal });
+  if (!res.ok || !res.body) throw new Error(`Could not download the file (${res.status}).`);
+  const total = Number(res.headers.get("content-length") ?? 0);
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    got += value.length;
+    if (total) onProgress?.(Math.min(1, got / total));
+  }
+  return new Blob(chunks as BlobPart[], { type: mime || res.headers.get("content-type") || "application/octet-stream" });
+}
+
+/** Whether a payload points at the account's own stored upload. */
+export function isStoredUpload(payload: string): boolean {
+  return SINGLE.test(payload) || isChunked(payload);
+}

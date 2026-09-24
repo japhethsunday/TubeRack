@@ -125,8 +125,9 @@ export function MediaImporter({
       if (toCloud) {
         try {
           const up = await uploadToCloud(job.file, found.mime, (r) => patch(job.id, { progress: 5 + Math.round(r * 93) }), ac.signal);
-          // Keep a device copy of multi-part files so this device plays them instantly.
-          if (up.parts > 1) await persistBlob(created.id, job.file, undefined, ac.signal);
+          // Keep a device copy: editing plays from local bytes (phones often
+          // won't buffer a remote video in a background element).
+          await persistBlob(created.id, job.file, undefined, ac.signal).catch(() => undefined);
           updateAsset(created.id, { source: "provider-output", payload: up.fileUrl, status: "ready" });
           stored = true;
         } catch (cloudError) {

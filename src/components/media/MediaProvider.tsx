@@ -1,7 +1,10 @@
 "use client";
 
 import { loadLocal, removeLocal, saveLocal } from "@/src/lib/media/local-store";
-import { downloadChunked, isChunked } from "@/src/lib/media/chunked";
+import { downloadStored, isChunked, isStoredUpload } from "@/src/lib/media/chunked";
+
+/** Video/audio play from a device copy (downloaded once) for reliable editing. */
+const TIMED = new Set(["video", "music", "voice", "sfx"]);
 import { uploadToCloud } from "@/src/lib/media/cloud-upload";
 import { useSession } from "@/src/components/auth/useSession";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -175,7 +178,11 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     const missing = bundle.assets.filter(
-      (a) => a.status === "ready" && !blobs.current.has(a.id) && !fetching.current.has(a.id) && (a.source === "upload-session" || isChunked(a.payload)),
+      (a) =>
+        a.status === "ready" &&
+        !blobs.current.has(a.id) &&
+        !fetching.current.has(a.id) &&
+        (a.source === "upload-session" || isChunked(a.payload) || (TIMED.has(a.kind) && isStoredUpload(a.payload))),
     );
     if (!missing.length) return;
     for (const a of missing) fetching.current.add(a.id);
@@ -183,9 +190,9 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       for (const a of missing) {
         try {
           let file: Blob | null = await loadLocal(a.id);
-          if (!file && cloud && isChunked(a.payload)) {
+          if (!file && cloud && isStoredUpload(a.payload)) {
             setDownloads((d) => ({ ...d, [a.id]: 0 }));
-            const whole = await downloadChunked(a.payload, a.mime, (r) => setDownloads((d) => ({ ...d, [a.id]: r })));
+            const whole = await downloadStored(a.payload, a.mime, (r) => setDownloads((d) => ({ ...d, [a.id]: r })));
             await saveLocal(a.id, whole).catch(() => undefined); // cache is best-effort
             file = (await loadLocal(a.id)) ?? whole;
           }

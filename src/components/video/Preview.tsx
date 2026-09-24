@@ -98,6 +98,7 @@ export function Preview({
       el.playsInline = true;
       el.preload = "auto";
       el.src = url;
+      el.load(); // mobile browsers may not start buffering a detached element otherwise
       el.onloadeddata = () => setLoadTick((n) => n + 1);
       el.onseeked = () => !playingRef.current && draw(state.current.playhead);
       videos.current.set(clip.id, { el, url });
