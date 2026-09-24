@@ -86,7 +86,7 @@ export function captionsFromNarration(narration: string, startSec: number, total
 }
 
 /**
- * Caption clips from real transcription timings (e.g. WhisperX segments),
+ * Caption clips from real transcription timings (Gemini transcription segments),
  * offset to where the voice clip starts on the timeline. Pure.
  */
 export function captionsFromSegments(

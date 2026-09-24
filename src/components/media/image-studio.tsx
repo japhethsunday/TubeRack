@@ -29,7 +29,7 @@ const ASPECTS: PosterAspect[] = ["16:9", "9:16", "1:1"];
 
 /**
  * Image studio: on-device SVG drafts (variations, compare, approve, assign)
- * or provider request drafts behind the capability gate. Approved drafts are
+ * or Gemini images, behind the capability gate. Approved drafts are
  * never auto-replaced — variations are always new assets.
  */
 export function ImageStudio({

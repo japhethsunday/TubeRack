@@ -106,7 +106,7 @@ export function MusicStudio({
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-4 rounded-xl border border-border bg-surface p-5">
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
-          {PROVIDERS.map((p) => (
+          {PROVIDERS.filter((p) => p.capabilities.music).map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
             </option>
@@ -249,7 +249,7 @@ export function SfxStudio({
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-4 rounded-xl border border-border bg-surface p-5">
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
-          {PROVIDERS.map((p) => (
+          {PROVIDERS.filter((p) => p.capabilities.sfx).map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
             </option>

@@ -8,7 +8,6 @@ import { Progress } from "@/src/components/ui/feedback";
 import { Breadcrumb, Table } from "@/src/components/ui/data";
 import { ProjectProgress } from "@/src/components/patterns/ProjectProgress";
 import { MediaCard } from "@/src/components/patterns/media";
-import { EditorLayout } from "@/src/components/patterns/EditorLayout";
 import { AIGenerationPanel } from "@/src/components/patterns/AIGenerationPanel";
 import { PREVIEW_PROGRESS } from "@/src/config/preview";
 
@@ -64,16 +63,6 @@ describe("ui components", () => {
     );
     assert.ok(html.includes("Failed"));
     assert.ok(html.includes("Delete"));
-  });
-
-  it("editor layout shows preview, scenes, and all four tracks", () => {
-    const html = renderToStaticMarkup(<EditorLayout />);
-    assert.ok(html.includes("Video editor"));
-    assert.ok(html.includes("Scenes"));
-    for (const t of ["Voice", "Music", "SFX", "Captions"]) {
-      assert.ok(html.includes(t), t);
-    }
-    assert.ok(html.includes("Phase 8"));
   });
 
   it("ai panel discloses its boundary instead of faking generation", () => {

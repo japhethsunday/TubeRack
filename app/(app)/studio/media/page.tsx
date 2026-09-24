@@ -10,7 +10,6 @@ import { MediaStorageNote } from "@/src/components/media/MediaProvider";
 import { LibraryView } from "@/src/components/media/library";
 import { SceneNeeds } from "@/src/components/media/needs";
 import { ImageStudio } from "@/src/components/media/image-studio";
-import { VideoStudio } from "@/src/components/media/video-studio";
 import { VoiceStudio } from "@/src/components/media/voice-studio";
 import { MusicStudio, SfxStudio } from "@/src/components/media/music-studio";
 import { UploadZone } from "@/src/components/media/uploads";
@@ -22,7 +21,7 @@ import { EmptyState } from "@/src/components/ui/states";
 import { LoadingState } from "@/src/components/ui/feedback";
 import { useMedia } from "@/src/components/media/MediaProvider";
 
-const TAB_IDS = ["library", "scenes", "image", "video", "voice", "audio", "uploads", "style", "queue"] as const;
+const TAB_IDS = ["library", "scenes", "image", "voice", "audio", "uploads", "style", "queue"] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 function isTabId(v: string | null): v is TabId {
@@ -167,11 +166,6 @@ function Studio() {
           registerRerun={registerRerun}
         />
       ),
-    },
-    {
-      id: "video",
-      label: "Video",
-      content: <VideoStudio projectId={project.id} scenes={sceneRefs} platform={project.platform} />,
     },
     {
       id: "voice",

@@ -4,7 +4,7 @@ import type { MediaKind } from "@/src/lib/media/types";
  * Provider capability system. The UI exposes only what the selected
  * provider supports; unsupported controls render as explained boundaries.
  * "ai-provider" is Google Gemini via the server routes (image + TTS); video,
- * music, and SFX synthesis stay gated behind request drafts.
+ * music, and SFX use on-device drafts or uploads.
  */
 
 export type Capability =
@@ -44,7 +44,7 @@ export const PROVIDERS: ProviderDef[] = [
     },
     capabilityNotes: {
       image: "Deterministic SVG compositions — layout drafts, not photography.",
-      video: "Video synthesis needs a provider. Save a request draft instead.",
+      video: "Video generation is not available. Upload video clips instead.",
       tts: "System voices vary by device and browser.",
       reference: "Reference images need a provider pipeline (Phase 11).",
     },
@@ -65,10 +65,10 @@ export const PROVIDERS: ProviderDef[] = [
       variations: true,
     },
     capabilityNotes: {
-      video: "Gemini does not generate video here yet. Save a request draft with full parameters instead.",
+      video: "Gemini video generation is not available. Upload video clips instead.",
       music: "Gemini does not generate music. Use on-device drafts or upload licensed tracks.",
       sfx: "Gemini does not generate sound effects. Use on-device drafts or uploads.",
-      reference: "Reference-image conditioning is not wired yet.",
+      reference: "Reference images are not supported.",
     },
   },
 ];

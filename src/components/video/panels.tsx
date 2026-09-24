@@ -75,7 +75,7 @@ export function MediaPanel({
   const usable = assets.filter((a) => a.status === "ready" && a.source !== "provider-request");
   const [dragging, setDragging] = useState<string | null>(null);
   if (usable.length === 0) {
-    return <EmptyState title="No placeable media" body="Approved drafts and session uploads appear here. Provider requests cannot be placed until media exists." />;
+    return <EmptyState title="No placeable media" body="Generated media, drafts, and uploads appear here once they are ready." />;
   }
   return (
     <ul className="space-y-1.5" aria-label="Placeable media">
