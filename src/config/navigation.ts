@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   FolderKanban,
   Compass,
+  Radar,
   FlaskConical,
   PenLine,
   Columns3,
@@ -90,6 +91,15 @@ export const NAV_SECTIONS: NavSection[] = [
         status: "live",
         phase: "Phase 5",
         blurb: "Opportunities, angles, positioning.",
+      },
+      {
+        slug: "niche",
+        label: "Niche Finder",
+        href: "/intelligence/niche",
+        icon: Radar,
+        status: "live",
+        phase: "Phase 6",
+        blurb: "Score niches on live demand, competition, and opportunity.",
       },
       {
         slug: "research",

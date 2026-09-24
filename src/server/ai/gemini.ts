@@ -537,3 +537,82 @@ export async function transcribeAudio(bytes: Uint8Array, mimeType: string): Prom
     throw providerError("transcription", error);
   }
 }
+
+export interface NicheCandidate {
+  name: string;
+  query: string;
+  angle: string;
+  audience: string;
+}
+
+/** Expand a seed interest into distinct, searchable YouTube niches. */
+export async function expandNiches(input: { seed: string; audience: string; count: number }): Promise<{ niches: NicheCandidate[]; model: string }> {
+  const provider = new GeminiTextProvider();
+  const { text, model } = await provider.generateText({
+    prompt:
+      `You are a YouTube niche researcher. Seed interest: "${input.seed.slice(0, 200)}".` +
+      (input.audience ? ` Target audience: "${input.audience.slice(0, 200)}".` : "") +
+      ` Propose ${input.count} DISTINCT sub-niches a new creator could own — mix broad and specific, avoid near-duplicates.` +
+      ` For each give: name (2-5 words), query (the exact 2-6 word phrase viewers type into YouTube search), angle (one sentence on the unique positioning), audience (who watches).` +
+      ` Respond ONLY with JSON: {"niches":[{"name":"","query":"","angle":"","audience":""}]}`,
+    maxTokens: 1500,
+    json: true,
+  });
+  const obj = parseJsonObject(text, "niche ideas");
+  const list = Array.isArray(obj.niches) ? (obj.niches as Record<string, unknown>[]) : [];
+  const niches = list
+    .map((n) => ({
+      name: String(n.name ?? "").trim().slice(0, 80),
+      query: String(n.query ?? n.name ?? "").trim().slice(0, 120),
+      angle: String(n.angle ?? "").trim().slice(0, 300),
+      audience: String(n.audience ?? "").trim().slice(0, 200),
+    }))
+    .filter((n) => n.name && n.query)
+    .slice(0, input.count);
+  if (niches.length === 0) throw new Error("Gemini niche ideas failed: no usable niches returned. Try again.");
+  return { niches, model };
+}
+
+export type { NicheReport } from "@/src/lib/niche/score";
+import type { NicheReport } from "@/src/lib/niche/score";
+
+/** Deep-dive plan for one niche, grounded in its measured YouTube metrics. */
+export async function writeNicheReport(input: {
+  name: string;
+  query: string;
+  angle: string;
+  metrics: Record<string, unknown>;
+  scores: Record<string, unknown>;
+  topTitles: string[];
+}): Promise<{ report: NicheReport; model: string }> {
+  const provider = new GeminiTextProvider();
+  const { text, model } = await provider.generateText({
+    prompt:
+      `You are a YouTube strategist. Build a launch plan for the niche "${input.name}" (search phrase "${input.query}"; angle: ${input.angle || "—"}).\n` +
+      `Measured from live YouTube data (last 180 days, top videos by views): ${JSON.stringify(input.metrics)}\nScores (0-100): ${JSON.stringify(input.scores)}\n` +
+      `Top-performing titles right now:\n- ${input.topTitles.slice(0, 12).join("\n- ")}\n\n` +
+      `Use ONLY these numbers; never invent statistics, RPMs, or earnings figures. Respond ONLY with JSON: ` +
+      `{"summary":"2-3 sentence verdict referencing the metrics","audience":"who they are and what they want","pillars":["4 content pillars"],` +
+      `"videoIdeas":[{"title":"","hook":"first line spoken","format":"long-form|short|series"}] (10 ideas that beat the current top titles),` +
+      `"monetization":["4-6 revenue paths suited to this audience, no figures"],"risks":["3-5 risks"],"firstWeekPlan":["5-7 concrete steps"]}`,
+    maxTokens: 3500,
+    json: true,
+  });
+  const o = parseJsonObject(text, "niche report");
+  const ideas = Array.isArray(o.videoIdeas) ? (o.videoIdeas as Record<string, unknown>[]) : [];
+  return {
+    model,
+    report: {
+      summary: String(o.summary ?? "").trim(),
+      audience: String(o.audience ?? "").trim(),
+      pillars: strings(o.pillars, 6),
+      videoIdeas: ideas
+        .map((i) => ({ title: String(i.title ?? "").trim(), hook: String(i.hook ?? "").trim(), format: String(i.format ?? "").trim() }))
+        .filter((i) => i.title)
+        .slice(0, 12),
+      monetization: strings(o.monetization, 8),
+      risks: strings(o.risks, 6),
+      firstWeekPlan: strings(o.firstWeekPlan, 8),
+    },
+  };
+}

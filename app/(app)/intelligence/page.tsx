@@ -53,6 +53,12 @@ function Hub() {
         <div className="flex items-center gap-2">
           {channel.picker}
           <Link
+            href="/intelligence/niche"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted"
+          >
+            Niche Finder
+          </Link>
+          <Link
             href="/intelligence/research"
             className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted"
           >

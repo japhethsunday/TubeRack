@@ -178,3 +178,38 @@ export interface VideoDetails {
 export function fetchYouTubeDetails(id: string) {
   return attempt(() => api.get<VideoDetails>(`/api/v1/youtube/details?id=${encodeURIComponent(id)}`));
 }
+
+export interface NicheResult {
+  name: string;
+  query: string;
+  angle: string;
+  audience: string;
+  metrics: import("@/src/lib/niche/score").NicheMetrics;
+  scores: import("@/src/lib/niche/score").NicheScores;
+  topVideos: import("@/src/lib/niche/score").NicheVideoSample[];
+}
+
+export interface NicheScan {
+  seed: string;
+  days: number;
+  model: string | null;
+  niches: NicheResult[];
+  failures: string[];
+}
+
+export function scanNiches(input: { seed: string; audience?: string; region?: string; count?: number; mode?: "expand" | "exact"; days?: number }) {
+  return attempt(() => api.post<NicheScan>("/api/v1/niche/scan", input));
+}
+
+export function nicheReport(niche: NicheResult) {
+  return attempt(() =>
+    api.post<{ report: import("@/src/lib/niche/score").NicheReport; model: string }>("/api/v1/niche/report", {
+      name: niche.name,
+      query: niche.query,
+      angle: niche.angle,
+      metrics: niche.metrics,
+      scores: niche.scores,
+      topTitles: niche.topVideos.map((v) => v.title),
+    }),
+  );
+}
