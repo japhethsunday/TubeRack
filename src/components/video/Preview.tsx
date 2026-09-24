@@ -122,16 +122,6 @@ export function Preview({
       },
       isDraft: (c) => s.assetFor(c.assetId)?.source === "local-draft",
     });
-    // Selection outline (preview only).
-    const sel = s.comp.clips.find((c) => c.id === s.selectedId && t >= c.startSec && t < c.startSec + c.durationSec);
-    if (sel && (sel.kind === "video" || sel.kind === "image")) {
-      ctx.save();
-      ctx.strokeStyle = "rgba(167,139,250,0.9)";
-      ctx.setLineDash([6, 4]);
-      ctx.lineWidth = 2;
-      ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
-      ctx.restore();
-    }
   }
 
   function syncVideos(t: number, isPlaying: boolean) {

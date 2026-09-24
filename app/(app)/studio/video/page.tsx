@@ -32,7 +32,7 @@ import { Modal } from "@/src/components/ui/overlays";
 import { Portal } from "@/src/components/ui/Portal";
 import { Input } from "@/src/components/ui/fields";
 import { newTrack, sceneSegments, buildFromScenes, captionsFromNarration, durationOf, validateComposition, healthOf } from "@/src/lib/video/build";
-import { moveClip, trimClip, splitClipAt, deleteClip, duplicateClip, addClip, snapTime, snapCandidates, pasteClips, maxDurationFor } from "@/src/lib/video/ops";
+import { moveClip, trimClip, splitClipAt, deleteClip, duplicateClip, addClip, snapTime, snapCandidates, pasteClips, maxDurationFor, rippleDelete } from "@/src/lib/video/ops";
 import { presetById, textPresetById, brandedTitleStyle } from "@/src/lib/video/presets";
 import type { MediaAsset } from "@/src/lib/media/types";
 import type { Composition, TimelineClip } from "@/src/lib/video/types";
@@ -138,7 +138,7 @@ function Studio() {
   // Clipboard + in/out marks, bound after the project loads (see actionsRef below).
   // Newest timeline + frame, for callbacks created on earlier renders.
   const latest = useRef<{ clips: TimelineClip[]; canvas: Composition["canvas"] }>({ clips: [], canvas: {} as Composition["canvas"] });
-  const actionsRef = useRef<{ copy: () => void; paste: () => void; markIn: () => void; markOut: () => void; clearMarks: () => void } | null>(null);
+  const actionsRef = useRef<{ copy: () => void; paste: () => void; markIn: () => void; markOut: () => void; clearMarks: () => void; split: () => void; remove: () => void; duplicate: () => void} | null>(null);
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
@@ -155,6 +155,16 @@ function Studio() {
       } else if (!mod && e.key.toLowerCase() === "i") a.markIn();
       else if (!mod && e.key.toLowerCase() === "o") a.markOut();
       else if (!mod && e.key === "Escape") a.clearMarks();
+      else if (!mod && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        a.split();
+      } else if (!mod && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        a.duplicate();
+      } else if (!mod && (e.key === "Delete" || e.key === "Backspace")) {
+        e.preventDefault();
+        a.remove();
+      }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -233,6 +243,12 @@ function Studio() {
     if (local) return local;
     return a.source === "provider-output" && !isChunked(a.payload) && /^(https?:|\/)/.test(a.payload) ? a.payload : null;
   };
+  /** Delete a clip; on the main video track later clips close the gap (CapCut-style magnetic track). */
+  const removeClip = (list: TimelineClip[], id: string) => {
+    const target = list.find((c) => c.id === id);
+    const mainTrack = tracks.find((t) => t.kind === "video")?.id;
+    return target && target.trackId === mainTrack ? rippleDelete(list, id) : deleteClip(list, id);
+  };
   const trackFor = (kind: TimelineClip["kind"]) => tracks.find((t) => t.kind === kind)?.id ?? `track_${kind}`;
   const endOf = (trackId: string) => latest.current.clips.filter((c) => c.trackId === trackId).reduce((m, c) => Math.max(m, c.startSec + c.durationSec), 0);
 
@@ -289,6 +305,17 @@ function Studio() {
     markIn: () => setInOut((m) => ({ in: playhead, out: m && m.out > playhead ? m.out : duration })),
     markOut: () => setInOut((m) => ({ in: m && m.in < playhead ? m.in : 0, out: playhead })),
     clearMarks: () => setInOut(null),
+    split: () => {
+      if (selectedClipId) commit(splitClipAt(latest.current.clips, selectedClipId, playhead));
+    },
+    remove: () => {
+      if (!selectedClipId) return;
+      commit(removeClip(latest.current.clips, selectedClipId));
+      setSelectedClipId(null);
+    },
+    duplicate: () => {
+      if (selectedClipId) commit(duplicateClip(latest.current.clips, selectedClipId));
+    },
   };
 
   function addTrack(kind: TimelineClip["kind"]) {
@@ -464,7 +491,7 @@ function Studio() {
           onDuplicate={() => selectedClip && commit(duplicateClip(clips, selectedClip.id))}
           onDelete={() => {
             if (!selectedClip) return;
-            commit(deleteClip(clips, selectedClip.id));
+            commit(removeClip(clips, selectedClip.id));
             setSelectedClipId(null);
           }}
         />
@@ -750,7 +777,7 @@ function Studio() {
           }}
           onDelete={() => {
             if (!selectedClipId) return;
-            commit(deleteClip(clips, selectedClipId));
+            commit(removeClip(clips, selectedClipId));
             setSelectedClipId(null);
           }}
           onDuplicate={() => {

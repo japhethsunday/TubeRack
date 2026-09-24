@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sparkles, Wand2 } from "lucide-react";
 import { writeScriptWithProvider } from "@/src/lib/ai-client";
 import { Alert } from "@/src/components/ui/Alert";
@@ -27,20 +27,29 @@ export function GenerationDialog({
   context,
   onApply,
   onClose,
+  autoWrite = false,
+  initialFormat,
+  initialLength,
+  initialInstruction = "",
 }: {
   assembly: Omit<AssemblyInput, "format" | "tone" | "complexity" | "structure" | "targetWords" | "instruction">;
   context: AssembledContext;
   onApply: (sections: ScriptSection[], meta: { format: string; tone: string; complexity: string; structure: string; targetWords: number; wpm: number; instruction: string }) => void;
   onClose: () => void;
+  /** Start writing with Gemini immediately and apply the draft when it lands. */
+  autoWrite?: boolean;
+  initialFormat?: string;
+  initialLength?: string;
+  initialInstruction?: string;
 }) {
   const formats = formatNames();
-  const [format, setFormat] = useState(formats[0]);
+  const [format, setFormat] = useState(initialFormat && formats.includes(initialFormat) ? initialFormat : formats[0]);
   const [tone, setTone] = useState<string>("Conversational");
   const [complexity, setComplexity] = useState<string>("Beginner");
   const [structure, setStructure] = useState<string>("Standard");
-  const [lengthLabel, setLengthLabel] = useState(LENGTH_TARGETS[1].label);
+  const [lengthLabel, setLengthLabel] = useState(initialLength && LENGTH_TARGETS.some((l) => l.label === initialLength) ? initialLength : LENGTH_TARGETS[1].label);
   const [customWords, setCustomWords] = useState("900");
-  const [instruction, setInstruction] = useState("");
+  const [instruction, setInstruction] = useState(initialInstruction);
   const [preview, setPreview] = useState<ScriptSection[] | null>(null);
   const [writing, setWriting] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -71,14 +80,26 @@ export function GenerationDialog({
       return;
     }
     setAiModel(outcome.data.model);
-    setPreview(
-      skeleton.map((s, i) => ({
-        ...s,
-        text: outcome.data.texts[i] ?? s.text,
-        aiNote: `Written by Gemini (${outcome.data.model}) from your intelligence context. Review facts before producing.`,
-      })),
-    );
+    const written = skeleton.map((s, i) => ({
+      ...s,
+      text: outcome.data.texts[i] ?? s.text,
+      aiNote: `Written by Gemini (${outcome.data.model}) from your intelligence context. Review facts before producing.`,
+    }));
+    if (autoWrite) {
+      // Brief came from the Channel Creator: put the draft straight into the editor.
+      onApply(written, { format, tone, complexity, structure, targetWords, wpm: 150, instruction });
+      return;
+    }
+    setPreview(written);
   }
+
+  const started = useRef(false);
+  useEffect(() => {
+    if (!autoWrite || started.current) return;
+    started.current = true;
+    void writeWithGemini();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on open
+  }, [autoWrite]);
 
   return (
     <Modal title="Generate script draft" description="Write a full draft with Gemini, or assemble a local template from your intelligence." onClose={onClose} wide>

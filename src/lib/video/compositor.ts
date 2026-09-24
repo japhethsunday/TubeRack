@@ -248,7 +248,7 @@ export function drawTextBlock(
 function drawText(ctx: CanvasRenderingContext2D, clip: TimelineClip, t: number, W: number, H: number) {
   if (!clip.text) return;
   const st: Partial<TextStyle> = clip.style ?? {};
-  const unit = W / 672; // style sizes are authored against the ~672px preview box
+  const unit = textUnit(W, H); // style sizes are authored against the ~672px preview box
   const fontPx = Math.max(10, (st.size ?? 32) / 2.4) * unit;
   const pos = st.position ?? "bottom";
   const tr = clip.transform ?? IDENTITY_TRANSFORM;
@@ -297,9 +297,17 @@ function drawText(ctx: CanvasRenderingContext2D, clip: TimelineClip, t: number, 
   ctx.restore();
 }
 
+/**
+ * Text scale from the frame's shorter side: identical to the old
+ * width-based size on 16:9, and full-size (not half-size) on 9:16 Shorts.
+ */
+export function textUnit(W: number, H: number): number {
+  return Math.min(W, H) / 378;
+}
+
 function drawCaption(ctx: CanvasRenderingContext2D, clip: TimelineClip, W: number, H: number) {
   if (!clip.text) return;
-  const unit = W / 672;
+  const unit = textUnit(W, H);
   const st: Partial<TextStyle> = clip.style ?? {};
   drawTextBlock(ctx, clip.text, {
     fontPx: Math.max(10, (st.size ?? 34) / 2.4) * unit,

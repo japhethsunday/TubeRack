@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Undo2, Redo2, Sparkles, Plus, FileText } from "lucide-react";
 import { useProjects, LocalStorageNote } from "@/src/components/projects/ProjectsProvider";
 import { useIntel } from "@/src/components/intelligence/IntelProvider";
@@ -57,7 +58,11 @@ function Studio() {
     setSyncedProject(projectId);
     setSelectedId(projectId);
   }
-  const [showGenerate, setShowGenerate] = useState(false);
+  // ?autowrite=1 (from the Channel Creator): the brief is complete, so
+  // open the writer and draft immediately — once, and never over a script.
+  const autoWrite = useSearchParams().get("autowrite") === "1";
+  const router = useRouter();
+  const [showGenerate, setShowGenerate] = useState(autoWrite);
   const [rev, setRev] = useState(0);
 
   const ready = projectsReady && intelReady && scripts.ready;
@@ -173,6 +178,14 @@ function Studio() {
         </div>
         {showGenerate && (
           <GenerationDialog
+            autoWrite={autoWrite}
+            initialFormat={project.contentType === "Short" ? "Short-form" : "YouTube long-form"}
+            initialLength={project.contentType === "Short" ? "Short (~2 min)" : "Medium (~6 min)"}
+            initialInstruction={
+              autoWrite && intel.strategy
+                ? [intel.strategy.angle && `Angle: ${intel.strategy.angle}`, intel.strategy.positioning && `Channel positioning: ${intel.strategy.positioning}`, intel.strategy.narrative, intel.strategy.differentiation && `Stand apart from competitors by: ${intel.strategy.differentiation}`].filter(Boolean).join("\n")
+                : ""
+            }
             assembly={{
               topic: project.topic,
               audience: intel.audience ? [intel.audience.primary, intel.audience.problem].filter(Boolean).join(" — ") : "",
@@ -207,8 +220,12 @@ function Studio() {
               setShowGenerate(false);
               setRev((r) => r + 1);
               touch(project.id);
+              if (autoWrite) router.replace(`/studio/script?project=${project.id}`, { scroll: false });
             }}
-            onClose={() => setShowGenerate(false)}
+            onClose={() => {
+              setShowGenerate(false);
+              if (autoWrite) router.replace(`/studio/script?project=${project.id}`, { scroll: false });
+            }}
           />
         )}
       </div>
@@ -222,7 +239,8 @@ function Studio() {
       rev={rev}
       onRev={() => setRev((r) => r + 1)}
       onGenerate={() => setShowGenerate(true)}
-      showGenerate={showGenerate}
+      // An existing script is never auto-overwritten by ?autowrite.
+      showGenerate={showGenerate && !autoWrite}
       onCloseGenerate={() => setShowGenerate(false)}
     />
   );

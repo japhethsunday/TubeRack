@@ -10,6 +10,8 @@ import { channelKeywordsField } from "@/src/lib/channel/plan";
 import { CATEGORIES } from "@/src/lib/market/signals";
 import { REGIONS, regionName } from "@/src/lib/market/regions";
 import { useProjects } from "@/src/components/projects/ProjectsProvider";
+import { useIntel } from "@/src/components/intelligence/IntelProvider";
+import { emptyAudienceProfile, emptyStrategyBrief } from "@/src/lib/intelligence/profiles";
 import { Button } from "@/src/components/ui/Button";
 import { Input, Select, Textarea } from "@/src/components/ui/fields";
 import { cx } from "@/src/components/ui/cx";
@@ -81,6 +83,7 @@ export function ChannelCreator() {
   const params = useSearchParams();
   const router = useRouter();
   const projects = useProjects();
+  const intel = useIntel();
   const [form, setForm] = useState({
     niche: params.get("niche") ?? "",
     query: params.get("query") ?? "",
@@ -145,12 +148,17 @@ export function ChannelCreator() {
     }
   }
 
-  /** Idea → real project in the workspace, then straight into the script studio. */
+  /**
+   * Idea → real project with a complete brief (audience, strategy, approved
+   * hook), then straight into the Script Studio, which writes the draft.
+   */
   function startVideo(idea: ChannelPlan["ideas"][number]) {
     if (!current) return;
-    const channelName = current.plan.names[0]?.name ?? current.niche;
+    const p = current.plan;
+    const channelName = p.names[0]?.name ?? current.niche;
     const channel = projects.channels.find((c) => c.name === channelName) ?? projects.addChannel(channelName, current.niche);
     const short = /short/i.test(idea.format);
+    const format = p.formats.find((f) => f.name.toLowerCase() === idea.format.toLowerCase());
     const project = projects.create({
       name: idea.title,
       contentType: short ? "Short" : "Long-form video",
@@ -158,9 +166,36 @@ export function ChannelCreator() {
       channelId: channel.id,
       topic: idea.title,
       description: [idea.hook && `Hook: ${idea.hook}`, idea.angle && `Angle: ${idea.angle}`, idea.pillar && `Pillar: ${idea.pillar}`].filter(Boolean).join("\n"),
-      goal: current.plan.positioning.slice(0, 280),
+      goal: p.positioning.slice(0, 280),
     });
-    router.push(`/studio/script?project=${project.id}`);
+    const now = new Date().toISOString();
+    intel.saveAudienceFor(project.id, {
+      ...emptyAudienceProfile(now),
+      primary: p.audience.primary,
+      problem: p.audience.painPoints[0] ?? "",
+      desire: p.audience.goals[0] ?? "",
+      pains: p.audience.painPoints.join("; "),
+      intent: p.audience.watchContext,
+    });
+    const pillar = p.pillars.find((x) => x.name === idea.pillar);
+    intel.saveStrategyFor(project.id, {
+      ...emptyStrategyBrief(now),
+      topic: idea.title,
+      angle: idea.angle,
+      positioning: p.positioning,
+      promise: idea.hook,
+      takeaway: idea.angle,
+      points: [pillar?.purpose, ...p.audience.goals.slice(0, 2)].filter(Boolean).join("\n"),
+      hook: idea.hook,
+      narrative: `Brand voice: ${p.brand.voice}`,
+      format: idea.format,
+      length: format?.length ?? (short ? "Under 60 seconds" : ""),
+      intent: p.audience.watchContext,
+      differentiation: p.competitors.map((c) => c.gap).filter(Boolean).slice(0, 2).join("; "),
+      cta: `Subscribe to ${channelName} for more on ${current.niche}.`,
+    });
+    if (idea.hook) intel.addHook(project.id, idea.hook, "From Channel Creator plan");
+    router.push(`/studio/script?project=${project.id}&autowrite=1`);
   }
 
   async function scheduleIdeas() {
