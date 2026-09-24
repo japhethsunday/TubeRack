@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const id = parseVideoId(new URL(request.url).searchParams.get("id") ?? "");
     if (!id) throw validationError("Paste a YouTube video link or 11-character video id.");
-    return NextResponse.json({ data: await fetchVideoDetails(id) });
+    return NextResponse.json({ data: await fetchVideoDetails(id) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return toErrorResponse(providerFailure(error, "YouTube (YOUTUBE_API_KEY)"));
   }

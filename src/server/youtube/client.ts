@@ -84,6 +84,7 @@ async function callApi(path: string, params: Record<string, string>, key: string
     response = await fetch(`${API_BASE}${path}?${query.toString()}`, {
       headers: { Accept: "application/json", ...(referer ? { Referer: referer } : {}) },
       signal: AbortSignal.timeout(15000),
+      cache: "no-store",
     });
   } catch {
     throw new Error("YouTube API request failed: network unreachable.");

@@ -21,14 +21,26 @@ function duration(sec: number | null): string {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 }
 
+/** Exact (fractional) days since upload, never below one hour. */
 function daysSince(iso: string): number {
   const t = new Date(iso).getTime();
-  return Number.isFinite(t) ? Math.max(1, Math.round((Date.now() - t) / 86400000)) : 1;
+  return Number.isFinite(t) ? Math.max(1 / 24, (Date.now() - t) / 86400000) : 1;
+}
+
+function ago(iso: string): string {
+  const days = daysSince(iso);
+  if (days < 1) return `${Math.max(1, Math.round(days * 24))} hours ago`;
+  if (days < 60) return `${Math.floor(days)} day${Math.floor(days) === 1 ? "" : "s"} ago`;
+  if (days < 730) return `${Math.floor(days / 30.44)} months ago`;
+  return `${Math.floor(days / 365.25)} years ago`;
 }
 
 function pct(part?: number, whole?: number): string {
-  if (!part || !whole) return "—";
-  return `${((part / whole) * 100).toFixed(2)}%`;
+  if (part === undefined || !whole) return "—";
+  const v = (part / whole) * 100;
+  if (v === 0) return "0%";
+  // Keep two significant digits so tiny rates (e.g. 0.0004%) are not shown as 0.00%.
+  return `${v >= 1 ? v.toFixed(2) : v.toPrecision(2)}%`;
 }
 
 function Stat({ icon: Icon, label, value, hint }: { icon: typeof Eye; label: string; value: string; hint?: string }) {
@@ -37,7 +49,7 @@ function Stat({ icon: Icon, label, value, hint }: { icon: typeof Eye; label: str
       <p className="flex items-center gap-1.5 text-xs text-muted-text">
         <Icon className="size-3.5" aria-hidden="true" /> {label}
       </p>
-      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
+      <p className="mt-1 truncate text-lg font-semibold tabular-nums" title={value}>{value}</p>
       {hint && <p className="text-[11px] text-muted-text">{hint}</p>}
     </div>
   );
@@ -185,14 +197,14 @@ export function VideoDetailsPanel({
                 </div>
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
-                    <Stat icon={Eye} label="Views" value={d.stats.views !== undefined ? compact.format(d.stats.views) : "—"} hint={perDay !== undefined ? `~${compact.format(perDay)}/day since upload` : undefined} />
-                    <Stat icon={ThumbsUp} label="Likes" value={d.stats.likes !== undefined ? compact.format(d.stats.likes) : "Hidden"} hint={`Like rate ${pct(d.stats.likes, d.stats.views)}`} />
-                    <Stat icon={MessageSquare} label="Comments" value={d.stats.comments !== undefined ? compact.format(d.stats.comments) : "—"} hint={`Comment rate ${pct(d.stats.comments, d.stats.views)}`} />
+                    <Stat icon={Eye} label="Views" value={d.stats.views !== undefined ? full.format(d.stats.views) : "—"} hint={perDay !== undefined ? `≈${compact.format(perDay)}/day avg since upload` : undefined} />
+                    <Stat icon={ThumbsUp} label="Likes" value={d.stats.likes !== undefined ? full.format(d.stats.likes) : "Hidden"} hint={d.stats.likes !== undefined ? `Like rate ${pct(d.stats.likes, d.stats.views)}` : "Owner hid likes"} />
+                    <Stat icon={MessageSquare} label="Comments" value={d.stats.comments !== undefined ? full.format(d.stats.comments) : d.commentsDisabled ? "Off" : "—"} hint={`Comment rate ${pct(d.stats.comments, d.stats.views)}`} />
                     <Stat icon={Clock} label="Duration" value={duration(d.durationSec)} hint={d.durationSec !== null && d.durationSec <= 60 ? "Short" : d.definition.toUpperCase()} />
                   </div>
                   <p className="flex items-center gap-1.5 text-xs text-muted-text">
                     <CalendarDays className="size-3.5" aria-hidden="true" />
-                    Published {new Date(d.publishedAt).toLocaleDateString(undefined, { dateStyle: "long" })} · {daysSince(d.publishedAt)} days ago
+                    Published {new Date(d.publishedAt).toLocaleDateString(undefined, { dateStyle: "long" })} · {ago(d.publishedAt)}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" loading={analyzing} onClick={() => void analyze()}>
@@ -299,7 +311,7 @@ export function VideoDetailsPanel({
                   },
                   {
                     id: "comments",
-                    label: "Comments",
+                    label: "Top comments",
                     badge: d.comments.length ? String(d.comments.length) : undefined,
                     content: d.commentsDisabled ? (
                       <p className="text-sm text-muted-text">Comments are turned off for this video.</p>
