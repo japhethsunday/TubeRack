@@ -12,11 +12,11 @@ describe("gemini retry", () => {
     assert.equal(isTransient(new Error("400 INVALID_ARGUMENT")), false);
   });
 
-  it("retries then succeeds on the same model", async () => {
+  it("retries a brief rate-limit on the same model", async () => {
     const seen: string[] = [];
     const out = await withModelFallback("a", ["b"], async (m) => {
       seen.push(m);
-      if (seen.length === 1) throw busy();
+      if (seen.length === 1) throw new Error("429 Too Many Requests");
       return "ok";
     }, opts);
     assert.equal(out, "ok");
@@ -74,5 +74,19 @@ describe("gemini quota", () => {
     assert.equal(out, "b");
     assert.equal(calls, 2);
     await assert.rejects(withModelFallback("a", [], async () => { throw q; }, opts), /limit: 0/);
+  });
+});
+
+describe("overload failover", () => {
+  it("moves to the next model on 503 without retrying the busy one", async () => {
+    const { withModelFallback } = await import("@/src/server/ai/gemini");
+    const calls: string[] = [];
+    const out = await withModelFallback("a", ["b"], async (m) => {
+      calls.push(m);
+      if (m === "a") throw new Error('{"error":{"code":503,"message":"This model is currently experiencing high demand.","status":"UNAVAILABLE"}}');
+      return m;
+    }, { baseDelayMs: 1 });
+    assert.equal(out, "b");
+    assert.deepEqual(calls, ["a", "b"]);
   });
 });

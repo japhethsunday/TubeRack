@@ -88,7 +88,16 @@ export function ProjectCard({
               {channel} · {project.contentType} · {project.platform}
             </p>
           </div>
-          <div className="relative shrink-0">
+          <div className="relative flex shrink-0 items-center">
+            <button
+              type="button"
+              onClick={onDelete}
+              aria-label={`Delete ${project.name}`}
+              title="Delete project"
+              className="rounded-md p-1.5 text-muted-text hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+            </button>
             <button
               type="button"
               aria-label={`Actions for ${project.name}`}
@@ -101,7 +110,7 @@ export function ProjectCard({
             {menu && (
               <>
                 <span aria-hidden="true" onClick={() => setMenu(false)} className="fixed inset-0 z-10 cursor-default" />
-                <div className="absolute right-0 z-20 w-44 rounded-lg border border-border bg-elevated p-1 shadow-lg">
+                <div onClick={() => setMenu(false)} className="absolute right-0 top-full z-20 w-44 rounded-lg border border-border bg-elevated p-1 shadow-lg">
                   {actions}
                 </div>
               </>

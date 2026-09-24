@@ -63,7 +63,9 @@ export function getGeminiClient(env = getServerEnv()): GoogleGenAI {
  * chain keeps working as older models are retired for new keys.
  */
 const FALLBACK_MODELS = {
-  text: ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"],
+  // Different families have separate capacity: when Flash is overloaded,
+  // Flash-Lite or Pro usually still answer. Missing models are skipped fast.
+  text: ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.5-pro", "gemini-pro-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
   image: ["gemini-3.1-flash-image", "gemini-3-pro-image-preview", "gemini-2.5-flash-image"],
   tts: ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"],
 } as const;
@@ -109,7 +111,7 @@ export async function withModelFallback<T>(
 ): Promise<T> {
   const chain = [model, ...fallbacks.filter((m) => m !== model)];
   const retries = opts.retries ?? 2;
-  const deadline = Date.now() + (opts.budgetMs ?? 40_000);
+  const deadline = Date.now() + (opts.budgetMs ?? 45_000);
   const base = opts.baseDelayMs ?? 700;
   let last: unknown;
   let busy: unknown;
@@ -124,6 +126,9 @@ export async function withModelFallback<T>(
         if (isModelMissing(error) || isQuotaBlocked(error)) break;
         if (!isTransient(error)) throw error;
         busy = error;
+        // Overloaded (503/high demand): another model is likelier to answer than
+        // this one a second later, so move on immediately.
+        if (/\b503\b|UNAVAILABLE|overloaded|high demand/i.test(errorText(error))) break;
         const wait = base * 2 ** attempt + Math.floor(Math.random() * 300);
         if (attempt === retries || Date.now() + wait > deadline) break;
         await sleep(wait);

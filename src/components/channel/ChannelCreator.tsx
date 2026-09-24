@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Rocket, Copy, Check, Loader2, Trash2, CalendarPlus, Clapperboard, Plus } from "lucide-react";
 import { api, ApiError } from "@/src/lib/api";
+import { retryBusy } from "@/src/lib/ai-client";
 import type { ChannelEvidence, ChannelInputs, ChannelPlan } from "@/src/lib/channel/plan";
 import { channelKeywordsField } from "@/src/lib/channel/plan";
 import { CATEGORIES } from "@/src/lib/market/signals";
@@ -128,7 +129,7 @@ export function ChannelCreator() {
     setBusy(true);
     setError(null);
     try {
-      const row = await api.post<PlanRow>("/api/v1/channel-plans", { ...form, competitors: form.competitors.map((c) => c.trim()).filter(Boolean) });
+      const row = await retryBusy(() => api.post<PlanRow>("/api/v1/channel-plans", { ...form, competitors: form.competitors.map((c) => c.trim()).filter(Boolean) }));
       setPlans((p) => [{ id: row.id, niche: row.niche, region: row.region, lead_name: row.plan.names[0]?.name ?? null, created_at: row.created_at }, ...p]);
       setCurrent(row);
       router.replace(`/channel-creator?plan=${row.id}`, { scroll: false });

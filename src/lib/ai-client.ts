@@ -24,9 +24,30 @@ function toOutcome(error: unknown): ProviderOutcome<never> {
   return { ok: false, reason: "failed", message: error instanceof Error ? error.message : "Request failed." };
 }
 
+/** Gemini overload (server already failed over across models). */
+export function isBusyError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /very busy|high demand|overloaded|try again in a minute/i.test(msg);
+}
+
+/**
+ * Overloads are usually over in seconds: wait and retry a couple of times
+ * (8 s, then 20 s) before surfacing the error.
+ */
+export async function retryBusy<T>(call: () => Promise<T>, waits = [8000, 20000]): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await call();
+    } catch (error) {
+      if (i >= waits.length || !isBusyError(error)) throw error;
+      await new Promise((r) => setTimeout(r, waits[i]));
+    }
+  }
+}
+
 export async function attempt<T>(call: () => Promise<T>): Promise<ProviderOutcome<T>> {
   try {
-    return { ok: true, data: await call() };
+    return { ok: true, data: await retryBusy(call) };
   } catch (error) {
     return toOutcome(error);
   }

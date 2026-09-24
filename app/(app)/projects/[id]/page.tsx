@@ -347,10 +347,10 @@ export default function ProjectOverviewPage() {
       )}
 
       {deleting && (
-        <Drawer title="Delete project?" description="This removes it from this device." onClose={() => setDeleting(false)}>
+        <Drawer title="Delete project?" description="Deletes it from your account on every device." onClose={() => setDeleting(false)}>
           <ConfirmDialog
             title="Delete project?"
-            body={`“${project.name}” and its stage progress will be gone from this browser. This cannot be undone.`}
+            body={`“${project.name}” — its script, storyboard, timeline, media and progress — will be deleted from your account on every device. This cannot be undone.`}
             confirmLabel="Delete forever"
             onConfirm={() => {
               remove(project.id);
