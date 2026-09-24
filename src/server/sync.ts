@@ -70,7 +70,7 @@ async function upsertById(
   table: string,
   row: Record<string, unknown>,
   workspaceId: string,
-): Promise<"inserted" | "updated"> {
+): Promise<"inserted" | "updated" | "skipped"> {
   const db = getDb();
   if (!db) throw backendUnavailable("Database");
   const existing = await db.unsafe(`SELECT workspace_id FROM ${table} WHERE id = $1 LIMIT 1`, [String(row.id)] as never[]);
@@ -82,7 +82,10 @@ async function upsertById(
       owner = await projectWorkspace(found.project_id);
     }
     if (owner !== workspaceId) {
-      throw conflict("A record with this id belongs to another workspace.");
+      // Another account's record (e.g. a device cache from a different login):
+      // skip it instead of failing the whole sync.
+      console.warn(`sync: skipped ${table} ${String(row.id)} owned by another workspace`);
+      return "skipped";
     }
     const cols = Object.keys(row).filter((c) => c !== "id");
     const vals = cols.map((c) => {
@@ -253,7 +256,7 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
       }
       // Bytes never sync up — uploads use the upload endpoint.
       delete (row as Record<string, unknown>).inline_bytes;
-      result[(await upsertById("media_assets", row, workspaceId)) === "inserted" ? "inserted" : "updated"] += 1;
+      result[await upsertById("media_assets", row, workspaceId)] += 1;
     }
     const voices = Array.isArray(body.voices) ? body.voices.slice(0, 100) : [];
     const consistency = Array.isArray(body.consistency) ? body.consistency.slice(0, 100) : [];
@@ -341,7 +344,7 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
         health: ["ready", "review", "blocked"].includes(String(doc.health)) ? String(doc.health) : "review",
         status: ["draft", "saved", "queued", "cancelled"].includes(String(doc.status)) ? String(doc.status) : "saved",
       };
-      result[(await upsertById("render_requests", row, workspaceId)) === "inserted" ? "inserted" : "updated"] += 1;
+      result[await upsertById("render_requests", row, workspaceId)] += 1;
     }
     for (const id of body.deletedRequestIds) {
       const rows = await db`SELECT workspace_id FROM render_requests WHERE id = ${id} LIMIT 1`;
@@ -423,7 +426,7 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
           continue;
         }
       }
-      result[(await upsertById("opportunities", row, workspaceId)) === "inserted" ? "inserted" : "updated"] += 1;
+      result[await upsertById("opportunities", row, workspaceId)] += 1;
     }
     for (const id of body.deletedOpportunityIds) {
       const rows = await db`SELECT workspace_id FROM opportunities WHERE id = ${id} LIMIT 1`;
@@ -538,7 +541,7 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
       result.skipped += 1;
       continue;
     }
-    result[(await upsertById("perf_entries", row, workspaceId)) === "inserted" ? "inserted" : "updated"] += 1;
+    result[await upsertById("perf_entries", row, workspaceId)] += 1;
   }
   for (const r of body.retention) {
     const doc = (r ?? {}) as Record<string, unknown>;
@@ -573,7 +576,7 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
       implication: String(doc.implication ?? "").slice(0, 4000),
       status: doc.status === "archived" ? "archived" : "active",
     };
-    result[(await upsertById("channel_signals", row, workspaceId)) === "inserted" ? "inserted" : "updated"] += 1;
+    result[await upsertById("channel_signals", row, workspaceId)] += 1;
   }
   for (const s of body.snapshots) {
     const doc = (s ?? {}) as Record<string, unknown>;
