@@ -73,8 +73,18 @@ function isModelMissing(error: unknown): boolean {
   return /not[ _]found|\b404\b|is not supported|unsupported model|no longer available|deprecated|retired/i.test(errorText(error));
 }
 
+/**
+ * Hard quota: the key's plan allows none (or no more today) of this model —
+ * e.g. free-tier keys get "limit: 0" for image models. Retrying won't help,
+ * but a different model might.
+ */
+export function isQuotaBlocked(error: unknown): boolean {
+  return /limit:\s*0\b|free[_ ]tier|billing|PerDay|per day|quota exceeded for metric/i.test(errorText(error));
+}
+
 /** Temporary capacity/rate problems worth retrying (503 overloaded, 429, transient 500s). */
 export function isTransient(error: unknown): boolean {
+  if (isQuotaBlocked(error)) return false;
   return /\b(503|429|500|502|504)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|try again later|deadline|ECONNRESET|fetch failed/i.test(
     errorText(error),
   );
@@ -100,13 +110,15 @@ export async function withModelFallback<T>(
   const base = opts.baseDelayMs ?? 700;
   let last: unknown;
   let busy: unknown;
+  let quota: unknown;
   for (const m of chain) {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         return await call(m);
       } catch (error) {
         last = error;
-        if (isModelMissing(error)) break;
+        if (isQuotaBlocked(error)) quota ??= error;
+        if (isModelMissing(error) || isQuotaBlocked(error)) break;
         if (!isTransient(error)) throw error;
         busy = error;
         const wait = base * 2 ** attempt + Math.floor(Math.random() * 300);
@@ -116,12 +128,19 @@ export async function withModelFallback<T>(
     }
     if (Date.now() > deadline) break;
   }
-  // Prefer reporting "busy" over a retired backup's 404 so the user knows retrying helps.
-  throw busy ?? last;
+  // Prefer the most actionable cause: busy (retry helps) > quota > whatever came last.
+  throw busy ?? quota ?? last;
 }
 
 /** Strip SDK failures to a safe message (never surfaces keys or payloads). */
 function providerError(what: string, error: unknown): Error {
+  // Server-side log for diagnosis (message only — never keys or payloads).
+  console.error(`[gemini] ${what} failed:`, errorText(error).slice(0, 500));
+  if (isQuotaBlocked(error)) {
+    return new Error(
+      `Your Gemini API key has no quota left for ${what}. Free-tier keys usually can't generate ${what === "image generation" ? "images" : "this"} — enable billing for the key in Google AI Studio (aistudio.google.com → API keys → set up billing), or try again tomorrow if you hit the daily limit.`,
+    );
+  }
   if (isTransient(error)) {
     return new Error(
       `Gemini is very busy right now, so ${what} could not finish. We retried automatically on backup models — please try again in a minute.`,

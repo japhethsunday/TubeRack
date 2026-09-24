@@ -61,3 +61,18 @@ describe("gemini retired models", () => {
     );
   });
 });
+
+describe("gemini quota", () => {
+  it("treats limit: 0 quota as non-retryable and moves to the next model", async () => {
+    const q = new Error('429 RESOURCE_EXHAUSTED Quota exceeded for metric: generate_content_free_tier_requests, limit: 0');
+    let calls = 0;
+    const out = await withModelFallback("a", ["b"], async (m) => {
+      calls++;
+      if (m === "a") throw q;
+      return m;
+    }, opts);
+    assert.equal(out, "b");
+    assert.equal(calls, 2);
+    await assert.rejects(withModelFallback("a", [], async () => { throw q; }, opts), /limit: 0/);
+  });
+});
