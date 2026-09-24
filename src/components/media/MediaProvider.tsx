@@ -2,6 +2,8 @@
 
 import { loadLocal, removeLocal, saveLocal } from "@/src/lib/media/local-store";
 import { downloadChunked, isChunked } from "@/src/lib/media/chunked";
+import { uploadToCloud } from "@/src/lib/media/cloud-upload";
+import { useSession } from "@/src/components/auth/useSession";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ApprovalState,
@@ -240,6 +242,30 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       })),
     [],
   );
+
+  // Media imported on this device before it could reach the cloud (older
+  // versions kept big/MOV files device-only): upload it now, so the rest of
+  // the account's devices get it. One file at a time, once per session.
+  const session = useSession();
+  const backfilled = useRef(new Set<string>());
+  useEffect(() => {
+    if (!ready || !cloud || session.status !== "signed-in") return;
+    const pending = bundle.assets.filter((a) => a.source === "upload-session" && a.status === "ready" && !backfilled.current.has(a.id));
+    if (!pending.length) return;
+    for (const a of pending) backfilled.current.add(a.id);
+    void (async () => {
+      for (const a of pending) {
+        try {
+          const file = await loadLocal(a.id);
+          if (!file) continue; // bytes live on another device
+          const up = await uploadToCloud(file, a.mime || file.type);
+          touchAsset(a.id, { source: "provider-output", payload: up.fileUrl });
+        } catch (error) {
+          console.error("media backfill failed:", error instanceof Error ? error.message : error);
+        }
+      }
+    })();
+  }, [ready, cloud, session.status, bundle.assets, touchAsset]);
 
   const value = useMemo<MediaContextValue>(
     () => ({

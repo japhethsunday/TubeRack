@@ -5,7 +5,7 @@ import { requireMembership } from "@/src/server/authz";
 import { defaultWorkspace } from "@/src/server/sync";
 import { isStorageConfigured, storageSignedUpload } from "@/src/server/storage";
 import { limiterFor } from "@/src/server/rate-limit";
-import { backendUnavailable, rateLimited, toErrorResponse } from "@/src/server/errors";
+import { BackendError, backendUnavailable, rateLimited, toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 import { MAX_PARTS, PART_BYTES, partCount } from "@/src/lib/media/chunked";
 
@@ -39,12 +39,16 @@ export async function POST(request: Request) {
     const input = await parseBody(request, body);
     const file = `${crypto.randomUUID()}.${EXT[input.mime]}`;
     const parts = partCount(input.size);
+    const sign = (key: string) =>
+      storageSignedUpload(key).catch(() => {
+        throw new BackendError("BACKEND_UNAVAILABLE", "Cloud storage is unreachable right now.");
+      });
     if (parts === 1) {
-      const uploadUrl = await storageSignedUpload(`${workspaceId}/uploads/${file}`);
+      const uploadUrl = await sign(`${workspaceId}/uploads/${file}`);
       return NextResponse.json({ data: { uploadUrl, uploadUrls: [uploadUrl], partBytes: PART_BYTES, fileUrl: `/api/v1/uploads/${file}` } });
     }
     const uploadUrls: string[] = [];
-    for (let i = 0; i < parts; i++) uploadUrls.push(await storageSignedUpload(`${workspaceId}/uploads/${file}.part${i}`));
+    for (let i = 0; i < parts; i++) uploadUrls.push(await sign(`${workspaceId}/uploads/${file}.part${i}`));
     return NextResponse.json({ data: { uploadUrl: uploadUrls[0], uploadUrls, partBytes: PART_BYTES, fileUrl: `/api/v1/uploads/${file}?parts=${parts}` } });
   } catch (error) {
     return toErrorResponse(error);

@@ -5,7 +5,7 @@ import { UploadCloud, X, RotateCcw, Check, HardDrive, Cloud, Film, Music2, Image
 import { validateUpload, readHeader, type UploadKind } from "@/src/lib/media/validation";
 import { useMedia } from "@/src/components/media/MediaProvider";
 import { useSession } from "@/src/components/auth/useSession";
-import { api } from "@/src/lib/api";
+import { uploadToCloud } from "@/src/lib/media/cloud-upload";
 import type { MediaAsset } from "@/src/lib/media/types";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
@@ -60,20 +60,6 @@ function probe(kind: UploadKind, url: string): Promise<{ durationSec?: number; w
     };
     el.onerror = () => reject(new Error(kind === "video" ? "This browser can't play that video's format. Convert it to MP4 (H.264) or WebM." : "This browser can't play that audio file."));
     el.src = url;
-  });
-}
-
-function putWithProgress(url: string, file: Blob, mime: string, onProgress: (r: number) => void, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", url);
-    xhr.setRequestHeader("Content-Type", mime);
-    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Cloud upload failed (${xhr.status}).`)));
-    xhr.onerror = () => reject(new Error("Cloud upload failed: network error."));
-    xhr.onabort = () => reject(new Error("Import cancelled."));
-    signal.addEventListener("abort", () => xhr.abort(), { once: true });
-    xhr.send(file);
   });
 }
 
@@ -138,15 +124,10 @@ export function MediaImporter({
       let stored = false;
       if (toCloud) {
         try {
-          const signed = await api.post<{ uploadUrls: string[]; partBytes: number; fileUrl: string }>("/api/v1/uploads/sign", { mime: found.mime, size: job.file.size });
-          const n = signed.uploadUrls.length;
-          for (const [i, url] of signed.uploadUrls.entries()) {
-            const part = n === 1 ? job.file : job.file.slice(i * signed.partBytes, (i + 1) * signed.partBytes);
-            await putWithProgress(url, part, found.mime, (r) => patch(job.id, { progress: 5 + Math.round(((i + r) / n) * 93) }), ac.signal);
-          }
+          const up = await uploadToCloud(job.file, found.mime, (r) => patch(job.id, { progress: 5 + Math.round(r * 93) }), ac.signal);
           // Keep a device copy of multi-part files so this device plays them instantly.
-          if (n > 1) await persistBlob(created.id, job.file, undefined, ac.signal);
-          updateAsset(created.id, { source: "provider-output", payload: signed.fileUrl, status: "ready" });
+          if (up.parts > 1) await persistBlob(created.id, job.file, undefined, ac.signal);
+          updateAsset(created.id, { source: "provider-output", payload: up.fileUrl, status: "ready" });
           stored = true;
         } catch (cloudError) {
           if (ac.signal.aborted) throw cloudError;
