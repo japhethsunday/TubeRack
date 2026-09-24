@@ -4,6 +4,7 @@ import {
   Lightbulb, Wand2, Rocket, Music, Captions, Layers,
 } from "lucide-react";
 import { HeroMockup } from "@/src/components/home/HeroMockup";
+import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
 import { Reveal, CountUp } from "@/src/components/home/motion";
 
 const FEATURES = [
@@ -48,26 +49,27 @@ const MARQUEE = [
 /** Public home: what TubeRack does, with real entry points. */
 export default function HomePage() {
   return (
-    <main id="main" className="relative min-h-screen overflow-hidden bg-[#0b0714] text-white">
-      <div className="auth-blob pointer-events-none absolute -left-32 -top-32 size-[32rem] rounded-full bg-fuchsia-600/30 blur-3xl" />
-      <div className="auth-blob pointer-events-none absolute -right-24 top-40 size-[30rem] rounded-full bg-sky-500/25 blur-3xl" style={{ animationDelay: "-7s" }} />
-      <div className="auth-blob pointer-events-none absolute left-1/3 top-[70rem] size-[36rem] rounded-full bg-violet-600/20 blur-3xl" style={{ animationDelay: "-11s" }} />
-      <div className="auth-grid pointer-events-none absolute inset-x-0 top-0 h-[60rem]" />
+    <main id="main" className="relative min-h-screen overflow-hidden bg-background text-foreground">
+      <div className="auth-blob pointer-events-none absolute -left-32 -top-32 size-[32rem] rounded-full bg-fuchsia-400/20 blur-3xl dark:bg-fuchsia-600/30" />
+      <div className="auth-blob pointer-events-none absolute -right-24 top-40 size-[30rem] rounded-full bg-sky-400/20 blur-3xl dark:bg-sky-500/25" style={{ animationDelay: "-7s" }} />
+      <div className="auth-blob pointer-events-none absolute left-1/3 top-[70rem] size-[36rem] rounded-full bg-violet-400/20 blur-3xl dark:bg-violet-600/20" style={{ animationDelay: "-11s" }} />
+      <div className="app-grid pointer-events-none absolute inset-x-0 top-0 h-[60rem]" />
 
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6">
         <Link href="/" className="flex items-center gap-2">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-white text-[#0b0714]">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-foreground text-background">
             <Clapperboard className="size-4" aria-hidden="true" />
           </span>
           <span className="font-semibold tracking-tight">TubeRack</span>
         </Link>
         <nav className="flex items-center gap-2 text-sm">
-          <a href="#how" className="hidden rounded-lg px-3 py-2 text-white/70 hover:text-white sm:inline">How it works</a>
-          <a href="#features" className="hidden rounded-lg px-3 py-2 text-white/70 hover:text-white sm:inline">Features</a>
-          <Link href="/login" className="rounded-lg px-3 py-2 font-medium text-white/80 hover:bg-white/10 hover:text-white">
+          <a href="#how" className="hidden rounded-lg px-3 py-2 text-foreground/70 hover:text-foreground sm:inline">How it works</a>
+          <a href="#features" className="hidden rounded-lg px-3 py-2 text-foreground/70 hover:text-foreground sm:inline">Features</a>
+          <ThemeToggle />
+          <Link href="/login" className="rounded-lg px-3 py-2 font-medium text-foreground/80 hover:bg-foreground/10 hover:text-foreground">
             Sign in
           </Link>
-          <Link href="/signup" className="rounded-lg bg-white px-3.5 py-2 font-medium text-[#0b0714] hover:bg-white/90">
+          <Link href="/signup" className="rounded-lg bg-foreground px-3.5 py-2 font-medium text-background hover:bg-foreground/90">
             Get started
           </Link>
         </nav>
@@ -76,7 +78,7 @@ export default function HomePage() {
       {/* Hero */}
       <section className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:pt-20">
         <div>
-          <p className="auth-rise inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80">
+          <p className="auth-rise inline-flex items-center gap-2 rounded-full border border-foreground/15 bg-foreground/5 px-3 py-1 text-xs text-foreground/80">
             <span className="relative flex size-2">
               <span className="home-pulse-ring absolute inline-flex size-full rounded-full bg-emerald-400" />
               <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
@@ -85,20 +87,20 @@ export default function HomePage() {
           </p>
           <h1 className="auth-rise mt-6 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl" style={{ animationDelay: "80ms" }}>
             Your YouTube studio,{" "}
-            <span className="bg-gradient-to-r from-fuchsia-300 via-violet-200 to-sky-300 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 dark:from-fuchsia-300 dark:via-violet-200 dark:to-sky-300 bg-clip-text text-transparent">
               from idea to published.
             </span>
           </h1>
-          <p className="auth-rise mt-5 max-w-xl text-lg leading-relaxed text-white/70" style={{ animationDelay: "160ms" }}>
+          <p className="auth-rise mt-5 max-w-xl text-lg leading-relaxed text-foreground/70" style={{ animationDelay: "160ms" }}>
             Research, script, voice, visuals, packaging, and analytics in one workspace — with AI that
             explains its reasoning and never invents your numbers.
           </p>
           <div className="auth-rise mt-8 flex flex-wrap gap-3" style={{ animationDelay: "240ms" }}>
-            <Link href="/signup" className="auth-sheen group inline-flex h-12 items-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-[#0b0714] hover:bg-white/90">
+            <Link href="/signup" className="auth-sheen group inline-flex h-12 items-center gap-2 rounded-xl bg-foreground px-5 text-sm font-semibold text-background hover:bg-foreground/90">
               Create free account
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
             </Link>
-            <Link href="/dashboard" className="inline-flex h-12 items-center gap-2 rounded-xl border border-white/20 px-5 text-sm font-medium text-white hover:bg-white/10">
+            <Link href="/dashboard" className="inline-flex h-12 items-center gap-2 rounded-xl border border-foreground/20 px-5 text-sm font-medium text-foreground hover:bg-foreground/10">
               Try without an account
             </Link>
           </div>
@@ -109,11 +111,11 @@ export default function HomePage() {
       </section>
 
       {/* Capability marquee */}
-      <div className="relative z-10 border-y border-white/10 bg-white/[0.02] py-4 [mask-image:linear-gradient(90deg,transparent,black_10%,black_90%,transparent)]">
+      <div className="relative z-10 border-y border-foreground/10 bg-foreground/[0.02] py-4 [mask-image:linear-gradient(90deg,transparent,black_10%,black_90%,transparent)]">
         <ul className="auth-marquee flex w-max gap-3" aria-label="Capabilities">
           {[...MARQUEE, ...MARQUEE].map((m, i) => (
-            <li key={`${m}-${i}`} className="flex items-center gap-3 whitespace-nowrap text-sm text-white/60">
-              <Sparkles className="size-3.5 text-violet-300" aria-hidden="true" />
+            <li key={`${m}-${i}`} className="flex items-center gap-3 whitespace-nowrap text-sm text-foreground/60">
+              <Sparkles className="size-3.5 text-violet-600 dark:text-violet-300" aria-hidden="true" />
               {m}
             </li>
           ))}
@@ -129,11 +131,11 @@ export default function HomePage() {
           { n: 10, label: "AI intelligence tasks" },
         ].map((f, i) => (
           <Reveal key={f.label} delay={i * 90}>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center">
-              <p className="bg-gradient-to-b from-white to-violet-300 bg-clip-text text-4xl font-semibold text-transparent">
+            <div className="rounded-2xl border border-foreground/10 bg-foreground/[0.03] p-5 text-center">
+              <p className="bg-gradient-to-b from-foreground to-violet-500 dark:to-violet-300 bg-clip-text text-4xl font-semibold text-transparent">
                 <CountUp to={f.n} />
               </p>
-              <p className="mt-1 text-sm text-white/60">{f.label}</p>
+              <p className="mt-1 text-sm text-foreground/60">{f.label}</p>
             </div>
           </Reveal>
         ))}
@@ -143,14 +145,14 @@ export default function HomePage() {
       <section className="relative z-10 mx-auto max-w-6xl px-4 pb-20 sm:px-6">
         <Reveal>
           <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">One pipeline. Every stage connected.</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-center text-white/60">Each stage opens its own studio, and everything you approve flows into the next one.</p>
+          <p className="mx-auto mt-3 max-w-2xl text-center text-foreground/60">Each stage opens its own studio, and everything you approve flows into the next one.</p>
         </Reveal>
         <ol className="mt-10 flex flex-wrap justify-center gap-2.5">
           {STAGES.map((s, i) => (
             <li key={s}>
               <Reveal delay={i * 45}>
-                <span className="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/80 transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300/50 hover:bg-violet-500/15 hover:text-white">
-                  <span className="text-xs tabular-nums text-violet-300/80">{String(i + 1).padStart(2, "0")}</span>
+                <span className="group inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-foreground/[0.04] px-4 py-2 text-sm text-foreground/80 transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300/50 hover:bg-violet-500/15 hover:text-foreground">
+                  <span className="text-xs tabular-nums text-violet-600/80 dark:text-violet-300/80">{String(i + 1).padStart(2, "0")}</span>
                   {s}
                 </span>
               </Reveal>
@@ -167,16 +169,16 @@ export default function HomePage() {
           </Reveal>
           {STEPS.map((s, i) => (
             <Reveal key={s.title} delay={i * 120}>
-              <div className="flex gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.06]">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-500 to-violet-600 shadow-lg shadow-violet-900/50">
+              <div className="flex gap-4 rounded-2xl border border-foreground/10 bg-foreground/[0.03] p-5 transition-colors hover:bg-foreground/[0.06]">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-500 to-violet-600 text-white shadow-lg shadow-violet-900/30 dark:shadow-violet-900/50">
                   <s.icon className="size-5" aria-hidden="true" />
                 </span>
                 <div>
                   <h3 className="font-semibold">
-                    <span className="mr-2 text-violet-300">{i + 1}.</span>
+                    <span className="mr-2 text-violet-600 dark:text-violet-300">{i + 1}.</span>
                     {s.title}
                   </h3>
-                  <p className="mt-1 text-sm leading-relaxed text-white/60">{s.body}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-foreground/60">{s.body}</p>
                 </div>
               </div>
             </Reveal>
@@ -184,21 +186,21 @@ export default function HomePage() {
         </div>
         <Reveal delay={150}>
           <div className="relative mx-auto aspect-square w-full max-w-md" aria-label="Providers TubeRack connects to">
-            <div className="home-orbit absolute inset-0 rounded-full border border-dashed border-white/15">
+            <div className="home-orbit absolute inset-0 rounded-full border border-dashed border-foreground/15">
               {ORBIT.map((o) => (
-                <span key={o.label} className={`absolute ${o.className} rounded-full border border-white/15 bg-[#1a1229] px-3 py-1 text-xs text-white/80 shadow-lg`}>
+                <span key={o.label} className={`absolute ${o.className} rounded-full border border-foreground/15 bg-elevated px-3 py-1 text-xs text-foreground/80 shadow-lg`}>
                   {o.label}
                 </span>
               ))}
             </div>
             <div className="home-orbit-rev absolute inset-[18%] rounded-full border border-dashed border-violet-300/20">
               {ORBIT_INNER.map((o) => (
-                <span key={o.label} className={`absolute ${o.className} rounded-full border border-violet-300/20 bg-violet-500/10 px-2.5 py-0.5 text-[11px] text-violet-100`}>
+                <span key={o.label} className={`absolute ${o.className} rounded-full border border-violet-300/20 bg-violet-500/10 px-2.5 py-0.5 text-[11px] text-violet-700 dark:text-violet-100`}>
                   {o.label}
                 </span>
               ))}
             </div>
-            <div className="absolute inset-[38%] flex items-center justify-center rounded-3xl bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 shadow-2xl shadow-violet-700/50">
+            <div className="absolute inset-[38%] flex items-center justify-center rounded-3xl bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white shadow-2xl shadow-violet-700/30 dark:shadow-violet-700/50">
               <Clapperboard className="size-10" aria-hidden="true" />
             </div>
           </div>
@@ -216,10 +218,10 @@ export default function HomePage() {
               <Reveal delay={i * 80}>
                 <div className="group relative h-full rounded-2xl p-px">
                   <div className="home-glow-border absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-                  <div className="relative h-full rounded-2xl border border-white/10 bg-[#120c1f] p-5 transition-transform duration-300 group-hover:-translate-y-1">
-                    <f.icon className="size-5 text-violet-300 transition-transform duration-300 group-hover:scale-110" aria-hidden="true" />
+                  <div className="relative h-full rounded-2xl border border-foreground/10 bg-surface p-5 transition-transform duration-300 group-hover:-translate-y-1">
+                    <f.icon className="size-5 text-violet-600 dark:text-violet-300 transition-transform duration-300 group-hover:scale-110" aria-hidden="true" />
                     <h3 className="mt-3 font-semibold">{f.title}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-white/60">{f.body}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-foreground/60">{f.body}</p>
                   </div>
                 </div>
               </Reveal>
@@ -227,9 +229,9 @@ export default function HomePage() {
           ))}
         </ul>
         <Reveal delay={200}>
-          <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs text-white/50">
+          <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs text-foreground/50">
             {[{ icon: Music, t: "Music beds" }, { icon: Captions, t: "Captions from your voiceover" }, { icon: Layers, t: "Multi-track timeline" }].map((x) => (
-              <span key={x.t} className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1">
+              <span key={x.t} className="inline-flex items-center gap-1.5 rounded-full border border-foreground/10 px-3 py-1">
                 <x.icon className="size-3.5" aria-hidden="true" />
                 {x.t}
               </span>
@@ -243,11 +245,11 @@ export default function HomePage() {
         <Reveal>
           <div className="relative rounded-3xl p-px">
             <div className="home-glow-border absolute inset-0 rounded-3xl" />
-            <div className="relative overflow-hidden rounded-3xl bg-[#120c1f] px-6 py-14 text-center">
-              <div className="auth-blob absolute -right-20 -top-20 size-64 rounded-full bg-fuchsia-600/30 blur-3xl" />
+            <div className="relative overflow-hidden rounded-3xl bg-surface px-6 py-14 text-center">
+              <div className="auth-blob absolute -right-20 -top-20 size-64 rounded-full bg-fuchsia-400/20 blur-3xl dark:bg-fuchsia-600/30" />
               <h2 className="relative text-3xl font-semibold tracking-tight sm:text-4xl">Make your next video better than your last.</h2>
-              <p className="relative mx-auto mt-3 max-w-xl text-white/60">Free to start. Your projects sync to your account across devices.</p>
-              <Link href="/signup" className="auth-sheen group relative mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-[#0b0714] hover:bg-white/90">
+              <p className="relative mx-auto mt-3 max-w-xl text-foreground/60">Free to start. Your projects sync to your account across devices.</p>
+              <Link href="/signup" className="auth-sheen group relative mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-foreground px-6 text-sm font-semibold text-background hover:bg-foreground/90">
                 Get started free
                 <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
               </Link>
@@ -256,9 +258,9 @@ export default function HomePage() {
         </Reveal>
       </section>
 
-      <footer className="relative z-10 border-t border-white/10 py-8 text-center text-xs text-white/40">
-        © {new Date().getFullYear()} TubeRack · <Link href="/login" className="hover:text-white/70">Sign in</Link> ·{" "}
-        <Link href="/signup" className="hover:text-white/70">Create account</Link>
+      <footer className="relative z-10 border-t border-foreground/10 py-8 text-center text-xs text-foreground/40">
+        © {new Date().getFullYear()} TubeRack · <Link href="/login" className="hover:text-foreground/70">Sign in</Link> ·{" "}
+        <Link href="/signup" className="hover:text-foreground/70">Create account</Link>
       </footer>
     </main>
   );
