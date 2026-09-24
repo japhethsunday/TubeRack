@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { Breadcrumb } from "@/src/components/ui/data";
 import { NicheFinder } from "@/src/components/intelligence/NicheFinder";
 
@@ -14,7 +15,9 @@ export default function NichePage() {
           competition, and whether small channels are breaking through. Deep-dive any niche for a launch plan.
         </p>
       </div>
-      <NicheFinder />
+      <Suspense fallback={null}>
+        <NicheFinder />
+      </Suspense>
     </div>
   );
 }

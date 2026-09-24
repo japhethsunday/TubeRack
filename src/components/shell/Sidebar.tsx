@@ -15,6 +15,12 @@ function useActiveFor(): (item: NavItem) => boolean {
     if (item.status !== "live") return false;
     const [hrefPath, query] = item.href.split("?");
     if (pathname !== hrefPath && !pathname.startsWith(`${hrefPath}/`)) return false;
+    // A parent section yields to a more specific live item (e.g. /intelligence vs /intelligence/niche).
+    const deeper = ALL_NAV_ITEMS.some((i) => {
+      const p = i.href.split("?")[0];
+      return i.status === "live" && p.length > hrefPath.length && p.startsWith(`${hrefPath}/`) && (pathname === p || pathname.startsWith(`${p}/`));
+    });
+    if (deeper) return false;
     if (!query) {
       // A query-less item yields to a same-path sibling whose query matches.
       const tab = search.get("tab");

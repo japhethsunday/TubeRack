@@ -5,13 +5,16 @@ import { exchangeCode, saveConnection } from "@/src/server/google/oauth";
 import { safeEqual } from "@/src/server/crypto";
 import { linkOrigin } from "@/src/server/email";
 import { audit } from "@/src/server/audit";
+import { sanitizeReturnTo } from "@/src/lib/auth/session";
 
 /** GET /api/v1/youtube/oauth/callback — finish Google consent and store the sealed tokens. */
 export async function GET(request: Request) {
   const origin = linkOrigin(request);
-  const back = (q: string) => NextResponse.redirect(`${origin}/youtube?${q}`);
   const url = new URL(request.url);
   const store = await cookies();
+  const returnTo = sanitizeReturnTo(store.get("yt_oauth_return")?.value ?? "/youtube");
+  store.delete({ name: "yt_oauth_return", path: "/api/v1/youtube/oauth" });
+  const back = (q: string) => NextResponse.redirect(`${origin}${returnTo}${returnTo.includes("?") ? "&" : "?"}${q}`);
   const expected = store.get("yt_oauth_state")?.value ?? "";
   store.delete({ name: "yt_oauth_state", path: "/api/v1/youtube/oauth" });
   if (url.searchParams.get("error")) return back(`error=${encodeURIComponent("Google sign-in was cancelled.")}`);

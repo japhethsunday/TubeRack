@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPlan } from "@/src/lib/channel/plan";
 import { stripMarkdown } from "@/src/lib/text/markdown";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
 import { getServerEnv } from "@/src/lib/env";
@@ -694,4 +695,48 @@ export async function planCalendar(input: { topic: string; audience: string; wee
     .slice(0, 200);
   if (!items.length) throw new Error("Gemini calendar plan failed: no items returned. Try again.");
   return { items, model };
+}
+
+/** Full channel strategy, grounded in measured market data and real competitors. */
+export async function writeChannelPlan(input: ChannelInputs, evidence: ChannelEvidence): Promise<{ plan: ChannelPlan; model: string }> {
+  const provider = new GeminiTextProvider();
+  const m = evidence.market;
+  const facts = [
+    m
+      ? `Measured YouTube market data${input.region ? ` (${input.region})` : ""}, top videos of the last 180 days: median ${m.medianViewsPerDay} views/day; ` +
+        `${Math.round(m.sponsoredShare * 100)}% carry sponsorships, ${Math.round(m.affiliateShare * 100)}% use affiliate links, ${Math.round(m.digitalShare * 100)}% sell their own products; ` +
+        `long-form median ${m.longViewsPerDay ?? "n/a"} views/day (typical length ${m.medianLongMinutes ?? "n/a"} min), Shorts median ${m.shortsViewsPerDay ?? "n/a"} views/day. ` +
+        `Advertiser category: ${m.category} (tier ${m.tier}/5, an industry estimate). Best-performing titles: ${m.topTitles.slice(0, 12).map((t) => `"${t}"`).join("; ")}.`
+      : "No market scan was available.",
+    evidence.competitors.length
+      ? `Competitor channels (live data): ${evidence.competitors
+          .map((c) => `${c.title} — ${c.subscribers ?? "hidden"} subscribers, ${c.videos ?? "?"} videos, median recent views ${c.medianViews ?? "n/a"}; recent titles: ${c.recentTitles.slice(0, 6).map((t) => `"${t}"`).join("; ")}`)
+          .join(" | ")}`
+      : "No competitor channels were supplied.",
+  ].join("\n");
+  const prompt =
+    `You are a senior YouTube channel strategist writing a launch plan a professional agency would hand to a client.\n` +
+    `Niche: ${input.niche}. Search phrase: ${input.query}. Target audience: ${input.audience || "not specified — infer from the data"}. Country/market: ${input.region || "worldwide"}.\n` +
+    `Content type: ${input.contentType}. Platform: ${input.platform}. Channel style: ${input.style || "not specified"}.` +
+    (input.brandName ? ` Name to build on: ${input.brandName}.` : "") +
+    `\n\nEvidence (the only numbers you may cite):\n${facts}\n\n` +
+    `Rules: be specific to this niche and audience; short, concrete sentences; no filler, no hype, no emojis, no markdown. ` +
+    `Never invent statistics, earnings, or percentages — only cite numbers from the evidence. ` +
+    `Differentiate from the competitors using their titles. Ideas must be distinct, searchable, and doable for a ${input.contentType} channel. ` +
+    `The About text must be ready to paste into YouTube (max 1000 characters, first two lines carry the promise and keywords). ` +
+    `Handles: 3-30 characters, letters/numbers/periods/underscores/hyphens only, without @.\n\n` +
+    `Respond ONLY with JSON of this shape:\n` +
+    `{"names":[{"name":"","why":""}] (6),"handles":[""] (8),"positioning":"","tagline":"","about":"",` +
+    `"brand":{"voice":"","visualStyle":"","colors":["#hex"],"typography":"","dos":[""],"donts":[""]},` +
+    `"audience":{"primary":"","painPoints":[""],"goals":[""],"watchContext":""},` +
+    `"pillars":[{"name":"","purpose":"","share":0}] (3-5, shares sum to 100),"categories":[""],` +
+    `"formats":[{"name":"","length":"","cadence":"","why":""}] (3-5),` +
+    `"ideas":[{"title":"","pillar":"","format":"","hook":"","angle":""}] (exactly 30),"titlePatterns":[""] (10),` +
+    `"thumbnail":{"style":"","rules":[""]},"publishing":{"cadence":"","days":[""],"time":"","first90Days":[""]},` +
+    `"monetisation":[{"stage":"","actions":[""]}] (3 stages from launch to established),` +
+    `"competitors":[{"name":"","strength":"","gap":""}],"seoKeywords":[""] (20),"channelKeywords":[""] (12),"launchChecklist":[""] (10-12)}`;
+  const { text, model } = await provider.generateText({ prompt, maxTokens: 8192, json: true });
+  const plan = normalisePlan(parseJsonObject(text, "channel plan"));
+  if (plan.names.length === 0 || plan.ideas.length < 10) throw new Error("Gemini returned an incomplete channel plan. Try again.");
+  return { plan, model };
 }

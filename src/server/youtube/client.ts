@@ -1,3 +1,4 @@
+import { descriptionSignals, type MarketSample } from "@/src/lib/market/signals";
 import type { NicheVideoSample } from "@/src/lib/niche/score";
 import { getServerEnv } from "@/src/lib/env";
 import { ProviderNotConfiguredError } from "@/src/lib/ai-gateway/types";
@@ -709,4 +710,79 @@ export async function channelUploads(uploadsPlaylist: string, max = 20): Promise
       durationSec: typeof cd.duration === "string" ? parseIsoDuration(cd.duration) : null,
     };
   });
+}
+
+/**
+ * Market scan (~103 quota units): like scanNiche, plus full descriptions and
+ * YouTube's paid-promotion flag, reduced to measured monetisation signals.
+ */
+export async function scanMarket(
+  query: string,
+  opts: { days?: number; regionCode?: string } = {},
+): Promise<{ samples: MarketSample[]; totalResults: number | null }> {
+  const q = query.trim().slice(0, 200);
+  if (!q) throw new Error("YouTube market scan failed: query cannot be empty.");
+  const key = requireKey();
+  const params: Record<string, string> = {
+    part: "snippet",
+    type: "video",
+    q,
+    order: "viewCount",
+    publishedAfter: new Date(Date.now() - (opts.days ?? 180) * 86_400_000).toISOString(),
+    maxResults: "25",
+    safeSearch: "moderate",
+  };
+  if (opts.regionCode && /^[A-Z]{2}$/.test(opts.regionCode)) params.regionCode = opts.regionCode;
+  const search = await callApi("/search", params, key);
+  const items = (Array.isArray(search.items) ? search.items : []) as Record<string, unknown>[];
+  const totalResults = toNumber(((search.pageInfo ?? {}) as Record<string, unknown>).totalResults) ?? null;
+  const ids = items.map((i) => ((i.id ?? {}) as { videoId?: string }).videoId).filter((id): id is string => typeof id === "string" && VIDEO_ID.test(id));
+  if (ids.length === 0) return { samples: [], totalResults };
+
+  let videos: Record<string, unknown>;
+  try {
+    videos = await callApi("/videos", { part: "snippet,statistics,contentDetails,paidProductPlacementDetails", id: ids.join(",") }, key);
+  } catch {
+    // Older API surfaces reject the paid-placement part: fall back to descriptions only.
+    videos = await callApi("/videos", { part: "snippet,statistics,contentDetails", id: ids.join(",") }, key);
+  }
+  const vItems = (Array.isArray(videos.items) ? videos.items : []) as Record<string, unknown>[];
+  const channelIds = [...new Set(vItems.map((v) => String(((v.snippet ?? {}) as Record<string, unknown>).channelId ?? "")).filter(Boolean))];
+  const subsById = new Map<string, number | null>();
+  if (channelIds.length) {
+    const channels = await callApi("/channels", { part: "statistics", id: channelIds.slice(0, 50).join(",") }, key);
+    for (const c of (Array.isArray(channels.items) ? channels.items : []) as Record<string, unknown>[]) {
+      const st = (c.statistics ?? {}) as Record<string, unknown>;
+      subsById.set(String(c.id), st.hiddenSubscriberCount ? null : toNumber(st.subscriberCount) ?? null);
+    }
+  }
+  const samples: MarketSample[] = vItems.map((v) => {
+    const sn = (v.snippet ?? {}) as Record<string, unknown>;
+    const st = (v.statistics ?? {}) as Record<string, unknown>;
+    const cd = (v.contentDetails ?? {}) as Record<string, unknown>;
+    const pp = (v.paidProductPlacementDetails ?? {}) as Record<string, unknown>;
+    const thumbs = (sn.thumbnails ?? {}) as Record<string, { url?: string }>;
+    const channelId = String(sn.channelId ?? "");
+    return {
+      videoId: String(v.id),
+      title: String(sn.title ?? ""),
+      channelId,
+      channelTitle: String(sn.channelTitle ?? ""),
+      publishedAt: String(sn.publishedAt ?? ""),
+      thumbnail: thumbs.medium?.url ?? thumbs.default?.url ?? "",
+      views: toNumber(st.viewCount) ?? 0,
+      durationSec: typeof cd.duration === "string" ? parseIsoDuration(cd.duration) : null,
+      channelSubs: subsById.get(channelId) ?? null,
+      ...descriptionSignals(String(sn.description ?? ""), pp.hasPaidProductPlacement === true),
+    };
+  });
+  return { samples, totalResults };
+}
+
+/** Whether a @handle is already taken on YouTube (1 quota unit). */
+export async function handleTaken(handle: string): Promise<boolean> {
+  const h = handle.replace(/^@/, "").trim();
+  if (!/^[A-Za-z0-9._-]{3,30}$/.test(h)) return true;
+  const res = await callApi("/channels", { part: "id", forHandle: `@${h}` }, requireKey());
+  return Array.isArray(res.items) && res.items.length > 0;
 }

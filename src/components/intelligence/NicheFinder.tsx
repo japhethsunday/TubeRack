@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Radar, Sparkles, Star, ChevronDown, Search, Lightbulb, Eye, Users, TrendingUp, Trophy } from "lucide-react";
 import { scanNiches, nicheReport, type NicheResult, type NicheScan } from "@/src/lib/ai-client";
 import type { NicheReport } from "@/src/lib/niche/score";
@@ -258,7 +259,8 @@ function Section({ title, items, ordered }: { title: string; items: string[]; or
 
 /** Niche Finder: Gemini proposes sub-niches, live YouTube data scores them. */
 export function NicheFinder() {
-  const [seed, setSeed] = useState("");
+  // Pre-filled from “Find sub-niches” links (?seed=).
+  const [seed, setSeed] = useState(useSearchParams().get("seed") ?? "");
   const [audience, setAudience] = useState("");
   const [region, setRegion] = useState("");
   const [days, setDays] = useState("180");

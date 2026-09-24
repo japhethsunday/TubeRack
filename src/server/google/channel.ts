@@ -300,3 +300,104 @@ export async function videoStatus(workspaceId: string, videoId: string): Promise
     thumbnail: sn.thumbnails?.medium?.url ?? "",
   };
 }
+
+// ---------- channel setup (Channel Creator) ----------
+
+export interface MyChannel {
+  id: string;
+  title: string;
+  handle: string;
+  description: string;
+  keywords: string;
+  country: string;
+  defaultLanguage: string;
+  thumbnail: string;
+  bannerUrl: string;
+  subscribers: number | null;
+  videos: number | null;
+}
+
+type Branding = { channel?: Record<string, unknown>; image?: Record<string, unknown>; watch?: Record<string, unknown> };
+
+async function readBranding(token: string): Promise<{ id: string; branding: Branding; snippet: Record<string, unknown>; statistics: Record<string, unknown> }> {
+  const r = await googleApi<{ items?: { id: string; brandingSettings?: Branding; snippet?: Record<string, unknown>; statistics?: Record<string, unknown> }[] }>(
+    `${DATA}/channels?part=snippet,brandingSettings,statistics&mine=true`,
+    token,
+  );
+  const ch = r.items?.[0];
+  if (!ch) throw new Error("This Google account has no YouTube channel yet. Create one at youtube.com/create_channel, then reconnect.");
+  return { id: ch.id, branding: ch.brandingSettings ?? {}, snippet: ch.snippet ?? {}, statistics: ch.statistics ?? {} };
+}
+
+/** The connected channel's current settings (1 quota unit). */
+export async function myChannel(workspaceId: string): Promise<MyChannel> {
+  const token = await accessToken(workspaceId);
+  const { id, branding, snippet, statistics } = await readBranding(token);
+  const thumbs = (snippet.thumbnails ?? {}) as Record<string, { url?: string }>;
+  const num = (v: unknown) => (v === undefined || v === null ? null : Number(v));
+  return {
+    id,
+    title: String(snippet.title ?? ""),
+    handle: String(snippet.customUrl ?? ""),
+    description: String(branding.channel?.description ?? snippet.description ?? ""),
+    keywords: String(branding.channel?.keywords ?? ""),
+    country: String(branding.channel?.country ?? snippet.country ?? ""),
+    defaultLanguage: String(branding.channel?.defaultLanguage ?? ""),
+    thumbnail: thumbs.default?.url ?? "",
+    bannerUrl: String(branding.image?.bannerExternalUrl ?? ""),
+    subscribers: statistics.hiddenSubscriberCount ? null : num(statistics.subscriberCount),
+    videos: num(statistics.videoCount),
+  };
+}
+
+/**
+ * Update the channel's About text, keywords, country and default language
+ * (channels.update, 50 quota units). YouTube replaces the whole
+ * brandingSettings object, so current values are read and merged first.
+ */
+export async function updateChannelBranding(
+  workspaceId: string,
+  patch: { description?: string; keywords?: string; country?: string; defaultLanguage?: string; bannerExternalUrl?: string },
+): Promise<MyChannel> {
+  const token = await accessToken(workspaceId);
+  const { id, branding } = await readBranding(token);
+  const channel = { ...(branding.channel ?? {}) };
+  if (patch.description !== undefined) channel.description = patch.description.slice(0, 1000);
+  if (patch.keywords !== undefined) channel.keywords = patch.keywords.slice(0, 500);
+  if (patch.country !== undefined) channel.country = patch.country || undefined;
+  if (patch.defaultLanguage !== undefined) channel.defaultLanguage = patch.defaultLanguage || undefined;
+  delete channel.title; // not writable through the API
+  const next: Branding = { ...branding, channel };
+  if (patch.bannerExternalUrl) next.image = { ...(branding.image ?? {}), bannerExternalUrl: patch.bannerExternalUrl };
+  await googleApi(`${DATA}/channels?part=brandingSettings`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, brandingSettings: next }),
+  });
+  return myChannel(workspaceId);
+}
+
+/** Upload a channel banner (≥ 2048×1152, ≤ 6 MB) and set it on the channel. */
+export async function uploadChannelBanner(workspaceId: string, bytes: Uint8Array, mime: string): Promise<MyChannel> {
+  const token = await accessToken(workspaceId);
+  const response = await fetch("https://www.googleapis.com/upload/youtube/v3/channelBanners/insert?uploadType=media", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": mime },
+    body: Buffer.from(bytes),
+    signal: AbortSignal.timeout(45000),
+  });
+  const body = (await response.json().catch(() => ({}))) as { url?: string; error?: { message?: string } };
+  if (!response.ok || !body.url) throw new Error(`YouTube banner upload failed: ${body.error?.message ?? response.status}`);
+  return updateChannelBranding(workspaceId, { bannerExternalUrl: body.url });
+}
+
+/** Create a playlist on the connected channel (50 quota units). */
+export async function createPlaylist(workspaceId: string, input: { title: string; description: string; privacy: "public" | "unlisted" | "private" }): Promise<Playlist> {
+  const token = await accessToken(workspaceId);
+  const r = await googleApi<{ id: string; snippet?: { title?: string }; status?: { privacyStatus?: string } }>(`${DATA}/playlists?part=snippet,status`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ snippet: { title: input.title.slice(0, 150), description: input.description.slice(0, 5000) }, status: { privacyStatus: input.privacy } }),
+  });
+  return { id: r.id, title: r.snippet?.title ?? input.title, itemCount: 0, privacy: r.status?.privacyStatus ?? input.privacy };
+}
