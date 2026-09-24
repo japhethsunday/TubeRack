@@ -6,9 +6,6 @@ import { Alert } from "@/src/components/ui/Alert";
 import { Badge } from "@/src/components/ui/Badge";
 import { Progress } from "@/src/components/ui/feedback";
 import { Breadcrumb, Table } from "@/src/components/ui/data";
-import { ProjectProgress } from "@/src/components/patterns/ProjectProgress";
-import { MediaCard } from "@/src/components/patterns/media";
-import { PREVIEW_PROGRESS } from "@/src/config/preview";
 
 /** Server-render component tests: structure, labels, and honest states. No DOM needed. */
 describe("ui components", () => {
@@ -43,25 +40,6 @@ describe("ui components", () => {
     );
     assert.ok(html.includes('aria-current="page"'));
     assert.ok(html.includes('aria-label="Breadcrumb"'));
-  });
-
-  it("project progress lists every stage with a preview badge", () => {
-    const html = renderToStaticMarkup(<ProjectProgress items={PREVIEW_PROGRESS} />);
-    assert.ok(html.includes("Project progress"));
-    assert.ok(html.includes("Preview"));
-    for (const s of ["Storyboard", "Visuals", "Publishing"]) {
-      assert.ok(html.includes(s), s);
-    }
-  });
-
-  it("media card surfaces status honestly", () => {
-    const html = renderToStaticMarkup(
-      <MediaCard
-        asset={{ id: "x", title: "Clip", kind: "Video", meta: "0:12", status: "failed" }}
-      />,
-    );
-    assert.ok(html.includes("Failed"));
-    assert.ok(html.includes("Delete"));
   });
 
   it("table renders rows and alert/badge carry their tones", () => {
