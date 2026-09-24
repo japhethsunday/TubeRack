@@ -7,22 +7,17 @@ export { stripThinking } from "@/src/server/ai/chat-compat";
  * NVIDIA hosted models (build.nvidia.com), taken from the account's live
  * model list. Names NVIDIA stops serving are skipped automatically.
  */
+// Ordered by live results on this account (speed + quality). Models that
+// timed out or aren't enabled for the account were left out.
 export const NVIDIA_TEXT_MODELS = [
   "nvidia/nemotron-3-super-120b-a12b",
-  "deepseek-ai/deepseek-v4.1-flash",
-  "moonshotai/kimi-k3",
   "z-ai/glm-5.3",
+  "mistralai/mistral-nemotron",
   "nvidia/nemotron-3-ultra-550b-a55b",
   "google/gemma-4-31b-it",
-  "mistralai/mistral-nemotron",
-  "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-  "nvidia/llama-3.1-nemotron-70b-instruct",
-  "openai/gpt-oss-20b",
-  "z-ai/glm-5.3-flash",
   "nvidia/nemotron-3.5-lightning-30b-a3b",
-  "nvidia/nemotron-nano-3-30b-a3b",
-  "mistralai/mistral-large",
-  "microsoft/phi-3.5-moe-instruct",
+  "z-ai/glm-5.3-flash",
+  "openai/gpt-oss-20b",
 ]
 
 export function isNvidiaConfigured(env = getServerEnv()): boolean {

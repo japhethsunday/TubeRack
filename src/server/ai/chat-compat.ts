@@ -13,6 +13,8 @@ export interface ChatProvider {
 }
 
 const catalogs = new Map<string, { ids: Set<string>; at: number }>();
+/** Models that answered "not found for this account" — skipped for an hour. */
+const unavailable = new Map<string, number>();
 
 /** Live model ids (cached for an hour). Null when the list can't be read — then every configured model is tried. */
 async function liveModels(p: ChatProvider): Promise<Set<string> | null> {
@@ -47,7 +49,9 @@ export function stripThinking(text: string): string {
 /** Configured models that the provider currently serves, in preferred order. */
 export async function modelOrder(p: ChatProvider): Promise<string[]> {
   const live = await liveModels(p);
-  const available = live ? p.models.filter((m) => live.has(m)) : p.models;
+  const now = Date.now();
+  const usable = (m: string) => (unavailable.get(`${p.baseUrl}|${m}`) ?? 0) < now;
+  const available = (live ? p.models.filter((m) => live.has(m)) : p.models).filter(usable);
   return available.length ? available : p.models;
 }
 
@@ -88,13 +92,14 @@ export async function chatGenerateText(
             temperature: request.json ? 0.4 : 0.7,
             stream: false,
           }),
-          signal: AbortSignal.timeout(Math.min(opts.attemptMs ?? 70_000, left)),
+          signal: AbortSignal.timeout(Math.min(opts.attemptMs ?? 45_000, left)),
         });
         if (!res.ok) {
           lastError = new Error(
             `${p.name} ${model} ${res.status}: ${(await res.text()).slice(0, 200)}`,
           );
-          if (res.status === 429 && attempt < 2) {
+          if (res.status === 404 || res.status === 403) unavailable.set(`${p.baseUrl}|${model}`, Date.now() + 3_600_000);
+        if (res.status === 429 && attempt < 1) {
             const after = Number(res.headers.get("retry-after"));
             await new Promise((r) =>
               setTimeout(

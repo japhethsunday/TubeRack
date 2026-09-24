@@ -8,12 +8,13 @@ import { chatGenerateText, type ChatProvider } from "@/src/server/ai/chat-compat
  */
 const BASE_URL = "https://api.mistral.ai/v1";
 // Large is used when the plan includes it; models missing from the account's list are skipped.
+// Ministral answers reliably on the current plan; Medium/Small/Large are
+// tried next and used whenever the plan's rate limits allow.
 export const MISTRAL_TEXT_MODELS = [
-  "mistral-large-latest",
-  "mistral-medium-latest",
-  "mistral-small-latest",
-  "magistral-medium-latest",
   "ministral-14b-latest",
+  "mistral-medium-latest",
+  "mistral-large-latest",
+  "mistral-small-latest",
   "ministral-8b-latest",
 ];
 const TTS_MODEL = "voxtral-mini-tts-2603";
