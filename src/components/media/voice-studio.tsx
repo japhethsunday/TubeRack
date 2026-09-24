@@ -15,6 +15,9 @@ import { EmptyState } from "@/src/components/ui/states";
 import { countWords, estimateSeconds } from "@/src/lib/script/measure";
 import { AssetDownload } from "@/src/components/media/AssetDownload";
 
+/** Matches the server limit: ~15 minutes of narration per take. */
+const MAX_TAKE_CHARS = 14_000;
+
 export interface TextSource {
   id: string;
   label: string;
@@ -101,32 +104,75 @@ export function VoiceStudio({
     setProfileId(saved.id);
   }
 
-  /** Gemini TTS: real narration audio, stored server-side, saved as a take. */
-  async function saveGeminiTake() {
-    const body = text.trim().slice(0, 5000);
-    setRunning(true);
-    setGenError(null);
+  const providerVoiceName = GEMINI_VOICES.includes(providerVoice) ? providerVoice : "Kore";
+
+  /**
+   * Generated narration: real audio stored server-side and saved as a take.
+   * Long text is voiced in full (the server splits and joins it); the take's
+   * length is the real audio length, so nothing is trimmed on the timeline.
+   */
+  async function generateTake(body: string, label: string, sceneIds: string[]): Promise<boolean> {
+    const words = countWords(body);
     const asset = addAsset({
       projectId,
-      sceneIds: [],
+      sceneIds,
       kind: "voice",
       source: "provider-output",
       status: "generating",
-      title: `Voice take — ${(source?.label ?? "custom").slice(0, 40)}`,
+      title: `Voice take — ${label.slice(0, 40)}`,
       payload: "",
       mime: "audio/wav",
-      durationSec: estSec,
-      tags: ["take", "gemini", GEMINI_VOICES.includes(providerVoice) ? providerVoice : "Kore"],
+      durationSec: estimateSeconds(Math.max(1, words), 150),
+      tags: ["take", "gemini", providerVoiceName],
       approval: "draft",
     });
-    registerRerun(asset.id, () => void saveGeminiTake());
-    const outcome = await synthesizeProviderSpeech(body, GEMINI_VOICES.includes(providerVoice) ? providerVoice : undefined);
+    registerRerun(asset.id, () => void generateTake(body, label, sceneIds));
+    const outcome = await synthesizeProviderSpeech(body, providerVoiceName);
     if (outcome.ok) {
-      updateAsset(asset.id, { status: "ready", payload: outcome.data.url, mime: outcome.data.mimeType });
-    } else {
-      updateAsset(asset.id, { status: "failed", error: outcome.message });
-      setGenError(outcome.message);
+      updateAsset(asset.id, {
+        status: "ready",
+        payload: outcome.data.url,
+        mime: outcome.data.mimeType,
+        ...(outcome.data.durationSec ? { durationSec: outcome.data.durationSec } : {}),
+      });
+      return true;
     }
+    updateAsset(asset.id, { status: "failed", error: outcome.message });
+    setGenError(outcome.message);
+    return false;
+  }
+
+  async function saveGeminiTake() {
+    setRunning(true);
+    setGenError(null);
+    const sceneIds = sourceId.startsWith("scn-") ? [sourceId.slice(4)] : [];
+    await generateTake(text.trim().slice(0, MAX_TAKE_CHARS), source?.label ?? "custom", sceneIds);
+    setRunning(false);
+  }
+
+  const sceneSources = sources.filter((s) => s.id.startsWith("scn-") && s.text.trim());
+  const [batch, setBatch] = useState<{ done: number; total: number; failed: number } | null>(null);
+
+  /** Voice every scene in one go: one take per scene, attached to that scene. */
+  async function voiceAllScenes() {
+    if (sceneSources.length === 0) return;
+    setRunning(true);
+    setGenError(null);
+    let done = 0;
+    let failed = 0;
+    setBatch({ done, total: sceneSources.length, failed });
+    // A few at a time: fast for long videos without tripping rate limits.
+    let next = 0;
+    const worker = async () => {
+      while (next < sceneSources.length) {
+        const s = sceneSources[next++];
+        const ok = await generateTake(s.text.trim().slice(0, MAX_TAKE_CHARS), s.label, [s.id.slice(4)]);
+        if (ok) done++;
+        else failed++;
+        setBatch({ done, total: sceneSources.length, failed });
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
     setRunning(false);
   }
 
@@ -146,7 +192,7 @@ export function VoiceStudio({
       source: "local-draft",
       status: "pending",
       title: `Take — ${(source?.label ?? "custom").slice(0, 40)}`,
-      payload: JSON.stringify({ text: text.trim().slice(0, 2000), ...settings }),
+      payload: JSON.stringify({ text: text.trim().slice(0, MAX_TAKE_CHARS), ...settings }),
       mime: "application/x-tuberack-voice",
       durationSec: estSec,
       tags: ["take", profile?.name ?? "default"],
@@ -286,8 +332,22 @@ export function VoiceStudio({
             </p>
             <Button onClick={saveTake} disabled={!text.trim() || running || Boolean(block)}>
               <Mic className="size-4" aria-hidden="true" />
-              {running ? "Synthesizing…" : isGemini ? "Generate take with Gemini" : "Preview + save take"}
+              {running && !batch ? "Generating voice-over…" : isGemini ? "Generate voice-over" : "Preview + save take"}
             </Button>
+            {isGemini && sceneSources.length > 1 && (
+              <Button variant="outline" onClick={() => void voiceAllScenes()} disabled={running || Boolean(block)}>
+                <Mic className="size-4" aria-hidden="true" />
+                {batch && running ? `Voicing scenes… ${batch.done + batch.failed}/${batch.total}` : `Voice all ${sceneSources.length} scenes`}
+              </Button>
+            )}
+            {batch && !running && (
+              <p className="text-xs text-muted-text" role="status">
+                {batch.done} of {batch.total} scenes voiced{batch.failed ? `; ${batch.failed} failed — use Retry on those takes` : ""}.
+              </p>
+            )}
+            {text.trim().length > MAX_TAKE_CHARS && (
+              <p className="text-xs text-warning">This text is longer than one take allows (~15 min). Voice it scene by scene instead.</p>
+            )}
             {genError && (
               <Alert tone="warn" title="Voice could not be generated">
                 {genError}

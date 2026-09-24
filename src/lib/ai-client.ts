@@ -69,7 +69,7 @@ export function generateProviderImage(prompt: string, aspectRatio: "16:9" | "9:1
 
 export function synthesizeProviderSpeech(text: string, voice?: string) {
   return attempt(() =>
-    api.post<{ url: string; mimeType: string; model: string }>("/api/v1/ai/speech", { text, voice }),
+    api.post<{ url: string; mimeType: string; model: string; durationSec?: number }>("/api/v1/ai/speech", { text, voice }),
   );
 }
 

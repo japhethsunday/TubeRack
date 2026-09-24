@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { GeminiTtsProvider } from "@/src/server/ai/gemini";
+import { GeminiTtsProvider, TTS_MAX_CHARS } from "@/src/server/ai/gemini";
 import { guardProviderCall, providerFailure, recordUsage, storeGenerated, type ProviderCaller } from "@/src/server/ai/guard";
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
@@ -8,7 +8,7 @@ import { parseBody } from "@/src/server/validate";
 export const maxDuration = 300;
 
 const body = z.object({
-  text: z.string().trim().min(1, "Text is required.").max(5000),
+  text: z.string().trim().min(1, "Text is required.").max(TTS_MAX_CHARS, `Narration is limited to ${TTS_MAX_CHARS.toLocaleString()} characters.`),
   voice: z.string().trim().max(40).optional(),
 });
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const stored = await storeGenerated(caller, Buffer.from(result.audioBase64, "base64"), result.mimeType, ext).catch(() => null);
     await recordUsage(caller, { kind: "tts", provider: "gemini", model: result.model, status: "completed" });
     const url = stored ?? `data:${result.mimeType};base64,${result.audioBase64}`;
-    return NextResponse.json({ data: { url, mimeType: result.mimeType, model: result.model } });
+    return NextResponse.json({ data: { url, mimeType: result.mimeType, model: result.model, durationSec: Math.round(result.durationSec * 100) / 100 } });
   } catch (error) {
     if (caller) await recordUsage(caller, { kind: "tts", provider: "gemini", status: "failed" });
     return toErrorResponse(providerFailure(error, "The generation service"));

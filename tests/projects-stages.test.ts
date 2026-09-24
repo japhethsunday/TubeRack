@@ -6,7 +6,7 @@ describe("pipeline stages", () => {
   it("maps pages back to stages, including tabs", () => {
     assert.equal(stageAt("/studio/script", null), "script");
     assert.equal(stageAt("/studio/media", "voice"), "voice");
-    assert.equal(stageAt("/studio/media", null), "visuals");
+    assert.equal(stageAt("/studio/media", null), "voice");
     assert.equal(stageAt("/studio/package", "seo"), "seo");
     assert.equal(stageAt("/dashboard", null), null);
   });

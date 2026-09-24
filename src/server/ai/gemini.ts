@@ -266,44 +266,109 @@ export function pcmToWavBase64(pcmBase64: string, sampleRate = 24000): string {
   return Buffer.concat([header, pcm]).toString("base64");
 }
 
+/** Longest text sent in one TTS call; longer narration is split and joined. */
+const TTS_CHUNK_CHARS = 1400;
+/**
+ * Upper bound for one take: ~15 minutes of speech, which keeps the WAV
+ * (24 kHz, 16-bit mono ≈ 2.9 MB/min) under the 50 MB storage object limit.
+ * Longer videos are voiced scene by scene.
+ */
+export const TTS_MAX_CHARS = 14_000;
+
+/**
+ * Split narration into chunks of at most `max` characters, breaking at
+ * paragraph, then sentence, then word boundaries so no word is cut.
+ */
+export function splitForSpeech(text: string, max = TTS_CHUNK_CHARS): string[] {
+  const out: string[] = [];
+  let cur = "";
+  const push = () => {
+    if (cur.trim()) out.push(cur.trim());
+    cur = "";
+  };
+  const sentences = text
+    .replace(/\r/g, "")
+    .split(/\n{2,}/)
+    .flatMap((para) => para.match(/[^.!?…]+(?:[.!?…]+["'”’)\]]*|$)\s*/g) ?? [para]);
+  for (const raw of sentences) {
+    const sentence = raw.replace(/\s+/g, " ").trim();
+    if (!sentence) continue;
+    if (sentence.length > max) {
+      push();
+      for (const word of sentence.split(" ")) {
+        if (cur && cur.length + word.length + 1 > max) push();
+        cur = cur ? `${cur} ${word}` : word;
+      }
+      continue;
+    }
+    if (cur && cur.length + sentence.length + 1 > max) push();
+    cur = cur ? `${cur} ${sentence}` : sentence;
+  }
+  push();
+  return out;
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 export class GeminiTtsProvider implements TtsProvider {
   readonly capability = "tts" as const;
   readonly name = "gemini";
 
+  /** One TTS call; returns raw 16-bit mono PCM and its sample rate. */
+  private async synthesizeChunk(text: string, voice: string, model: string): Promise<{ pcm: Buffer; rate: number }> {
+    const ai = getGeminiClient();
+    const response = await withModelFallback(model, FALLBACK_MODELS.tts, (m) =>
+      ai.models.generateContent({
+        model: m,
+        contents: text,
+        config: {
+          responseModalities: ["AUDIO"],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+        },
+      }),
+    );
+    const parts = response.candidates?.[0]?.content?.parts ?? [];
+    const audioPart = parts.find((p) => p.inlineData?.data);
+    const data = audioPart?.inlineData?.data;
+    if (!data) throw new Error("empty response");
+    const mimeType = audioPart?.inlineData?.mimeType ?? "audio/pcm";
+    if (!/pcm|L16/i.test(mimeType)) throw new Error(`unexpected audio format ${mimeType}`);
+    return { pcm: Buffer.from(data, "base64"), rate: Number(/rate=(\d+)/.exec(mimeType)?.[1] ?? 24000) };
+  }
+
+  /**
+   * Narration of any length: long text is split at sentence breaks, voiced
+   * a few chunks at a time, and joined into one WAV with short pauses, so
+   * nothing is cut off.
+   */
   async synthesizeSpeech(request: {
     text: string;
     voice?: string;
-  }): Promise<{ audioBase64: string; mimeType: string; model: string }> {
+  }): Promise<{ audioBase64: string; mimeType: string; model: string; durationSec: number }> {
     const text = request.text.trim();
     if (!text) throw new Error("Speech synthesis failed: text cannot be empty.");
-    if (text.length > 5000) throw new Error("Speech synthesis failed: text exceeds 5000 characters.");
+    if (text.length > TTS_MAX_CHARS) throw new Error(`Speech synthesis failed: text exceeds ${TTS_MAX_CHARS} characters.`);
     const env = getServerEnv();
     const model = env.GEMINI_TTS_MODEL || DEFAULT_TTS_MODEL;
     const voice = request.voice?.trim() || env.GEMINI_TTS_VOICE || DEFAULT_TTS_VOICE;
     try {
-      const ai = getGeminiClient(env);
-      const response = await withModelFallback(model, FALLBACK_MODELS.tts, (m) =>
-        ai.models.generateContent({
-          model: m,
-          contents: text,
-          config: {
-            responseModalities: ["AUDIO"],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
-          },
-        }),
-      );
-      const parts = response.candidates?.[0]?.content?.parts ?? [];
-      const audioPart = parts.find((p) => p.inlineData?.data);
-      const data = audioPart?.inlineData?.data;
-      if (!data) throw new Error("empty response");
-      const mimeType = audioPart?.inlineData?.mimeType ?? "audio/pcm";
-      // Gemini returns raw 16-bit PCM (e.g. "audio/L16;codec=pcm;rate=24000");
-      // browsers cannot play that, so wrap it in a WAV container.
-      if (/pcm|L16/i.test(mimeType)) {
-        const rate = Number(/rate=(\d+)/.exec(mimeType)?.[1] ?? 24000);
-        return { audioBase64: pcmToWavBase64(data, rate), mimeType: "audio/wav", model };
-      }
-      return { audioBase64: data, mimeType, model };
+      const chunks = splitForSpeech(text);
+      const parts = await mapLimit(chunks, 4, (chunk) => this.synthesizeChunk(chunk, voice, model));
+      const rate = parts[0].rate;
+      const pause = Buffer.alloc(Math.round(rate * 0.25) * 2); // 250 ms of silence between chunks
+      const pcm = Buffer.concat(parts.flatMap((p, i) => (i < parts.length - 1 ? [p.pcm, pause] : [p.pcm])));
+      return { audioBase64: pcmToWavBase64(pcm.toString("base64"), rate), mimeType: "audio/wav", model, durationSec: pcm.length / 2 / rate };
     } catch (error) {
       if (error instanceof ProviderNotConfiguredError) throw error;
       throw providerError("speech synthesis", error);

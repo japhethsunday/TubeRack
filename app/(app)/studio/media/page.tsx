@@ -21,7 +21,7 @@ import { EmptyState } from "@/src/components/ui/states";
 import { LoadingState } from "@/src/components/ui/feedback";
 import { useMedia } from "@/src/components/media/MediaProvider";
 
-const TAB_IDS = ["library", "scenes", "image", "voice", "audio", "uploads", "style", "queue"] as const;
+const TAB_IDS = ["library", "scenes", "voice", "image", "audio", "uploads", "style", "queue"] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 function isTabId(v: string | null): v is TabId {
@@ -132,7 +132,9 @@ function Studio() {
     scriptText: s.scriptText,
     visual: s.visual,
   }));
+  const fullScript = script?.sections.map((s) => s.text.trim()).filter(Boolean).join("\n\n") ?? "";
   const voiceSources = [
+    ...(fullScript ? [{ id: "full", label: "Full script", text: fullScript }] : []),
     ...(script?.sections.map((s) => ({ id: `sec-${s.id}`, label: `Script: ${s.heading}`, text: s.text })) ?? []),
     ...scenes.map((s) => ({ id: `scn-${s.id}`, label: `Scene ${s.number}: ${s.title}`, text: s.narration || s.scriptText })),
   ];
@@ -169,6 +171,11 @@ function Studio() {
       ),
     },
     {
+      id: "voice",
+      label: "Voice",
+      content: <VoiceStudio key={`vox-${jumpScene}`} projectId={project.id} sources={voiceSources} registerRerun={registerRerun} initialSourceId={jumpScene ? `scn-${jumpScene}` : undefined} />,
+    },
+    {
       id: "image",
       label: "Image",
       content: (
@@ -186,11 +193,6 @@ function Studio() {
           registerRerun={registerRerun}
         />
       ),
-    },
-    {
-      id: "voice",
-      label: "Voice",
-      content: <VoiceStudio key={`vox-${jumpScene}`} projectId={project.id} sources={voiceSources} registerRerun={registerRerun} initialSourceId={jumpScene ? `scn-${jumpScene}` : undefined} />,
     },
     {
       id: "audio",
