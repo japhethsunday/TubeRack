@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { getServerEnv } from "@/src/lib/env";
+import { jsonType } from "@/src/server/json-type";
 
 /**
  * Supabase Postgres client (lazy singleton). All queries are parameterized
@@ -28,6 +29,8 @@ export function getDb(): ReturnType<typeof postgres> | null {
       connect_timeout: 10,
       // Supabase transaction pooler (port 6543) does not support prepared statements.
       prepare: false,
+      // Never double-encode JSON columns; heal rows that were (see json-type.ts).
+      types: { json: jsonType },
       // Never log statements (could contain PII); errors surfaced via BackendError.
       onnotice: () => {},
     });

@@ -136,8 +136,9 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
             setSnapshot({ bundle: mergeWorkspace(readStorage(), parseBundle(remote)), recents: readRecents(), ready: true });
             return;
           }
-        } catch {
-          // Fall through to device storage.
+        } catch (error) {
+          // Fall through to device storage, but never silently.
+          console.error("workspace sync pull failed:", error instanceof Error ? error.message : error);
         }
       }
       if (!cancelled) setSnapshot({ bundle: readStorage(), recents: readRecents(), ready: true });
