@@ -11,7 +11,7 @@ export interface EmailRequest {
   subject: string;
   text: string;
   html?: string;
-  kind: "verify" | "recovery" | "security";
+  kind: "verify" | "recovery" | "security" | "digest" | "reminder";
 }
 
 export interface EmailResult {
@@ -57,7 +57,7 @@ export function actionEmail(opts: { heading: string; body: string; action: strin
 <div style="max-width:480px;margin:32px auto;background:#fff;border-radius:16px;padding:32px;border:1px solid #e4e4e7">
 <p style="margin:0 0 24px;font-weight:600;font-size:15px">TubeRack</p>
 <h1 style="margin:0 0 12px;font-size:22px">${escape(opts.heading)}</h1>
-<p style="margin:0 0 24px;line-height:1.6;color:#52525b">${escape(opts.body)}</p>
+<p style="margin:0 0 24px;line-height:1.6;color:#52525b;white-space:pre-line">${escape(opts.body)}</p>
 <a href="${escape(opts.url)}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;font-size:14px">${escape(opts.action)}</a>
 <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#a1a1aa">${escape(opts.footer)}<br>${escape(opts.url)}</p>
 </div></body></html>`;

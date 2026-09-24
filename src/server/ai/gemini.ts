@@ -616,3 +616,83 @@ export async function writeNicheReport(input: {
     },
   };
 }
+
+export interface ThumbnailScore {
+  index: number;
+  score: number;
+  strengths: string[];
+  weaknesses: string[];
+}
+
+/** Gemini vision review of thumbnail variants for one title (predicted, labeled as such). */
+export async function scoreThumbnails(title: string, images: { mime: string; base64: string }[]): Promise<{ scores: ThumbnailScore[]; pick: number; reasoning: string; model: string }> {
+  if (!isGeminiConfigured()) throw new IntelligenceNotConfiguredError("title-analysis");
+  const ai = getGeminiClient();
+  const model = getGeminiModels().text;
+  try {
+    const response = await withModelFallback(model, FALLBACK_MODELS.text, (m) =>
+      ai.models.generateContent({
+        model: m,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text:
+                  `You review YouTube thumbnails for the video "${title.slice(0, 150)}". Images are numbered 0..${images.length - 1} in order. ` +
+                  `Judge each for mobile legibility, focal subject, contrast, emotion, curiosity, and honesty vs the title. ` +
+                  `Respond ONLY with JSON: {"scores":[{"index":0,"score":0-100,"strengths":["..."],"weaknesses":["..."]}],"pick":index,"reasoning":"one paragraph"}`,
+              },
+              ...images.map((img) => ({ inlineData: { mimeType: img.mime, data: img.base64 } })),
+            ],
+          },
+        ],
+        config: { responseMimeType: "application/json", maxOutputTokens: 2000, temperature: 0.2 },
+      }),
+    );
+    const o = parseJsonObject(response.text?.trim() ?? "", "thumbnail review");
+    const scores = (Array.isArray(o.scores) ? (o.scores as Record<string, unknown>[]) : [])
+      .map((s) => ({ index: Number(s.index), score: Math.max(0, Math.min(100, Number(s.score) || 0)), strengths: strings(s.strengths, 4), weaknesses: strings(s.weaknesses, 4) }))
+      .filter((s) => Number.isInteger(s.index) && s.index >= 0 && s.index < images.length);
+    return { scores, pick: Number(o.pick ?? 0), reasoning: String(o.reasoning ?? ""), model };
+  } catch (error) {
+    throw providerError("thumbnail review", error);
+  }
+}
+
+export interface PlannedItem {
+  title: string;
+  kind: "idea" | "script" | "record" | "edit" | "thumbnail" | "publish" | "promote";
+  dayOffset: number;
+  notes: string;
+}
+
+/** Gemini production schedule: per video, the stages leading up to each publish day. */
+export async function planCalendar(input: { topic: string; audience: string; weeks: number; perWeek: number; publishDays: string[] }): Promise<{ items: PlannedItem[]; model: string }> {
+  const provider = new GeminiTextProvider();
+  const total = input.weeks * input.perWeek;
+  const { text, model } = await provider.generateText({
+    prompt:
+      `Plan a YouTube content calendar for the niche/topic "${input.topic.slice(0, 200)}"` +
+      (input.audience ? ` for ${input.audience.slice(0, 150)}` : "") +
+      `. ${total} videos over ${input.weeks} weeks (${input.perWeek}/week), publishing on ${input.publishDays.join(", ") || "any day"}. ` +
+      `For EACH video create 5 items: script, record, edit, thumbnail, publish — scheduled before its publish day (script ~5 days before, record ~3, edit ~2, thumbnail ~1). ` +
+      `dayOffset = days from the start date (0 = start). Video titles must be specific and clickable, and build on each other (series, pillars). ` +
+      `Respond ONLY with JSON: {"items":[{"title":"Video title — stage detail","kind":"script|record|edit|thumbnail|publish","dayOffset":0,"notes":"one line"}]}`,
+    maxTokens: 6000,
+    json: true,
+  });
+  const o = parseJsonObject(text, "calendar plan");
+  const kinds = ["idea", "script", "record", "edit", "thumbnail", "publish", "promote"];
+  const items = (Array.isArray(o.items) ? (o.items as Record<string, unknown>[]) : [])
+    .map((i) => ({
+      title: String(i.title ?? "").trim().slice(0, 200),
+      kind: (kinds.includes(String(i.kind)) ? String(i.kind) : "publish") as PlannedItem["kind"],
+      dayOffset: Math.max(0, Math.min(input.weeks * 7 + 7, Math.round(Number(i.dayOffset) || 0))),
+      notes: String(i.notes ?? "").trim().slice(0, 300),
+    }))
+    .filter((i) => i.title)
+    .slice(0, 200);
+  if (!items.length) throw new Error("Gemini calendar plan failed: no items returned. Try again.");
+  return { items, model };
+}

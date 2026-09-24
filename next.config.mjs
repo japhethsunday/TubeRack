@@ -22,7 +22,7 @@ const nextConfig = {
           "img-src 'self' data: blob: https://*.supabase.co https://i.ytimg.com https://*.ytimg.com https://yt3.ggpht.com https://*.googleusercontent.com",
           "media-src 'self' blob: data: https://*.supabase.co",
           // Browser → Supabase signed upload URLs.
-          "connect-src 'self' https://*.supabase.co",
+          "connect-src 'self' https://*.supabase.co https://www.googleapis.com",
           // In-app YouTube player (privacy-enhanced domain).
           "frame-src https://www.youtube-nocookie.com https://www.youtube.com",
           "frame-ancestors 'none'",

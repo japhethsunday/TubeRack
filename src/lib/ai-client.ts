@@ -24,7 +24,7 @@ function toOutcome(error: unknown): ProviderOutcome<never> {
   return { ok: false, reason: "failed", message: error instanceof Error ? error.message : "Request failed." };
 }
 
-async function attempt<T>(call: () => Promise<T>): Promise<ProviderOutcome<T>> {
+export async function attempt<T>(call: () => Promise<T>): Promise<ProviderOutcome<T>> {
   try {
     return { ok: true, data: await call() };
   } catch (error) {

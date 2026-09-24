@@ -624,3 +624,89 @@ export async function scanNiche(
   });
   return { samples, totalResults };
 }
+
+export interface ResolvedChannel {
+  id: string;
+  title: string;
+  thumbnail: string;
+  subscribers: number | null;
+  videos: number | null;
+  uploadsPlaylist: string;
+  customUrl: string;
+}
+
+/** Channel from a URL, @handle, UC… id, or name (search fallback costs 100 units). */
+export async function resolveChannel(input: string): Promise<ResolvedChannel> {
+  const key = requireKey();
+  const raw = input.trim();
+  let params: Record<string, string> | null = null;
+  const idMatch = /(UC[A-Za-z0-9_-]{22})/.exec(raw);
+  const handleMatch = /(?:youtube\.com\/)?@([A-Za-z0-9._-]{3,100})/.exec(raw);
+  if (idMatch) params = { id: idMatch[1] };
+  else if (handleMatch) params = { forHandle: `@${handleMatch[1]}` };
+  else {
+    const userMatch = /youtube\.com\/(?:user|c)\/([^/?#]+)/.exec(raw);
+    if (userMatch) params = { forUsername: userMatch[1] };
+  }
+  if (!params) {
+    const s = await callApi("/search", { part: "snippet", type: "channel", q: raw.slice(0, 100), maxResults: "1" }, key);
+    const first = (Array.isArray(s.items) ? s.items[0] : undefined) as { id?: { channelId?: string } } | undefined;
+    if (!first?.id?.channelId) throw new Error("YouTube channel not found. Paste the channel URL or @handle.");
+    params = { id: first.id.channelId };
+  }
+  const res = await callApi("/channels", { part: "snippet,statistics,contentDetails", ...params }, key);
+  const ch = (Array.isArray(res.items) ? res.items[0] : undefined) as Record<string, unknown> | undefined;
+  if (!ch) throw new Error("YouTube channel not found. Paste the channel URL or @handle.");
+  const sn = (ch.snippet ?? {}) as Record<string, unknown>;
+  const st = (ch.statistics ?? {}) as Record<string, unknown>;
+  const cd = (ch.contentDetails ?? {}) as { relatedPlaylists?: { uploads?: string } };
+  const thumbs = (sn.thumbnails ?? {}) as Record<string, { url?: string }>;
+  return {
+    id: String(ch.id),
+    title: String(sn.title ?? ""),
+    thumbnail: thumbs.default?.url ?? "",
+    subscribers: st.hiddenSubscriberCount ? null : toNumber(st.subscriberCount) ?? null,
+    videos: toNumber(st.videoCount) ?? null,
+    uploadsPlaylist: cd.relatedPlaylists?.uploads ?? "",
+    customUrl: String(sn.customUrl ?? ""),
+  };
+}
+
+export interface ChannelUpload {
+  id: string;
+  title: string;
+  thumbnail: string;
+  publishedAt: string;
+  views: number;
+  likes: number | null;
+  comments: number | null;
+  durationSec: number | null;
+}
+
+/** Latest uploads with stats (2 quota units). */
+export async function channelUploads(uploadsPlaylist: string, max = 20): Promise<ChannelUpload[]> {
+  if (!uploadsPlaylist) return [];
+  const key = requireKey();
+  const list = await callApi("/playlistItems", { part: "contentDetails", playlistId: uploadsPlaylist, maxResults: String(Math.min(50, max)) }, key);
+  const ids = ((Array.isArray(list.items) ? list.items : []) as { contentDetails?: { videoId?: string } }[])
+    .map((i) => i.contentDetails?.videoId)
+    .filter((x): x is string => typeof x === "string" && VIDEO_ID.test(x));
+  if (!ids.length) return [];
+  const v = await callApi("/videos", { part: "snippet,statistics,contentDetails", id: ids.join(",") }, key);
+  return ((Array.isArray(v.items) ? v.items : []) as Record<string, unknown>[]).map((it) => {
+    const sn = (it.snippet ?? {}) as Record<string, unknown>;
+    const st = (it.statistics ?? {}) as Record<string, unknown>;
+    const cd = (it.contentDetails ?? {}) as Record<string, unknown>;
+    const thumbs = (sn.thumbnails ?? {}) as Record<string, { url?: string }>;
+    return {
+      id: String(it.id),
+      title: String(sn.title ?? ""),
+      thumbnail: thumbs.medium?.url ?? "",
+      publishedAt: String(sn.publishedAt ?? ""),
+      views: toNumber(st.viewCount) ?? 0,
+      likes: toNumber(st.likeCount) ?? null,
+      comments: toNumber(st.commentCount) ?? null,
+      durationSec: typeof cd.duration === "string" ? parseIsoDuration(cd.duration) : null,
+    };
+  });
+}

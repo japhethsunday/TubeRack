@@ -5,7 +5,7 @@ import { Menu, Bell, CircleHelp, Command } from "lucide-react";
 import { IconButton } from "@/src/components/ui/IconButton";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Drawer } from "@/src/components/ui/overlays";
-import { EmptyState } from "@/src/components/ui/states";
+import { NotificationsList, useUnreadCount } from "@/src/components/shell/NotificationsList";
 import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
 import { BackendBadge } from "@/src/components/shell/BackendStatus";
 import { UserMenu } from "@/src/components/shell/UserMenu";
@@ -25,6 +25,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   const workspace = useProjectsOptional();
   const session = useSession();
   const displayName = session.user?.name || session.user?.email || "Account";
+  const [unread, refreshUnread] = useUnreadCount(session.status === "signed-in");
   const projectHits = (workspace?.projects ?? []).map((p) => ({
     id: p.id,
     label: p.name,
@@ -69,7 +70,14 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           )}
           <ThemeToggle />
           <Tooltip tip="Notifications">
-            <IconButton icon={Bell} label="Notifications" onClick={() => setDrawer("notifications")} />
+            <span className="relative inline-flex">
+              <IconButton icon={Bell} label={unread ? `Notifications (${unread} unread)` : "Notifications"} onClick={() => setDrawer("notifications")} />
+              {unread > 0 && (
+                <span aria-hidden="true" className="pointer-events-none absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
+            </span>
           </Tooltip>
           <Tooltip tip="Help and support">
             <IconButton icon={CircleHelp} label="Help and support" onClick={() => setDrawer("help")} />
@@ -107,11 +115,12 @@ export function Header({ onMenu }: { onMenu: () => void }) {
       />
 
       {drawer === "notifications" && (
-        <Drawer title="Notifications" description="Activity, renders, and mentions land here." onClose={() => setDrawer("none")}>
-          <EmptyState
-            title="No notifications yet"
-            body="Render completions, comments, and performance alerts will appear here."
-          />
+        <Drawer title="Notifications" description="Breakouts, trends, reminders, and test results." onClose={() => setDrawer("none")}>
+          {session.status === "signed-in" ? (
+            <NotificationsList onNavigate={() => setDrawer("none")} onRead={refreshUnread} />
+          ) : (
+            <p className="text-sm text-muted-text">Sign in to see your notifications.</p>
+          )}
         </Drawer>
       )}
       {drawer === "help" && (

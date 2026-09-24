@@ -51,6 +51,12 @@ const serverSchema = z.object({
   // server calls. Must match an allowed referrer on the key. Defaults to APP_URL.
   YOUTUBE_API_REFERER: z.string().optional(),
 
+  // Google OAuth for "Connect YouTube" (YouTube Data + Analytics on the user's channel)
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  // Shared secret Vercel Cron sends as "Authorization: Bearer <CRON_SECRET>"
+  CRON_SECRET: z.string().optional(),
+
   // Google Gemini (server-only primary AI provider: text, intelligence, image, TTS)
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_TEXT_MODEL: z.string().default("gemini-3.6-flash"),
