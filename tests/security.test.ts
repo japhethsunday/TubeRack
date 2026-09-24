@@ -40,3 +40,10 @@ describe("login return path", () => {
     assert.equal(sanitizeReturnTo("/youtube?tab=upload"), "/youtube?tab=upload");
   });
 });
+
+it("svg sanitizer keeps same-origin stored images, drops other urls", () => {
+  const ok = '<svg xmlns="http://www.w3.org/2000/svg"><image href="/api/v1/uploads/0f8fad5b-d9cb-469f-a165-70867728950e.jpg"/></svg>';
+  assert.ok(sanitizeSvg(ok).includes("/api/v1/uploads/0f8fad5b"));
+  const bad = '<svg xmlns="http://www.w3.org/2000/svg"><image href="/api/v1/uploads/../evil.svg"/><image href="https://evil.test/x.png"/></svg>';
+  assert.ok(!/evil/.test(sanitizeSvg(bad)));
+});

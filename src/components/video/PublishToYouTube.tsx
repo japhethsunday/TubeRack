@@ -21,9 +21,12 @@ import {
   Film,
   AlertTriangle,
   ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import { growth, type PublishRecord } from "@/src/lib/growth-client";
+import { suggestTitlesWithProvider, writeSeoWithProvider } from "@/src/lib/ai-client";
 import { usePackaging } from "@/src/components/package/PackagingProvider";
+import { inlineSvgImages } from "@/src/lib/package/svg-images";
 import { composeThumbnail } from "@/src/lib/package/thumbnails";
 import { renderComposition, renderSupport, RenderError, type RenderAsset } from "@/src/lib/video/render";
 import { uploadResumable, UploadError } from "@/src/lib/youtube-upload";
@@ -69,7 +72,8 @@ const STEP_META: Record<StepId, { label: string; icon: typeof Film }> = {
 
 const ORDER: StepId[] = ["render", "upload", "thumbnail", "playlist", "processing", "captions"];
 
-async function svgToImage(svg: string): Promise<{ mime: "image/png" | "image/jpeg"; base64: string; url: string }> {
+async function svgToImage(composed: string): Promise<{ mime: "image/png" | "image/jpeg"; base64: string; url: string }> {
+  const svg = await inlineSvgImages(composed);
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
   try {
     const img = new Image();
@@ -100,6 +104,8 @@ const fmtMb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 export interface PublishSource {
   projectId: string;
   projectName: string;
+  /** Project topic/idea — context for Gemini metadata. */
+  topic?: string;
   comp: Composition;
   duration: number;
   fps: number;
@@ -166,6 +172,47 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
   const [conn, setConn] = useState<{ connected: boolean; canManage: boolean; channel: string } | null>(null);
   const [playlists, setPlaylists] = useState<{ id: string; title: string }[]>([]);
   const [title, setTitle] = useState(clampTitle(primary?.text || source.projectName));
+  const [titleIdeas, setTitleIdeas] = useState<{ text: string; category: string }[]>([]);
+  const [aiBusy, setAiBusy] = useState<"titles" | "seo" | null>(null);
+  const [aiError, setAiError] = useState("");
+  // What the video actually says (captions) — grounds the AI metadata.
+  const transcript = useMemo(
+    () =>
+      source.comp.clips
+        .filter((c) => c.kind === "captions" && c.text)
+        .sort((a, b) => a.startSec - b.startSec)
+        .map((c) => c.text)
+        .join(" ")
+        .slice(0, 6000),
+    [source.comp.clips],
+  );
+  const aiContext = () => ({
+    topic: source.topic || source.projectName,
+    audience: seo.audience || "",
+    promise: "",
+    takeaway: "",
+    cta: "",
+    title,
+    script: transcript || source.comp.clips.filter((c) => c.kind === "text" && c.text).map((c) => c.text).join(" ").slice(0, 3000),
+    chapters: seo.chapters.map((c) => `${Math.floor(c.timeSec / 60)}:${String(Math.floor(c.timeSec % 60)).padStart(2, "0")} ${c.title}`).join("\n"),
+  });
+  async function genTitles() {
+    setAiBusy("titles");
+    setAiError("");
+    const o = await suggestTitlesWithProvider(aiContext());
+    setAiBusy(null);
+    if (o.ok) setTitleIdeas(o.data.titles);
+    else setAiError(o.message);
+  }
+  async function genSeo() {
+    setAiBusy("seo");
+    setAiError("");
+    const o = await writeSeoWithProvider(aiContext());
+    setAiBusy(null);
+    if (!o.ok) return setAiError(o.message);
+    setDescription(buildDescription({ description: o.data.description, chapters: seo.chapters, hashtags: o.data.hashtags }));
+    setTags(normalizeTags(o.data.tags).join(", "));
+  }
   const [description, setDescription] = useState(() => buildDescription({ description: seo.description, chapters: seo.chapters, hashtags: seo.hashtags }));
   const [tags, setTags] = useState(() => normalizeTags([...seo.tags, ...seo.keywords]).join(", "));
   const [category, setCategory] = useState(categoryId(seo.category));
@@ -461,7 +508,28 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
               )}
             </div>
             <div className="space-y-3">
-              <Input label="Title" value={title} maxLength={YT_TITLE_MAX} onChange={(e) => setTitle(e.target.value)} hint={`${title.length}/${YT_TITLE_MAX}`} />
+              <div className="space-y-1.5">
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1">
+                    <Input label="Title" value={title} maxLength={YT_TITLE_MAX} onChange={(e) => setTitle(e.target.value)} hint={`${title.length}/${YT_TITLE_MAX}`} />
+                  </div>
+                  <Button size="sm" variant="outline" className="mb-5" loading={aiBusy === "titles"} onClick={() => void genTitles()} title="Suggest titles with Gemini">
+                    <Sparkles className="size-3.5" aria-hidden="true" /> Generate
+                  </Button>
+                </div>
+                {titleIdeas.length > 0 && (
+                  <ul className="ui-panel max-h-44 space-y-1 overflow-y-auto rounded-lg border border-border p-1.5" aria-label="Title ideas">
+                    {titleIdeas.map((t) => (
+                      <li key={t.text}>
+                        <button type="button" onClick={() => { setTitle(clampTitle(t.text)); setTitleIdeas([]); }} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted">
+                          <span className="min-w-0 flex-1">{t.text}</span>
+                          <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-text">{t.category}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1 text-sm" role="radiogroup" aria-label="Visibility">
                 {(["public", "unlisted", "private"] as const).map((v) => (
                   <button key={v} type="button" role="radio" aria-checked={privacy === v} onClick={() => setPrivacy(v)} className={cx("rounded-md py-1.5 font-medium capitalize transition-colors", privacy === v ? "bg-surface shadow-sm" : "text-muted-text hover:text-foreground")}>
@@ -480,6 +548,13 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
             </div>
           </div>
 
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-primary/5 px-3 py-2 text-xs">
+            <span className="text-muted-text">{transcript ? "Gemini writes from your video's captions and topic." : "Gemini writes from your project topic. Add captions for sharper results."}</span>
+            <Button size="sm" loading={aiBusy === "seo"} onClick={() => void genSeo()}>
+              <Sparkles className="size-3.5" aria-hidden="true" /> Write description & tags
+            </Button>
+          </div>
+          {aiError && <p role="alert" className="rounded-lg bg-destructive/10 p-2.5 text-xs text-destructive">{aiError}</p>}
           <Textarea label="Description" rows={6} value={description} onChange={(e) => setDescription(e.target.value)} hint={`${description.length}/${YT_DESCRIPTION_MAX} · chapters and hashtags from Packaging are included`} />
           <Input label="Tags" value={tags} onChange={(e) => setTags(e.target.value)} hint={`${normalizeTags(tags.split(",")).length} tags · trimmed to YouTube's 500-character limit`} />
           <div className="grid gap-3 sm:grid-cols-3">

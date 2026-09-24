@@ -5,11 +5,13 @@
  * with workspace members, so they are untrusted input. This removes every
  * script vector: <script>, <foreignObject> (embeds HTML), frames/objects,
  * animation elements that can rewrite attributes, event-handler attributes,
- * and links/hrefs other than fragment ids and inline raster images.
+ * and links/hrefs other than fragment ids, inline raster images, and
+ * same-origin stored images (/api/v1/uploads|generated).
  */
 
 const BLOCKED_ELEMENTS = ["script", "foreignobject", "iframe", "frame", "object", "embed", "applet", "meta", "link", "base", "animate", "set", "animatemotion", "animatetransform", "handler", "listener"];
-const SAFE_HREF = /^(#|data:image\/(png|jpe?g|gif|webp);base64,)/i;
+// Fragment ids, inline rasters, and the account's own stored images.
+const SAFE_HREF = /^(#|data:image\/(png|jpe?g|gif|webp);base64,|\/api\/v1\/(uploads|generated)\/[0-9a-f-]{36}\.(png|jpg|gif|webp)$)/i;
 const URL_ATTRS = new Set(["href", "xlink:href", "src", "action", "formaction"]);
 
 function sanitizeWithDom(svg: string): string {

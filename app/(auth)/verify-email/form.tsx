@@ -59,9 +59,10 @@ export function VerifyForm({ token }: { token?: string; preview?: boolean }) {
             <BadgeCheck className="size-4 text-success" aria-hidden="true" />
             Thanks — your account is verified.
           </p>
-          <Link href="/dashboard" className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
+          {/* Full navigation so every provider picks up the new session. */}
+          <a href="/dashboard?welcome=1" className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
             Go to your dashboard
-          </Link>
+          </a>
         </div>
       </AuthLayout>
     );

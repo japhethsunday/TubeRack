@@ -7,6 +7,7 @@ import { GeminiAssist } from "@/src/components/intelligence/GeminiAssist";
 import { DownloadButton } from "@/src/components/ui/DownloadButton";
 import { downloadStored, safeFileName } from "@/src/lib/download";
 import type { MediaAsset } from "@/src/lib/media/types";
+import { storeThumbnailImage } from "@/src/lib/package/svg-images";
 import { solidBase } from "@/src/lib/package/thumbnails";
 import { usePackaging } from "@/src/components/package/PackagingProvider";
 import { useMedia } from "@/src/components/media/MediaProvider";
@@ -16,7 +17,10 @@ import { Input, Select } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
 import { Badge } from "@/src/components/ui/Badge";
 
-/** Downscale an upload to a data-URL base (real bytes embedded for export). */
+/**
+ * Downscale an upload into a thumbnail base. The photo goes to file storage
+ * (keeps synced SVG small); without an account it is embedded instead.
+ */
 async function uploadToBase(url: string): Promise<string> {
   const img = new Image();
   img.crossOrigin = "anonymous";
@@ -29,7 +33,9 @@ async function uploadToBase(url: string): Promise<string> {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas unavailable.");
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  const jpeg = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+  const stored = jpeg ? await storeThumbnailImage(jpeg) : null;
+  const dataUrl = stored ?? canvas.toDataURL("image/jpeg", 0.85);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><image href="${dataUrl}" x="0" y="0" width="1280" height="720" preserveAspectRatio="xMidYMid slice"/></svg>`;
 }
 

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { createSession, sessionCookie } from "@/src/server/auth";
 import { z } from "zod";
 import { getDb } from "@/src/server/db";
 import { hashToken } from "@/src/server/crypto";
@@ -29,6 +31,10 @@ export async function POST(request: Request) {
     await db`UPDATE auth_tokens SET consumed_at = now() WHERE id = ${row.id}`;
     await db`UPDATE users SET email_verified_at = now(), updated_at = now() WHERE id = ${row.user_id}`;
     await audit({ userId: row.user_id, action: "auth.verified", resourceType: "user", resourceId: row.user_id });
+    // The link proves control of the inbox: sign the user in on this device.
+    const session = await createSession(row.user_id, { userAgent: request.headers.get("user-agent") ?? undefined });
+    const cookie = sessionCookie(session);
+    (await cookies()).set(cookie.name, cookie.value, cookie.options as never);
     return NextResponse.json({ data: { verified: true } });
   } catch (error) {
     return toErrorResponse(error);

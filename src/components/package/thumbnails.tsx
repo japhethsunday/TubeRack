@@ -4,6 +4,7 @@ import { sanitizeSvg } from "@/src/lib/security/svg";
 import { useState } from "react";
 import { Plus, Trash2, Copy, Download, Check } from "lucide-react";
 import type { ThumbnailVariant, TextOverlay } from "@/src/lib/package/types";
+import { inlineSvgImages } from "@/src/lib/package/svg-images";
 import { buildConcepts, composeThumbnail, reviewThumbnail, reviewPairing, THUMBNAIL_METHOD } from "@/src/lib/package/thumbnails";
 import { usePackaging } from "@/src/components/package/PackagingProvider";
 import { ApprovalFlow } from "@/src/components/package/approval";
@@ -42,7 +43,8 @@ function newOverlay(text: string, brandColor: string): TextOverlay {
 }
 
 /** Download a standalone SVG file (real export preparation). */
-export function downloadSvg(svg: string, filename: string) {
+export async function downloadSvg(composed: string, filename: string): Promise<void> {
+  const svg = await inlineSvgImages(composed);
   const blob = new Blob([svg], { type: "image/svg+xml" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -53,7 +55,8 @@ export function downloadSvg(svg: string, filename: string) {
 }
 
 /** Rasterize the composed SVG to PNG via canvas (real client-side export). */
-export async function downloadPng(svg: string, filename: string, width = 1280): Promise<void> {
+export async function downloadPng(composed: string, filename: string, width = 1280): Promise<void> {
+  const svg = await inlineSvgImages(composed);
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
   try {
     const img = new Image();
@@ -230,7 +233,7 @@ export function VariantEditor({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => downloadSvg(composed, `${variant.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.svg`)}
+            onClick={() => downloadSvg(composed, `${variant.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.svg`).catch(() => {})}
           >
             <Download className="size-4" aria-hidden="true" />
             SVG

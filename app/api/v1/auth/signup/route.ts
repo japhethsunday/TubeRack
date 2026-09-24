@@ -1,17 +1,15 @@
-import { cookies } from "next/headers";
 import { sharedLimit } from "@/src/server/shared-limit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/src/server/db";
 import { hashPassword } from "@/src/server/crypto";
-import { createSession, sessionCookie } from "@/src/server/auth";
-import { conflict, toErrorResponse, validationError, backendUnavailable, zodToDetails } from "@/src/server/errors";
+import { toErrorResponse, validationError, backendUnavailable, zodToDetails } from "@/src/server/errors";
 import { parseBody, emailSchema, passwordSchema, nameSchema } from "@/src/server/validate";
 import { limiterFor, clientKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 import { randomToken, hashToken } from "@/src/server/crypto";
-import { sendVerificationEmail } from "@/src/server/email";
+import { sendAccountExistsEmail, sendVerificationEmail } from "@/src/server/email";
 
 const signupSchema = z
   .object({
@@ -23,7 +21,14 @@ const signupSchema = z
   })
   .refine((v) => v.password === v.confirm, { message: "Passwords do not match.", path: ["confirm"] });
 
-/** POST /api/v1/auth/signup — create user + workspace + session. */
+/** Identical for new and existing addresses, so sign-up can't reveal who has an account. */
+const PENDING = () => NextResponse.json({ data: { pending: true } }, { status: 202 });
+
+/**
+ * POST /api/v1/auth/signup — create an unverified user + workspace and email
+ * a verification link (which signs them in). An existing address gets a
+ * "you already have an account" email instead; the response is the same.
+ */
 export async function POST(request: Request) {
   try {
     const limit = limiterFor("auth").take(`auth:${clientKey(request)}`);
@@ -35,9 +40,13 @@ export async function POST(request: Request) {
     const email = body.email.toLowerCase();
 
     const existing = await db`SELECT id FROM users WHERE lower(email) = ${email} AND deleted_at IS NULL LIMIT 1`;
-    if (existing.length > 0) throw conflict("An account with this email already exists.");
-
+    // Hash either way so both paths take the same time.
     const passwordHash = await hashPassword(body.password);
+    if (existing.length > 0) {
+      await sendAccountExistsEmail(request, email);
+      return PENDING();
+    }
+
     const result = await db.begin(async (tx) => {
       const users = await tx`
         INSERT INTO users (email, name, password_hash) VALUES (${email}, ${body.name.trim()}, ${passwordHash})
@@ -59,13 +68,7 @@ export async function POST(request: Request) {
       return { user, workspace };
     });
 
-    const token = await createSession(String(result.user.id), {
-      userAgent: request.headers.get("user-agent") ?? undefined,
-    });
-    const cookie = sessionCookie(token);
-    const store = await cookies();
-    store.set(cookie.name, cookie.value, cookie.options as never);
-    // Verification email (best effort; the account works before verifying).
+    // Verification email; its link signs the new user in.
     try {
       const verifyToken = randomToken(24);
       await db`
@@ -77,14 +80,10 @@ export async function POST(request: Request) {
       console.error("verification email failed:", mailError instanceof Error ? mailError.message : String(mailError));
     }
     await audit({ userId: String(result.user.id), workspaceId: String(result.workspace.id), action: "auth.signup", resourceType: "user", resourceId: String(result.user.id) });
-    return NextResponse.json(
-      { data: { user: { id: result.user.id, email: result.user.email, name: result.user.name }, workspace: result.workspace } },
-      { status: 201 },
-    );
+    return PENDING();
   } catch (error) {
-    if (error instanceof Error && "code" in error && (error as { code: string }).code === "23505") {
-      return toErrorResponse(conflict("An account with this email already exists."));
-    }
+    // Lost a race with a concurrent sign-up for the same address.
+    if (error instanceof Error && "code" in error && (error as { code: string }).code === "23505") return PENDING();
     if (error instanceof z.ZodError) {
       return toErrorResponse(validationError("Invalid signup data.", zodToDetails(error)));
     }

@@ -11,27 +11,6 @@ const nextConfig = {
         key: "Permissions-Policy",
         value: "camera=(), microphone=(), geolocation=()",
       },
-      {
-        key: "Content-Security-Policy",
-        value: [
-          "default-src 'self'",
-          // 'unsafe-eval' is only needed by the dev server (fast refresh).
-          `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'"}`,
-          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-          "font-src 'self' https://fonts.gstatic.com data:",
-          // Supabase signed URLs (generated media/uploads) and YouTube thumbnails.
-          "img-src 'self' data: blob: https://*.supabase.co https://i.ytimg.com https://*.ytimg.com https://yt3.ggpht.com https://*.googleusercontent.com",
-          "media-src 'self' blob: data: https://*.supabase.co",
-          // Browser → Supabase signed upload URLs.
-          "connect-src 'self' https://*.supabase.co https://www.googleapis.com",
-          // In-app YouTube player (privacy-enhanced domain).
-          "frame-src https://www.youtube-nocookie.com https://www.youtube.com",
-          "frame-ancestors 'none'",
-          "base-uri 'self'",
-          "form-action 'self'",
-          "object-src 'none'",
-        ].join("; "),
-      },
     ];
     const hsts =
       process.env.NODE_ENV === "production"
@@ -42,7 +21,12 @@ const nextConfig = {
             },
           ]
         : [];
-    return [{ source: "/:path*", headers: [...security, ...hsts] }];
+    // Page CSP (with a per-request script nonce) is set in proxy.ts.
+    // API responses never render HTML, so they get a lock-down policy.
+    return [
+      { source: "/:path*", headers: [...security, ...hsts] },
+      { source: "/api/:path*", headers: [{ key: "Content-Security-Policy", value: "default-src 'none'; frame-ancestors 'none'" }] },
+    ];
   },
 };
 

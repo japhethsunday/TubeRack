@@ -130,7 +130,7 @@ export function PackageOverview({
                 variant="outline"
                 onClick={() => {
                   const svg = composeThumbnail(approvedVariantFor.baseSvg ?? "", approvedVariantFor.overlays);
-                  downloadSvg(svg, "thumbnail.svg");
+                  downloadSvg(svg, "thumbnail.svg").catch(() => {});
                 }}
               >
                 <Download className="size-4" aria-hidden="true" />

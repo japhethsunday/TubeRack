@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
@@ -9,15 +10,16 @@ export const metadata: Metadata = {
 
 const THEME_INIT = `(function(){try{var t=localStorage.getItem("tuberack-theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}})();`;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased">
         <a

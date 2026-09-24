@@ -86,6 +86,18 @@ export async function sendVerificationEmail(request: Request, to: string, token:
   return sendEmail({ to, subject: "Verify your TubeRack email", kind: "verify", ...mail });
 }
 
+/** Sent instead of a verification link when the address already has an account. */
+export async function sendAccountExistsEmail(request: Request, to: string): Promise<EmailResult> {
+  const mail = actionEmail({
+    heading: "You already have an account",
+    body: "Someone (hopefully you) tried to create a TubeRack account with this email. You already have one — sign in, or reset your password if you forgot it.",
+    action: "Sign in",
+    url: `${linkOrigin(request)}/login`,
+    footer: "If this wasn't you, no action is needed; your account was not changed.",
+  });
+  return sendEmail({ to, subject: "Your TubeRack account", kind: "security", ...mail });
+}
+
 export async function sendRecoveryEmail(request: Request, to: string, token: string): Promise<EmailResult> {
   const url = `${linkOrigin(request)}/reset-password?token=${encodeURIComponent(token)}`;
   const mail = actionEmail({

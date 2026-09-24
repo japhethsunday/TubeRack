@@ -10,7 +10,7 @@ import { useScripts } from "@/src/components/script/ScriptProvider";
 import { useMedia } from "@/src/components/media/MediaProvider";
 import { useVideo, VideoStorageNote } from "@/src/components/video/VideoProvider";
 import { useIntelQuery } from "@/src/components/intelligence/chrome";
-import { Timeline } from "@/src/components/video/Timeline";
+import { TimelinePro } from "@/src/components/video/TimelinePro";
 import { Preview } from "@/src/components/video/Preview";
 import { ScenesPanel, MediaPanel, TextPanel, Inspector, ExportPanel } from "@/src/components/video/panels";
 import { GeminiCaptions } from "@/src/components/video/GeminiCaptions";
@@ -77,6 +77,8 @@ function Studio() {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [pxPerSec, setPxPerSec] = useState(44);
   const [snap, setSnap] = useState(true);
+  const [playing, setPlaying] = useState(false);
+  const [locked, setLocked] = useState<Set<string>>(() => new Set());
   const [leftTab, setLeftTab] = useState("media");
   const [clipboard, setClipboard] = useState<TimelineClip[]>([]);
   const [inOut, setInOut] = useState<{ in: number; out: number } | null>(null);
@@ -499,6 +501,7 @@ function Studio() {
             source={{
               projectId: pid,
               projectName: project.name,
+              topic: project.topic,
               comp: composition,
               duration,
               fps: Number(fps) || 30,
@@ -574,6 +577,7 @@ function Studio() {
         assetFor={renderAsset}
         fps={Number(fps) || 30}
         selectedId={selectedClipId}
+        onPlayingChange={setPlaying}
       />
     );
   }
@@ -621,7 +625,7 @@ function Studio() {
         // Drop onto empty timeline space appends to a fitting track.
         if (e.dataTransfer.getData("application/x-tuberack-asset")) onDropAsset(e);
       }} onDragOver={(e) => e.preventDefault()}>
-        <Timeline
+        <TimelinePro
           clips={clips}
           tracks={tracks}
           segments={segments}
@@ -634,28 +638,56 @@ function Studio() {
           onZoom={setPxPerSec}
           snap={snap}
           onToggleSnap={() => setSnap((s) => !s)}
-          onMoveClip={(id, newStart) => {
-            const target = clips.find((c) => c.id === id);
-            if (!target) return;
-            commit(moveClip(clips, id, newStart - target.startSec));
+          onCommit={commit}
+          onToggleTrack={(trackId, field) => {
+            video.setTracks(pid, tracks.map((t) => (t.id === trackId ? { ...t, [field]: !t[field] } : t)));
           }}
-          onSplitSelected={() => {
-            if (!selectedClipId) return;
-            commit(splitClipAt(clips, selectedClipId, playhead));
+          assetFor={(assetId) => {
+            const a = assets.find((x) => x.id === assetId);
+            const r = renderAsset(assetId);
+            if (!a || !r) return null;
+            const url = r.blobUrl ?? (a.source === "provider-output" && /^(https?:|\/)/.test(a.payload) ? a.payload : null);
+            return { url, kind: a.kind, durationSec: a.durationSec, title: a.title };
           }}
-          onDeleteSelected={() => {
+          onDropAsset={(assetId, trackId, atSec) => {
+            const asset = assets.find((a) => a.id === assetId);
+            if (asset) placeAsset(asset, atSec, trackId ?? undefined);
+          }}
+          onSplit={() => {
+            if (selectedClipId) commit(splitClipAt(clips, selectedClipId, playhead));
+          }}
+          onDelete={() => {
             if (!selectedClipId) return;
             commit(deleteClip(clips, selectedClipId));
             setSelectedClipId(null);
           }}
-          onDuplicateSelected={() => {
-            if (!selectedClipId) return;
-            commit(duplicateClip(clips, selectedClipId));
+          onDuplicate={() => {
+            if (selectedClipId) commit(duplicateClip(clips, selectedClipId));
           }}
-          onToggleTrack={(trackId, field) => {
-            video.setTracks(pid, tracks.map((t) => (t.id === trackId ? { ...t, [field]: !t[field] } : t)));
+          onSpeed={(speed) => {
+            const c = clips.find((x) => x.id === selectedClipId);
+            if (!c || speed <= 0) return;
+            // Keep the same span of source footage: duration scales inversely.
+            const footage = c.durationSec * (c.speed ?? 1);
+            const durationSec = Math.max(0.1, Math.round((footage / speed) * 100) / 100);
+            commit(clips.map((x) => (x.id === c.id ? { ...x, speed, durationSec } : x)));
           }}
-          renderThumb={thumbFor}
+          aspect={canvas.aspect}
+          onAspect={(aspect) => {
+            const size = { "16:9": [1920, 1080], "9:16": [1080, 1920], "1:1": [1080, 1080], "4:5": [1080, 1350] }[aspect];
+            const preset = aspect === "16:9" ? "youtube" : aspect === "9:16" ? "shorts" : aspect === "1:1" ? "square" : "custom";
+            video.setCanvas(pid, { ...canvas, preset, aspect, width: size[0], height: size[1] });
+          }}
+          playing={playing}
+          locked={locked}
+          onToggleLock={(trackId) =>
+            setLocked((prev) => {
+              const next = new Set(prev);
+              if (next.has(trackId)) next.delete(trackId);
+              else next.add(trackId);
+              return next;
+            })
+          }
         />
       </div>
       </div>

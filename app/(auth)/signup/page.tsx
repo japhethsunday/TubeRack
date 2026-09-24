@@ -26,6 +26,7 @@ export default function SignupPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [shake, setShake] = useState(0);
 
   async function submit(e: React.FormEvent) {
@@ -41,16 +42,12 @@ export default function SignupPage() {
     setLoading(true);
     try {
       await api.post("/api/v1/auth/signup", { name, email, password, confirm, terms });
-      // Full navigation: every provider re-reads the new session cookie.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.assign("/dashboard?welcome=1");
+      setSentTo(email);
+      setLoading(false);
       return;
     } catch (error) {
       if (error instanceof ApiError && error.isUnavailable()) {
         setOffline(true);
-      } else if (error instanceof ApiError && error.code === "CONFLICT") {
-        setErrors({ email: "An account with this email already exists. Sign in instead." });
-        setShake((n) => n + 1);
       } else if (error instanceof ApiError) {
         setFormError(error.details?.[0] ?? error.message);
         setShake((n) => n + 1);
@@ -74,7 +71,12 @@ export default function SignupPage() {
         </>
       }
     >
-      {offline ? (
+      {sentTo ? (
+        <div role="status" className="space-y-3 text-sm">
+          <p className="rounded-lg bg-success/10 p-3 text-success">Check your inbox at <strong>{sentTo}</strong>.</p>
+          <p className="text-muted-text">We sent a link to finish creating your account — it signs you in and expires in 24 hours. Nothing arrived after a few minutes? Check spam, or sign in if you already have an account.</p>
+        </div>
+      ) : offline ? (
         <AuthBoundaryNotice
           feature="Sign-up"
           validated={`Details for ${email} passed validation, but the server could not be reached.`}
