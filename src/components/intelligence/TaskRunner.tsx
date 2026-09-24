@@ -114,7 +114,7 @@ export function TaskRunner<T>({
             {status === "generating" ? ` — ${progress}%` : ""}
           </span>
         </p>
-        {ai?.ok ? <Badge tone="ok">Gemini + local</Badge> : <Badge tone="preview">Local analysis</Badge>}
+        {ai?.ok ? <Badge tone="ok">Full analysis</Badge> : <Badge tone="preview">Local analysis</Badge>}
       </div>
 
       <p className="text-xs text-muted-text">Input: {contextSummary}</p>
@@ -146,11 +146,11 @@ export function TaskRunner<T>({
             Analysis complete — review, edit, and save what is useful.
           </p>
           {ai?.ok && (
-            <section aria-label="Gemini analysis" className="space-y-2 rounded-lg border border-border bg-muted p-4">
+            <section aria-label="Detailed analysis" className="space-y-2 rounded-lg border border-border bg-muted p-4">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="flex items-center gap-2 text-sm font-semibold">
                   <Sparkles className="size-4 text-primary" aria-hidden="true" />
-                  Gemini analysis
+                  Detailed analysis
                   <span className="text-xs font-normal text-muted-text">{ai.data.model}</span>
                 </h3>
                 <DownloadButton

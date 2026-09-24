@@ -199,11 +199,11 @@ export function SeoWorkspace({ projectId, context }: { projectId: string; contex
               </Button>
               <Button size="sm" onClick={() => void writeWithGemini()} disabled={aiBusy}>
                 <Sparkles className="size-4" aria-hidden="true" />
-                {aiBusy ? "Writing…" : "Write with Gemini"}
+                {aiBusy ? "Writing…" : "Write description"}
               </Button>
             </span>
           </div>
-          {aiError && <p role="alert" className="mt-2 text-xs text-destructive">Gemini unavailable: {aiError}</p>}
+          {aiError && <p role="alert" className="mt-2 text-xs text-destructive">Couldn&apos;t write: {aiError}</p>}
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             <Input label="Link label" value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} placeholder="Template" />
             <Input label="Link URL" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://…" />

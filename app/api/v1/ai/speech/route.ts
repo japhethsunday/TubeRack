@@ -26,6 +26,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: { url, mimeType: result.mimeType, model: result.model } });
   } catch (error) {
     if (caller) await recordUsage(caller, { kind: "tts", provider: "gemini", status: "failed" });
-    return toErrorResponse(providerFailure(error, "Gemini (GEMINI_API_KEY)"));
+    return toErrorResponse(providerFailure(error, "The generation service"));
   }
 }

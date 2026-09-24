@@ -130,7 +130,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           <ul className="space-y-2 text-sm">
             {[
               { href: "/projects", title: "Start a project", body: "Create a project, then follow the pipeline stage by stage." },
-              { href: "/intelligence", title: "Content Intelligence", body: "Analyze ideas, audiences, titles, hooks, and retention with Gemini." },
+              { href: "/intelligence", title: "Content Intelligence", body: "Analyze ideas, audiences, titles, hooks, and retention." },
               { href: "/intelligence/research", title: "YouTube research", body: "Search live videos and pull references into your studios." },
               { href: "/settings?tab=security", title: "Account & security", body: "Password, sessions, and email verification." },
             ].map((l) => (

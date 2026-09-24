@@ -290,7 +290,7 @@ export function ImageStudio({
                 />
               </div>
             ))}
-            <MethodologyNote text="Local assembly from scene, script, DNA, and consistency. Edit freely — Gemini receives exactly this direction." />
+            <MethodologyNote text="Local assembly from scene, script, DNA, and consistency. Edit freely; this is exactly the direction used." />
           </div>
         </details>
 
@@ -305,12 +305,12 @@ export function ImageStudio({
           <Button onClick={() => launch()} disabled={Boolean(block)}>
             <ImagePlus className="size-4" aria-hidden="true" />
             {isGemini
-              ? `Generate ${variations} image${variations === 1 ? "" : "s"} with Gemini`
+              ? `Generate ${variations} image${variations === 1 ? "" : "s"}`
               : `Generate ${variations} draft${variations === 1 ? "" : "s"} — free, on-device`}
           </Button>
         )}
         {genError && (
-          <Alert tone="warn" title="Gemini could not generate">
+          <Alert tone="warn" title="Images could not be generated">
             {genError}
           </Alert>
         )}
@@ -348,7 +348,7 @@ function RunResults({ assetIds, sceneId, onMore }: { assetIds: string[]; sceneId
             )}
             <p className="mt-2 truncate text-sm font-medium">{a.title}</p>
             <p className="text-xs text-muted-text">
-              {a.source === "provider-output" ? "Gemini" : `Seed ${a.seed}`} · {a.width}×{a.height}
+              {a.source === "provider-output" ? "Generated" : `Seed ${a.seed}`} · {a.width}×{a.height}
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <AssetDownload asset={a} />

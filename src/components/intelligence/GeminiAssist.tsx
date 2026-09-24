@@ -18,7 +18,7 @@ export function GeminiAssist({
   title,
   blurb,
   context,
-  actionLabel = "Generate with Gemini",
+  actionLabel = "Generate",
   disabledReason,
 }: {
   task: IntelligenceTaskType;

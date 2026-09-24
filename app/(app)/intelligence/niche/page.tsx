@@ -11,7 +11,7 @@ export default function NichePage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Niche Finder</h1>
         <p className="mt-1 max-w-prose text-sm text-muted-text">
-          Turn an interest into ranked YouTube niches. Gemini proposes sub-niches; live YouTube data scores each on demand,
+          Turn an interest into ranked YouTube niches. We propose sub-niches; live YouTube data scores each on demand,
           competition, and whether small channels are breaking through. Deep-dive any niche for a launch plan.
         </p>
       </div>

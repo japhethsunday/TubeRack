@@ -218,7 +218,7 @@ export function VideoDetailsPanel({
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" loading={analyzing} onClick={() => void analyze()}>
-                      <Sparkles className="size-3.5" aria-hidden="true" /> Analyze with Gemini
+                      <Sparkles className="size-3.5" aria-hidden="true" /> Analyze video
                     </Button>
                     {onAdd && (
                       <Button size="sm" variant="outline" disabled={added} onClick={() => { onAdd(d); setAdded(true); }}>
@@ -242,10 +242,10 @@ export function VideoDetailsPanel({
               </div>
 
               {(analysis || analysisError) && (
-                <section aria-label="Gemini analysis" className="auth-rise space-y-2 rounded-xl border border-violet-400/30 bg-violet-500/5 p-4">
+                <section aria-label="Analysis" className="auth-rise space-y-2 rounded-xl border border-violet-400/30 bg-violet-500/5 p-4">
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="flex items-center gap-2 text-sm font-semibold">
-                      <Sparkles className="size-4 text-violet-500" aria-hidden="true" /> Gemini analysis
+                      <Sparkles className="size-4 text-violet-500" aria-hidden="true" /> Analysis
                     </h3>
                     {analysis && (
                       <DownloadButton size="xs" onDownload={() => downloadText(`# Analysis: ${d.title}\n\n${analysis}`, safeFileName(`${d.title} analysis`, "md"), "text/markdown")} />

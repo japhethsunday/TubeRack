@@ -85,14 +85,14 @@ export function TitlesTab({
           </Button>
           <Button size="sm" variant="outline" onClick={() => void suggest()} disabled={aiBusy || !topic.trim()}>
             <Sparkles className="size-4" aria-hidden="true" />
-            {aiBusy ? "Asking Gemini…" : "Suggest with Gemini"}
+            {aiBusy ? "Suggesting…" : "Suggest titles"}
           </Button>
           <Button size="sm" variant="outline" onClick={() => setShowDirections((s) => !s)}>
             {showDirections ? "Hide" : "Browse"} 8 direction templates
           </Button>
         </div>
         {aiError && (
-          <Alert tone="warn" title="Gemini unavailable">
+          <Alert tone="warn" title="Suggestions unavailable">
             {aiError}
           </Alert>
         )}
@@ -104,7 +104,7 @@ export function TitlesTab({
           />
         )}
         {aiTitles && (
-          <ul className="space-y-1.5" aria-label="Gemini title suggestions">
+          <ul className="space-y-1.5" aria-label="Title suggestions">
             {aiTitles.map((t) => (
               <li key={t.text} className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-2.5 py-2 text-sm">
                 <span>

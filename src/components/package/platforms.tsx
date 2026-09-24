@@ -47,7 +47,7 @@ export function PlatformsPanel({
     <div className="space-y-4">
     <GeminiAssist
       task="platform-copy"
-      title="Platform copy with Gemini"
+      title="Platform copy"
       blurb="Publish-ready titles, captions, and hashtags for every platform, within each one's limits."
       context={{ title: defaults.title, description: defaults.description.slice(0, 2000), hashtags: defaults.hashtags, currentPlatform: platform }}
     />

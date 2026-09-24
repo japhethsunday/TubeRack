@@ -83,7 +83,7 @@ export function GenerationDialog({
     const written = skeleton.map((s, i) => ({
       ...s,
       text: outcome.data.texts[i] ?? s.text,
-      aiNote: `Written by Gemini (${outcome.data.model}) from your intelligence context. Review facts before producing.`,
+      aiNote: "Drafted from your research. Check facts before recording.",
     }));
     if (autoWrite) {
       // Brief came from the Channel Creator: put the draft straight into the editor.
@@ -102,7 +102,7 @@ export function GenerationDialog({
   }, [autoWrite]);
 
   return (
-    <Modal title="Generate script draft" description="Write a full draft with Gemini, or assemble a local template from your intelligence." onClose={onClose} wide>
+    <Modal title="Generate script draft" description="Write a full draft, or assemble a local template from your intelligence." onClose={onClose} wide>
       <div className="grid gap-4 sm:grid-cols-2">
         <Select label="Format" value={format} onChange={(e) => { setFormat(e.target.value); setPreview(null); }}>
           {formats.map((f) => (
@@ -143,7 +143,7 @@ export function GenerationDialog({
 
       {aiError && !preview && (
         <div className="mt-4">
-          <Alert tone="warn" title="Gemini could not write the script">
+          <Alert tone="warn" title="The draft could not be written">
             {aiError} You can still assemble the local template.
           </Alert>
         </div>
@@ -160,14 +160,14 @@ export function GenerationDialog({
           </Button>
           <Button onClick={() => void writeWithGemini()} disabled={writing}>
             <Wand2 className="size-4" aria-hidden="true" />
-            {writing ? "Writing with Gemini…" : "Write with Gemini"}
+            {writing ? "Writing…" : "Write draft"}
           </Button>
         </div>
       ) : (
         <div className="mt-4 space-y-2">
           <p className="text-sm font-medium" role="status">
             {preview.length} sections · ~{preview.reduce((n, s) => n + countWords(s.text), 0)} words
-            {aiModel ? ` written by Gemini (${aiModel})` : " of starter text"}. Review before applying.
+            {aiModel ? " drafted" : " of starter text"}. Review before applying.
           </p>
           <ul className="max-h-64 space-y-1.5 overflow-y-auto" aria-label="Assembled preview">
             {preview.map((s) => (

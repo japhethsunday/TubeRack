@@ -48,7 +48,7 @@ export async function POST(request: Request) {
   try {
     caller = await guardProviderCall();
     const input = await parseBody(request, body);
-    if (!isGeminiConfigured()) throw validationError("The Channel Creator needs Gemini (GEMINI_API_KEY).");
+    if (!isGeminiConfigured()) throw validationError("The Channel Creator isn't available right now.");
     const db = getDb();
     if (!db) throw backendUnavailable("Database");
     const query = input.query || input.niche;

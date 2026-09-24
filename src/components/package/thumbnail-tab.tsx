@@ -78,7 +78,7 @@ export function ThumbnailTab({
     try {
       const svg = await uploadToBase(outcome.data.url);
       const variant = addVariant(projectId, {
-        name: `Gemini art ${variants.length + 1}`,
+        name: `Art ${variants.length + 1}`,
         baseKind: "upload",
         baseSvg: svg,
         overlays: [],
@@ -146,26 +146,26 @@ export function ThumbnailTab({
     <div className="space-y-6">
       <GeminiAssist
         task="thumbnail-concepts"
-        title="Thumbnail concepts with Gemini"
+        title="Thumbnail concepts"
         blurb="Four distinct, honest thumbnail concepts built from this project's title, audience, and angle."
         context={{ ...context, title: primaryTitle || context.title }}
       />
 
-      <section aria-label="Gemini thumbnail art" className="space-y-3 rounded-xl border border-border bg-surface p-4">
+      <section aria-label="Thumbnail art" className="space-y-3 rounded-xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-end gap-2">
           <div className="min-w-0 flex-1">
-            <Input label="Thumbnail art prompt (Gemini image)" value={artPrompt} onChange={(e) => setArtPrompt(e.target.value)} placeholder={defaultArtPrompt} />
+            <Input label="Thumbnail art prompt " value={artPrompt} onChange={(e) => setArtPrompt(e.target.value)} placeholder={defaultArtPrompt} />
           </div>
           <Button loading={artBusy} onClick={() => void generateArt()}>
             <Sparkles className="size-4" aria-hidden="true" /> Generate art
           </Button>
         </div>
-        <p className="text-xs text-muted-text">Generates a real 16:9 image with Gemini and opens it as a new variant, ready for your text overlays.</p>
+        <p className="text-xs text-muted-text">Generates a real 16:9 image and opens it as a new variant, ready for your text overlays.</p>
         {artError && <p role="alert" className="text-xs text-destructive">{artError}</p>}
         {artUrl && (
           <div className="ui-panel flex flex-wrap items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL. */}
-            <img src={artUrl} alt="Gemini thumbnail art" className="aspect-video w-60 rounded-lg border border-border object-cover" />
+            <img src={artUrl} alt="Thumbnail art" className="aspect-video w-60 rounded-lg border border-border object-cover" />
             <DownloadButton onDownload={() => downloadStored(artUrl, safeFileName(primaryTitle || "thumbnail", "png"))} />
           </div>
         )}

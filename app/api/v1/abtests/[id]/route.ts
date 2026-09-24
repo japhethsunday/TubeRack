@@ -73,6 +73,6 @@ export async function POST(request: Request, ctx: Ctx) {
       }
     }
   } catch (error) {
-    return toErrorResponse(providerFailure(error, "YouTube / Gemini"));
+    return toErrorResponse(providerFailure(error, "YouTube"));
   }
 }

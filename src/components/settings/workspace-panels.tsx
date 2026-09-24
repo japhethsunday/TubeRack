@@ -158,7 +158,7 @@ export function BillingPanel() {
         {usage === null ? (
           <p className="mt-2 text-sm text-muted-text">Loading usage…</p>
         ) : Object.keys(byKind).length === 0 ? (
-          <p className="mt-2 text-sm text-muted-text">No Gemini or YouTube calls yet this month.</p>
+          <p className="mt-2 text-sm text-muted-text">No generation or YouTube calls yet this month.</p>
         ) : (
           <ul className="mt-3 space-y-1.5">
             {Object.entries(byKind).map(([k, n]) => (

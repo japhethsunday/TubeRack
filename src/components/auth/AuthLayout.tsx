@@ -71,7 +71,7 @@ function BrandPanel() {
       <div className="relative h-80">
         <FloatingCard className="left-0 top-2 w-64" delay="0s" tilt="-3deg">
           <p className="flex items-center gap-2 text-xs font-medium text-white/70">
-            <Sparkles className="size-3.5 text-fuchsia-300" /> Gemini analysis
+            <Sparkles className="size-3.5 text-fuchsia-300" /> Video analysis
           </p>
           <p className="mt-1.5 text-sm leading-snug">Lead with the payoff — your hook buries the result 12s in.</p>
         </FloatingCard>

@@ -216,7 +216,7 @@ export function GenerateVideoDialog({
   const needsConfirm = existingClips > 0 && !replaceOk;
 
   return (
-    <Modal title="Generate video from script" description={`${writable.length} scenes · ${aspect} · voice-over, visuals and captions by Gemini`} onClose={() => { cancelled.current = true; onClose(); }}>
+    <Modal title="Generate video from script" description={`${writable.length} scenes · ${aspect} · voice-over, visuals and captions`} onClose={() => { cancelled.current = true; onClose(); }}>
       {writable.length === 0 ? (
         <p className="text-sm text-muted-text">Write the script first — every section with text becomes a scene.</p>
       ) : (

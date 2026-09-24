@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     let candidates: NicheCandidate[];
     let model: string | null = null;
     if (input.mode === "expand") {
-      if (!isGeminiConfigured()) throw validationError("Niche ideas need Gemini (GEMINI_API_KEY). Switch to “Scan exactly this niche”.");
+      if (!isGeminiConfigured()) throw validationError("Niche ideas aren't available right now. Switch to “Scan exactly this niche”.");
       const expanded = await expandNiches({ seed: input.seed, audience: input.audience, count: input.count });
       candidates = expanded.niches;
       model = expanded.model;

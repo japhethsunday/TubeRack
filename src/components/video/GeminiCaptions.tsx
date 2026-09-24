@@ -57,10 +57,10 @@ export function GeminiCaptions({
   return (
     <section aria-label="Captions from voice" className="auth-rise space-y-2 rounded-xl border border-border bg-surface p-4">
       <h3 className="flex items-center gap-2 text-sm font-semibold">
-        <Captions className="size-4 text-muted-text" aria-hidden="true" /> Captions from voice (Gemini)
+        <Captions className="size-4 text-muted-text" aria-hidden="true" /> Captions from voice
       </h3>
       {voiceClips.length === 0 ? (
-        <p className="text-xs text-muted-text">Add a Gemini voice take or an uploaded voice file to the timeline, then transcribe it into timed captions.</p>
+        <p className="text-xs text-muted-text">Add a generated voice take or an uploaded voice file to the timeline, then transcribe it into timed captions.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {voiceClips.slice(0, 6).map((c) => (

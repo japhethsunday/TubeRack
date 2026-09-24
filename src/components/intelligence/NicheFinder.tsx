@@ -180,7 +180,7 @@ function NicheCard({
 
       <div className="mt-3 flex flex-wrap gap-2">
         <Button size="sm" loading={busy} onClick={() => void deepDive()}>
-          <Sparkles className="size-3.5" aria-hidden="true" /> {report ? "Rewrite plan" : "Deep dive with Gemini"}
+          <Sparkles className="size-3.5" aria-hidden="true" /> {report ? "Rewrite plan" : "Deep dive"}
         </Button>
         <Button size="sm" variant="outline" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
           <ChevronDown className={cx("size-3.5 transition-transform", open && "rotate-180")} aria-hidden="true" /> Top videos
@@ -307,7 +307,7 @@ export function NicheFinder() {
     <div className="space-y-5">
       <form onSubmit={(e) => void run(e)} className="space-y-4 rounded-xl border border-border bg-surface p-5">
         <div className="flex gap-1 rounded-lg bg-muted p-1 text-sm" role="radiogroup" aria-label="Scan mode">
-          {([["expand", "Find sub-niches (Gemini + YouTube)"], ["exact", "Score one exact niche"]] as const).map(([id, label]) => (
+          {([["expand", "Find sub-niches"], ["exact", "Score one exact niche"]] as const).map(([id, label]) => (
             <button key={id} type="button" role="radio" aria-checked={mode === id} onClick={() => setMode(id)} className={cx("flex-1 rounded-md px-3 py-1.5 font-medium transition-colors", mode === id ? "bg-surface shadow-sm" : "text-muted-text hover:text-foreground")}>
               {label}
             </button>

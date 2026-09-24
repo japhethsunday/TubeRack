@@ -38,6 +38,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: { created: inserted.length } }, { status: 201 });
   } catch (error) {
     if (caller) await recordUsage(caller, { kind: "text", provider: "gemini", status: "failed", ref: "calendar-plan" });
-    return toErrorResponse(providerFailure(error, "Gemini (GEMINI_API_KEY)"));
+    return toErrorResponse(providerFailure(error, "The generation service"));
   }
 }

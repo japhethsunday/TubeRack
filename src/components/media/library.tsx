@@ -145,7 +145,7 @@ export function AssetCard({
           <div className="min-w-0">
             <h4 className="truncate text-sm font-medium">{asset.title}</h4>
             <p className="mt-0.5 text-xs text-muted-text">
-              {asset.kind} · {asset.source === "local-draft" ? "on-device draft" : asset.source === "upload-session" ? "upload (this session)" : asset.source === "provider-output" ? (asset.tags.includes("upload") ? "upload" : "Gemini") : "older request"}
+              {asset.kind} · {asset.source === "local-draft" ? "on-device draft" : asset.source === "upload-session" ? "upload (this session)" : asset.source === "provider-output" ? (asset.tags.includes("upload") ? "upload" : "generated") : "older request"}
               {asset.durationSec ? ` · ${asset.durationSec.toFixed(1)}s` : ""}
               {asset.width ? ` · ${asset.width}×${asset.height}` : ""}
               {typeof asset.fileSize === "number" ? ` · ${(asset.fileSize / 1024).toFixed(0)} KB` : ""}
@@ -340,7 +340,7 @@ export function LibraryView({ projectId, sceneOptions }: { projectId: string; sc
       {assets.length === 0 ? (
         <EmptyState
           title="Library is empty"
-          body="Generate with Gemini, make on-device drafts, or upload files. Everything here belongs to this project."
+          body="Generate images and voice, make on-device drafts, or upload files. Everything here belongs to this project."
         />
       ) : shown.length === 0 ? (
         <EmptyState title="No assets match" body="Try a different search or filter." />

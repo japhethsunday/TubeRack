@@ -83,7 +83,7 @@ function WatchCard({ watch, onChange, onRemove, onOpen }: { watch: TrendWatch; o
           <GeminiAssist
             task="topic-discovery"
             title="Video ideas from this week's trends"
-            blurb="Gemini turns what's rising right now into specific video ideas you could publish this week."
+            blurb="Turn what's rising right now into specific video ideas you could publish this week."
             actionLabel="Get ideas"
             context={{ topic: watch.query, risingPhrases: r.phrases.map((p) => p.phrase), topVideos: r.videos.slice(0, 10).map((v) => ({ title: v.title, viewsPerHour: v.viewsPerHour, channelSubs: v.channelSubs })) }}
           />

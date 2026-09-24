@@ -46,7 +46,7 @@ function Hub() {
             Content Intelligence
           </h1>
           <p className="mt-1 max-w-prose text-sm text-muted-text">
-            Instant local analysis over your input, plus Gemini reasoning and live
+            Instant local analysis over your input, plus deeper analysis and live
             YouTube research when you are signed in.
           </p>
         </div>

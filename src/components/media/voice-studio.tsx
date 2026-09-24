@@ -112,7 +112,7 @@ export function VoiceStudio({
       kind: "voice",
       source: "provider-output",
       status: "generating",
-      title: `Gemini take — ${(source?.label ?? "custom").slice(0, 40)}`,
+      title: `Voice take — ${(source?.label ?? "custom").slice(0, 40)}`,
       payload: "",
       mime: "audio/wav",
       durationSec: estSec,
@@ -229,7 +229,7 @@ export function VoiceStudio({
               <span className="w-8 text-xs tabular-nums">{pitch.toFixed(2)}</span>
             </label>
           </div>
-          <Select label="Gemini voice" value={GEMINI_VOICES.includes(providerVoice) ? providerVoice : "Kore"} onChange={(e) => setProviderVoice(e.target.value)} hint="Used when the provider is Gemini (AI).">
+          <Select label="Voice" value={GEMINI_VOICES.includes(providerVoice) ? providerVoice : "Kore"} onChange={(e) => setProviderVoice(e.target.value)} hint="Used for generated narration.">
             {GEMINI_VOICES.map((v) => (
               <option key={v}>{v}</option>
             ))}
@@ -289,7 +289,7 @@ export function VoiceStudio({
               {running ? "Synthesizing…" : isGemini ? "Generate take with Gemini" : "Preview + save take"}
             </Button>
             {genError && (
-              <Alert tone="warn" title="Gemini could not synthesize">
+              <Alert tone="warn" title="Voice could not be generated">
                 {genError}
               </Alert>
             )}

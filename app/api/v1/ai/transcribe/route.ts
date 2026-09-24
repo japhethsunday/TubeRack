@@ -33,6 +33,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: result });
   } catch (error) {
     if (caller) await recordUsage(caller, { kind: "transcription", provider: "gemini", status: "failed" });
-    return toErrorResponse(providerFailure(error, "Gemini (GEMINI_API_KEY)"));
+    return toErrorResponse(providerFailure(error, "The generation service"));
   }
 }

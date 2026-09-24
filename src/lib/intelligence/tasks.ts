@@ -108,7 +108,7 @@ export const INTELLIGENCE_TASK_DEFS: Record<IntelligenceTaskType, IntelligenceTa
   "thumbnail-concepts": {
     type: "thumbnail-concepts",
     label: "Thumbnail concepts",
-    blurb: "Gemini thumbnail concepts: focal subject, text overlay, contrast, emotion.",
+    blurb: "Thumbnail concepts: focal subject, text overlay, contrast, emotion.",
     usageKind: "text",
     route: "/studio/package?tab=thumbnail",
   },

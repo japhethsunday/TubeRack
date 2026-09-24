@@ -52,7 +52,7 @@ export function getGeminiModels(env = getServerEnv()): GeminiModels {
 /** Lazy SDK client. Throws the gateway boundary error when unconfigured. */
 export function getGeminiClient(env = getServerEnv()): GoogleGenAI {
   if (!env.GEMINI_API_KEY) {
-    throw new ProviderNotConfiguredError("text", "Set GEMINI_API_KEY to enable Gemini.");
+    throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   }
   return new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 }
@@ -155,7 +155,7 @@ function providerError(what: string, error: unknown): Error {
     );
   }
   const message = error instanceof Error ? error.message : String(error);
-  return new Error(`Gemini ${what} failed: ${message.slice(0, 300)}`);
+  return new Error(`${what} failed: ${message.slice(0, 300)}`);
 }
 
 export class GeminiTextProvider implements TextProvider {
@@ -164,7 +164,7 @@ export class GeminiTextProvider implements TextProvider {
 
   async generateText(request: { prompt: string; maxTokens?: number; json?: boolean }): Promise<{ text: string; model: string }> {
     const prompt = request.prompt.trim();
-    if (!prompt) throw new Error("Gemini text generation failed: prompt cannot be empty.");
+    if (!prompt) throw new Error("Text generation failed: prompt cannot be empty.");
     const env = getServerEnv();
     const model = env.GEMINI_TEXT_MODEL || DEFAULT_TEXT_MODEL;
     // Floor of 256: reasoning models spend output budget on thought tokens,
@@ -208,7 +208,7 @@ export class GeminiImageProvider implements ImageProvider {
 
   async generateImage(request: { prompt: string; aspectRatio?: string }): Promise<{ url: string; prompt: string }> {
     const prompt = request.prompt.trim();
-    if (!prompt) throw new Error("Gemini image generation failed: prompt cannot be empty.");
+    if (!prompt) throw new Error("Image generation failed: prompt cannot be empty.");
     const env = getServerEnv();
     const model = env.GEMINI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL;
     const aspect = request.aspectRatio === "9:16" || request.aspectRatio === "1:1" ? request.aspectRatio : "16:9";
@@ -265,8 +265,8 @@ export class GeminiTtsProvider implements TtsProvider {
     voice?: string;
   }): Promise<{ audioBase64: string; mimeType: string; model: string }> {
     const text = request.text.trim();
-    if (!text) throw new Error("Gemini speech synthesis failed: text cannot be empty.");
-    if (text.length > 5000) throw new Error("Gemini speech synthesis failed: text exceeds 5000 characters.");
+    if (!text) throw new Error("Speech synthesis failed: text cannot be empty.");
+    if (text.length > 5000) throw new Error("Speech synthesis failed: text exceeds 5000 characters.");
     const env = getServerEnv();
     const model = env.GEMINI_TTS_MODEL || DEFAULT_TTS_MODEL;
     const voice = request.voice?.trim() || env.GEMINI_TTS_VOICE || DEFAULT_TTS_VOICE;
@@ -383,7 +383,7 @@ export interface ScriptWriteRequest {
  * JSON shape (never silently pads missing sections).
  */
 export async function writeScriptSections(req: ScriptWriteRequest): Promise<{ texts: string[]; model: string }> {
-  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Set GEMINI_API_KEY to enable Gemini.");
+  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   const perSection = Math.max(40, Math.round(req.targetWords / Math.max(1, req.sections.length)));
   const brief = {
     topic: req.topic,
@@ -417,7 +417,7 @@ export async function writeScriptSections(req: ScriptWriteRequest): Promise<{ te
   const parsed: unknown = parseJsonObject(text, "script generation");
   const list = (parsed as { sections?: unknown }).sections;
   if (!Array.isArray(list) || list.length !== req.sections.length || !list.every((t) => typeof t === "string")) {
-    throw new Error("Gemini script generation failed: section count did not match. Try again.");
+    throw new Error("Script generation failed: section count did not match. Try again.");
   }
   return { texts: (list as string[]).map((t) => stripMarkdown(t)), model };
 }
@@ -425,7 +425,7 @@ export async function writeScriptSections(req: ScriptWriteRequest): Promise<{ te
 function parseJsonObject(text: string, what: string): Record<string, unknown> {
   const obj = extractJsonObject(text);
   if (obj) return obj;
-  throw new Error(`Gemini ${what} failed: the reply couldn't be read. Please try again.`);
+  throw new Error(`${what} failed: the reply couldn't be read. Please try again.`);
 }
 
 const strings = (v: unknown, max: number) =>
@@ -436,7 +436,7 @@ export async function writePackaging(
   kind: "titles" | "seo",
   context: { topic: string; audience: string; promise: string; takeaway: string; cta: string; title: string; script: string; chapters: string },
 ): Promise<{ titles?: { text: string; category: string }[]; description?: string; tags?: string[]; hashtags?: string[]; model: string }> {
-  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Set GEMINI_API_KEY to enable Gemini.");
+  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   const brief = JSON.stringify({ ...context, script: context.script.slice(0, 5000) });
   const rules = "Never invent statistics, rankings, or view counts. No clickbait that the video does not deliver.";
   if (kind === "titles") {
@@ -451,7 +451,7 @@ export async function writePackaging(
       .filter((t) => typeof t.text === "string" && t.text.trim())
       .map((t) => ({ text: String(t.text).trim().slice(0, 100), category: typeof t.category === "string" ? t.category : "Curiosity" }))
       .slice(0, 10);
-    if (titles.length === 0) throw new Error("Gemini title generation failed: no titles returned. Try again.");
+    if (titles.length === 0) throw new Error("Title generation failed: no titles returned. Try again.");
     return { titles, model };
   }
   const { text, model } = await new GeminiTextProvider().generateText({
@@ -461,7 +461,7 @@ export async function writePackaging(
   });
   const obj = parseJsonObject(text, "SEO generation");
   if (typeof obj.description !== "string" || !obj.description.trim()) {
-    throw new Error("Gemini SEO generation failed: no description returned. Try again.");
+    throw new Error("SEO generation failed: no description returned. Try again.");
   }
   return {
     description: obj.description.trim(),
@@ -478,7 +478,7 @@ export async function rewriteSection(input: {
   instruction: string;
   topic: string;
 }): Promise<{ text: string; model: string }> {
-  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Set GEMINI_API_KEY to enable Gemini.");
+  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   const { text, model } = await new GeminiTextProvider().generateText({
     prompt: [
       "You are an expert YouTube scriptwriter. Rewrite the script section below as spoken narration.",
@@ -505,8 +505,8 @@ export interface TimedSegment {
  * clamped — segments that are not well-formed are dropped, never invented.
  */
 export async function transcribeAudio(bytes: Uint8Array, mimeType: string): Promise<{ text: string; segments: TimedSegment[]; model: string }> {
-  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Set GEMINI_API_KEY to enable Gemini.");
-  if (bytes.byteLength === 0) throw new Error("Gemini transcription failed: audio is empty.");
+  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
+  if (bytes.byteLength === 0) throw new Error("Transcription failed: audio is empty.");
   const env = getServerEnv();
   const model = env.GEMINI_TEXT_MODEL || DEFAULT_TEXT_MODEL;
   const ai = getGeminiClient(env);
@@ -574,7 +574,7 @@ export async function expandNiches(input: { seed: string; audience: string; coun
     }))
     .filter((n) => n.name && n.query)
     .slice(0, input.count);
-  if (niches.length === 0) throw new Error("Gemini niche ideas failed: no usable niches returned. Try again.");
+  if (niches.length === 0) throw new Error("Niche ideas failed: no usable niches returned. Try again.");
   return { niches, model };
 }
 
@@ -698,7 +698,7 @@ export async function planCalendar(input: { topic: string; audience: string; wee
     }))
     .filter((i) => i.title)
     .slice(0, 200);
-  if (!items.length) throw new Error("Gemini calendar plan failed: no items returned. Try again.");
+  if (!items.length) throw new Error("Calendar plan failed: no items returned. Try again.");
   return { items, model };
 }
 
@@ -742,7 +742,7 @@ export async function writeChannelPlan(input: ChannelInputs, evidence: ChannelEv
     `"competitors":[{"name":"","strength":"","gap":""}],"seoKeywords":[""] (20),"channelKeywords":[""] (12),"launchChecklist":[""] (10-12)}`;
   const { text, model } = await provider.generateText({ prompt, maxTokens: 8192, json: true });
   const plan = normalisePlan(parseJsonObject(text, "channel plan"));
-  if (plan.names.length === 0 || plan.ideas.length < 10) throw new Error("Gemini returned an incomplete channel plan. Try again.");
+  if (plan.names.length === 0 || plan.ideas.length < 10) throw new Error("Received an incomplete channel plan. Try again.");
   return { plan, model };
 }
 

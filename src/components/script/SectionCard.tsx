@@ -140,7 +140,7 @@ export function SectionCard({
           onClick={() => setShortenPreview(extractShorten(section.text))}
           icon={<ShortenIcon className="size-3.5" />}
         />
-        <ToolButton label="Rewrite with Gemini" disabled={!section.text.trim()} onClick={() => { setRewriteDraft(null); setRewriteError(null); setRewriteOpen(true); }} icon={<Wand2 className="size-3.5" />} />
+        <ToolButton label="Rewrite" disabled={!section.text.trim()} onClick={() => { setRewriteDraft(null); setRewriteError(null); setRewriteOpen(true); }} icon={<Wand2 className="size-3.5" />} />
         <ToolButton label="Delete section" danger onClick={onDelete} icon={<Trash2 className="size-3.5" />} />
         <ToolButton
           label={showNotes ? "Hide creator notes" : "Creator notes"}
@@ -243,7 +243,7 @@ export function SectionCard({
       )}
 
       {rewriteOpen && (
-        <Modal title={`Rewrite “${section.heading}”`} description="Gemini rewrites this section. Review it before replacing — save a version first if you want to keep the original." onClose={() => setRewriteOpen(false)}>
+        <Modal title={`Rewrite “${section.heading}”`} description="Rewrites this section. Review it before replacing — save a version first if you want to keep the original." onClose={() => setRewriteOpen(false)}>
           <div className="space-y-3">
             <Textarea
               label="How should it change? (optional)"

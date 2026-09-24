@@ -513,7 +513,7 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
                   <div className="min-w-0 flex-1">
                     <Input label="Title" value={title} maxLength={YT_TITLE_MAX} onChange={(e) => setTitle(e.target.value)} hint={`${title.length}/${YT_TITLE_MAX}`} />
                   </div>
-                  <Button size="sm" variant="outline" className="mb-5" loading={aiBusy === "titles"} onClick={() => void genTitles()} title="Suggest titles with Gemini">
+                  <Button size="sm" variant="outline" className="mb-5" loading={aiBusy === "titles"} onClick={() => void genTitles()} title="Suggest titles">
                     <Sparkles className="size-3.5" aria-hidden="true" /> Generate
                   </Button>
                 </div>
@@ -549,7 +549,7 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-primary/5 px-3 py-2 text-xs">
-            <span className="text-muted-text">{transcript ? "Gemini writes from your video's captions and topic." : "Gemini writes from your project topic. Add captions for sharper results."}</span>
+            <span className="text-muted-text">{transcript ? "Written from your video's captions and topic." : "Written from your project topic. Add captions for sharper results."}</span>
             <Button size="sm" loading={aiBusy === "seo"} onClick={() => void genSeo()}>
               <Sparkles className="size-3.5" aria-hidden="true" /> Write description & tags
             </Button>

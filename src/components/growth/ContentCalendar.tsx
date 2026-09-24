@@ -92,7 +92,7 @@ function PlanDialog({ onClose, onPlanned }: { onClose: () => void; onPlanned: (n
     else setError(o.message);
   }
   return (
-    <Modal title="Plan a content schedule with Gemini" description="Creates script, record, edit, thumbnail, and publish steps for every video." onClose={onClose} wide>
+    <Modal title="Plan a content schedule" description="Creates script, record, edit, thumbnail, and publish steps for every video." onClose={onClose} wide>
       <form onSubmit={(e) => void plan(e)} className="space-y-3">
         <Input label="Niche or topic" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. budget meal prep for students" />
         <Input label="Audience (optional)" value={audience} onChange={(e) => setAudience(e.target.value)} />
@@ -170,7 +170,7 @@ export function ContentCalendar() {
         <Button size="sm" variant="outline" onClick={() => setCursor({ y: now.getFullYear(), m: now.getMonth() })}>Today</Button>
         <span className="ml-auto flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => setEditing(blank(today))}><Plus className="size-4" aria-hidden="true" /> Add item</Button>
-          <Button size="sm" onClick={() => setPlanning(true)}><Sparkles className="size-4" aria-hidden="true" /> Plan with Gemini</Button>
+          <Button size="sm" onClick={() => setPlanning(true)}><Sparkles className="size-4" aria-hidden="true" /> Auto-plan</Button>
           <Button size="sm" variant="outline" disabled={!items?.length} onClick={() => downloadText(toIcs(items ?? []), `tuberack-${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}.ics`, "text/calendar")}>
             <CalendarArrowDown className="size-4" aria-hidden="true" /> Export .ics
           </Button>
@@ -211,7 +211,7 @@ export function ContentCalendar() {
       <section className="rounded-xl border border-border bg-surface p-4">
         <h3 className="text-sm font-semibold">Up next</h3>
         {upcoming.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-text">Nothing planned from today in this view. Add items or let Gemini plan a schedule.</p>
+          <p className="mt-2 text-sm text-muted-text">Nothing planned from today in this view. Add items or auto-plan a schedule.</p>
         ) : (
           <ul className="mt-2 divide-y divide-border">
             {upcoming.map((it) => (
@@ -251,7 +251,7 @@ export function ContentCalendar() {
           onClose={() => setPlanning(false)}
           onPlanned={(n, start) => {
             setPlanning(false);
-            setNotice(`Gemini added ${n} items starting ${start}.`);
+            setNotice(`Added ${n} items starting ${start}.`);
             const d = new Date(`${start}T00:00:00`);
             setCursor({ y: d.getFullYear(), m: d.getMonth() });
             void load();

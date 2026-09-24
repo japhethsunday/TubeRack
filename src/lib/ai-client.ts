@@ -15,7 +15,7 @@ export type ProviderOutcome<T> =
 
 function toOutcome(error: unknown): ProviderOutcome<never> {
   if (error instanceof ApiError) {
-    if (error.code === "UNAUTHORIZED") return { ok: false, reason: "signed-out", message: "Sign in to use Gemini and YouTube." };
+    if (error.code === "UNAUTHORIZED") return { ok: false, reason: "signed-out", message: "Sign in to generate and use YouTube data." };
     if (error.code === "BACKEND_UNAVAILABLE") return { ok: false, reason: "not-configured", message: error.message };
     if (error.code === "RATE_LIMITED") return { ok: false, reason: "rate-limited", message: error.message };
     if (error.code === "NETWORK_ERROR") return { ok: false, reason: "offline", message: error.message };

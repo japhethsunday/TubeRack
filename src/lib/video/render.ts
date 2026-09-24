@@ -202,7 +202,7 @@ export async function renderComposition(o: RenderOptions): Promise<RenderResult>
     }
   }
   if (deviceVoices) {
-    warnings.push(`${deviceVoices} voice clip(s) use your device's built-in voice, which browsers can't record. Generate those takes with Gemini in the Voice studio to include them.`);
+    warnings.push(`${deviceVoices} voice clip(s) use your device's built-in voice, which browsers can't record. Generate those takes in the Voice studio to include them.`);
   }
   // Original sound of video clips, routed into the mix (never to the speakers).
   const videoGains = new Map<string, GainNode>();

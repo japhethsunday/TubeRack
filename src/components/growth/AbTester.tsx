@@ -158,7 +158,7 @@ function TestCard({ test, onChange, onDelete }: { test: AbTest; onChange: (t: Ab
           </span>
         )}
         <span className="ml-auto flex flex-wrap gap-1.5">
-          <Button size="sm" variant="outline" loading={busy === "score"} onClick={() => void act("score")}><Sparkles className="size-3.5" aria-hidden="true" /> Gemini review</Button>
+          <Button size="sm" variant="outline" loading={busy === "score"} onClick={() => void act("score")}><Sparkles className="size-3.5" aria-hidden="true" /> Score variants</Button>
           {test.status === "draft" && <Button size="sm" loading={busy === "start"} onClick={() => void act("start")}><Play className="size-3.5" aria-hidden="true" /> Start test</Button>}
           {test.status === "running" && (
             <>
@@ -190,7 +190,7 @@ function TestCard({ test, onChange, onDelete }: { test: AbTest; onChange: (t: Ab
                 {v.label}
                 {live && <Badge tone="info">Live now</Badge>}
                 {winner && <Badge tone="ok"><Trophy className="mr-0.5 inline size-3" aria-hidden="true" />Winner</Badge>}
-                {test.ai_scores.pickVariantId === v.id && <Badge tone="neutral">Gemini pick</Badge>}
+                {test.ai_scores.pickVariantId === v.id && <Badge tone="neutral">Recommended</Badge>}
               </p>
               {r && r.days > 0 && (
                 <p className="text-xs tabular-nums text-muted-text">

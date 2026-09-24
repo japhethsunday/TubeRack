@@ -96,7 +96,7 @@ export function SiteFooter() {
             <p>© {new Date().getFullYear()} TubeRack. All rights reserved.</p>
             <p className="inline-flex items-center gap-1.5">
               <Sparkles className="size-3.5 text-violet-500 dark:text-violet-300" aria-hidden="true" />
-              Powered by Gemini, the YouTube Data API, and Supabase
+              Built on the YouTube Data API
             </p>
             <button
               type="button"

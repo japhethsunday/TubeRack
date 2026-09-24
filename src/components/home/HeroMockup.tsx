@@ -24,7 +24,7 @@ export function HeroMockup() {
           <div className="space-y-3 p-4">
             <div className="rounded-xl border border-violet-400/20 bg-violet-500/10 p-3">
               <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-violet-200">
-                <Sparkles className="size-3" /> Writing with Gemini
+                <Sparkles className="size-3" /> Writing draft
               </p>
               <Typewriter />
             </div>

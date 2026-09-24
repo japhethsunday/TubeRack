@@ -9,10 +9,10 @@ import { SiteFooter } from "@/src/components/home/SiteFooter";
 import { Reveal, CountUp } from "@/src/components/home/motion";
 
 const FEATURES = [
-  { icon: Sparkles, title: "Gemini intelligence", body: "Idea, audience, title, hook, and retention analysis — local checks plus AI reasoning." },
+  { icon: Sparkles, title: "Content intelligence", body: "Idea, audience, title, hook, and retention analysis, scored against real YouTube data." },
   { icon: Search, title: "Live YouTube research", body: "Search real videos with public view counts and pull them in as references." },
   { icon: FileText, title: "Scripts that write back", body: "Full drafts in your format and tone, section by section, ready to edit." },
-  { icon: ImageIcon, title: "Visuals", body: "AI images and on-device drafts, approved and assigned to scenes." },
+  { icon: ImageIcon, title: "Visuals", body: "Generated images and on-device drafts, approved and assigned to scenes." },
   { icon: Mic, title: "Voiceovers", body: "Studio-quality narration takes that play straight in the timeline." },
   { icon: BarChart3, title: "Packaging + analytics", body: "Titles, SEO descriptions, tags, and live YouTube stats after you publish." },
 ];
@@ -29,7 +29,7 @@ const STEPS = [
 ];
 
 const ORBIT = [
-  { label: "Gemini", className: "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2" },
+  { label: "Intelligence", className: "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2" },
   { label: "YouTube API", className: "right-0 top-1/2 translate-x-1/2 -translate-y-1/2" },
   { label: "Supabase", className: "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2" },
   { label: "Resend", className: "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2" },
@@ -43,7 +43,7 @@ const ORBIT_INNER = [
 
 const MARQUEE = [
   "Hook analysis", "Audience profiles", "Retention risks", "Content gaps", "YouTube search",
-  "Script drafts", "Section rewrites", "Storyboards", "AI images", "Narration", "Music beds",
+  "Script drafts", "Section rewrites", "Storyboards", "Scene images", "Narration", "Music beds",
   "Timeline", "Captions", "Title options", "SEO descriptions", "Repurposing", "Live stats",
 ];
 
@@ -84,7 +84,7 @@ export default function HomePage() {
               <span className="home-pulse-ring absolute inline-flex size-full rounded-full bg-emerald-400" />
               <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
             </span>
-            Powered by Gemini + the YouTube Data API
+            Built on the YouTube Data API
           </p>
           <h1 className="auth-rise mt-6 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl" style={{ animationDelay: "80ms" }}>
             Your YouTube studio,{" "}
@@ -93,8 +93,8 @@ export default function HomePage() {
             </span>
           </h1>
           <p className="auth-rise mt-5 max-w-xl text-lg leading-relaxed text-foreground/70" style={{ animationDelay: "160ms" }}>
-            Research, script, voice, visuals, packaging, and analytics in one workspace — with AI that
-            explains its reasoning and never invents your numbers.
+            Research, script, voice, visuals, packaging, and analytics in one workspace.
+            Every number comes from real YouTube data.
           </p>
           <div className="auth-rise mt-8 flex flex-wrap gap-3" style={{ animationDelay: "240ms" }}>
             <Link href="/signup" className="auth-sheen group inline-flex h-12 items-center gap-2 rounded-xl bg-foreground px-5 text-sm font-semibold text-background hover:bg-foreground/90">
@@ -129,7 +129,7 @@ export default function HomePage() {
           { n: 15, label: "pipeline stages, one project" },
           { n: 8, label: "intelligence studios" },
           { n: 5, label: "production studios" },
-          { n: 10, label: "AI intelligence tasks" },
+          { n: 10, label: "analysis tools" },
         ].map((f, i) => (
           <Reveal key={f.label} delay={i * 90}>
             <div className="rounded-2xl border border-foreground/10 bg-foreground/[0.03] p-5 text-center">

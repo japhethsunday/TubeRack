@@ -152,7 +152,7 @@ export function CompetitorTracker() {
         <GeminiAssist
           task="competitive-analysis"
           title="What's working for your competitors"
-          blurb="Gemini reads the real breakout videos above and explains the patterns you can borrow, plus the gaps they leave open."
+          blurb="Break down the real breakout videos above: the patterns you can borrow, plus the gaps they leave open."
           context={{ breakouts, channels: (reports ?? []).map((r) => ({ title: r.competitor.title, medianViews: r.stats.medianViews, uploadsPerWeek: r.stats.uploadsPerWeek, shortsShare: r.stats.shortsShare, keywords: r.keywords.map((k) => k.word) })) }}
         />
       )}

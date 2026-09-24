@@ -51,8 +51,8 @@ export const PROVIDERS: ProviderDef[] = [
   },
   {
     id: "ai-provider",
-    label: "Gemini (AI)",
-    blurb: "Real AI images and studio-quality narration via Google Gemini. Requires sign-in.",
+    label: "Studio generation",
+    blurb: "High-quality images and studio narration. Requires sign-in.",
     available: true,
     unavailableReason: "",
     capabilities: {
@@ -65,9 +65,9 @@ export const PROVIDERS: ProviderDef[] = [
       variations: true,
     },
     capabilityNotes: {
-      video: "Gemini video generation is not available. Upload video clips instead.",
-      music: "Gemini does not generate music. Use on-device drafts or upload licensed tracks.",
-      sfx: "Gemini does not generate sound effects. Use on-device drafts or uploads.",
+      video: "Video generation is not available. Upload video clips instead.",
+      music: "Music generation is not available. Use on-device drafts or upload licensed tracks.",
+      sfx: "Sound effect generation is not available. Use on-device drafts or uploads.",
       reference: "Reference images are not supported.",
     },
   },
