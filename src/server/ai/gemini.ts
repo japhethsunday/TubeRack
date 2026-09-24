@@ -55,25 +55,72 @@ export function getGeminiClient(env = getServerEnv()): GoogleGenAI {
 }
 
 /** Stable fallbacks used when a configured/default model is unavailable (404). */
-const FALLBACK_MODELS = { text: "gemini-2.5-flash", image: "gemini-2.5-flash-image" } as const;
+/** Backup models, tried in order when the primary is missing or overloaded. */
+const FALLBACK_MODELS = {
+  text: ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
+  image: ["gemini-2.5-flash-image"],
+  tts: ["gemini-2.5-flash-preview-tts"],
+} as const;
 
-function isModelMissing(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /not[ _]found|404|is not supported|unsupported model/i.test(message);
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
-/** Run `call(model)`; on a missing-model error retry once with the fallback. */
-async function withModelFallback<T>(model: string, fallback: string, call: (m: string) => Promise<T>): Promise<T> {
-  try {
-    return await call(model);
-  } catch (error) {
-    if (model !== fallback && isModelMissing(error)) return call(fallback);
-    throw error;
+function isModelMissing(error: unknown): boolean {
+  return /not[ _]found|\b404\b|is not supported|unsupported model/i.test(errorText(error));
+}
+
+/** Temporary capacity/rate problems worth retrying (503 overloaded, 429, transient 500s). */
+export function isTransient(error: unknown): boolean {
+  return /\b(503|429|500|502|504)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|try again later|deadline|ECONNRESET|fetch failed/i.test(
+    errorText(error),
+  );
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Resilient call: retry transient failures on the same model with
+ * jittered backoff, then move down the fallback chain. Missing models skip
+ * straight to the next one. Other errors fail immediately. Total time is
+ * capped so requests stay inside the serverless limit.
+ */
+export async function withModelFallback<T>(
+  model: string,
+  fallbacks: readonly string[],
+  call: (m: string) => Promise<T>,
+  opts: { retries?: number; budgetMs?: number; baseDelayMs?: number } = {},
+): Promise<T> {
+  const chain = [model, ...fallbacks.filter((m) => m !== model)];
+  const retries = opts.retries ?? 2;
+  const deadline = Date.now() + (opts.budgetMs ?? 40_000);
+  const base = opts.baseDelayMs ?? 700;
+  let last: unknown;
+  for (const m of chain) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await call(m);
+      } catch (error) {
+        last = error;
+        if (isModelMissing(error)) break;
+        if (!isTransient(error)) throw error;
+        const wait = base * 2 ** attempt + Math.floor(Math.random() * 300);
+        if (attempt === retries || Date.now() + wait > deadline) break;
+        await sleep(wait);
+      }
+    }
+    if (Date.now() > deadline) break;
   }
+  throw last;
 }
 
 /** Strip SDK failures to a safe message (never surfaces keys or payloads). */
 function providerError(what: string, error: unknown): Error {
+  if (isTransient(error)) {
+    return new Error(
+      `Gemini is very busy right now, so ${what} could not finish. We retried automatically on backup models — please try again in a minute.`,
+    );
+  }
   const message = error instanceof Error ? error.message : String(error);
   return new Error(`Gemini ${what} failed: ${message.slice(0, 300)}`);
 }
@@ -186,14 +233,16 @@ export class GeminiTtsProvider implements TtsProvider {
     const voice = request.voice?.trim() || env.GEMINI_TTS_VOICE || DEFAULT_TTS_VOICE;
     try {
       const ai = getGeminiClient(env);
-      const response = await ai.models.generateContent({
-        model,
-        contents: text,
-        config: {
-          responseModalities: ["AUDIO"],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
-        },
-      });
+      const response = await withModelFallback(model, FALLBACK_MODELS.tts, (m) =>
+        ai.models.generateContent({
+          model: m,
+          contents: text,
+          config: {
+            responseModalities: ["AUDIO"],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+          },
+        }),
+      );
       const parts = response.candidates?.[0]?.content?.parts ?? [];
       const audioPart = parts.find((p) => p.inlineData?.data);
       const data = audioPart?.inlineData?.data;
