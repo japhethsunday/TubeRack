@@ -9,9 +9,17 @@ import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
 import { Skeleton } from "@/src/components/ui/feedback";
 import { DownloadButton } from "@/src/components/ui/DownloadButton";
+import { Portal } from "@/src/components/ui/Portal";
 
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 const full = new Intl.NumberFormat("en");
+
+/** YouTube's standard video category ids. */
+const CATEGORIES: Record<string, string> = {
+  "1": "Film & Animation", "2": "Autos & Vehicles", "10": "Music", "15": "Pets & Animals", "17": "Sports",
+  "19": "Travel & Events", "20": "Gaming", "22": "People & Blogs", "23": "Comedy", "24": "Entertainment",
+  "25": "News & Politics", "26": "Howto & Style", "27": "Education", "28": "Science & Technology", "29": "Nonprofits & Activism",
+};
 
 function duration(sec: number | null): string {
   if (sec === null) return "—";
@@ -153,6 +161,7 @@ export function VideoDetailsPanel({
   const perDay = d?.stats.views !== undefined ? Math.round(d.stats.views / daysSince(d.publishedAt)) : undefined;
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Video details">
       <div aria-hidden="true" onClick={onClose} className="ui-overlay absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="ui-modal relative flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl border border-border bg-elevated shadow-2xl sm:rounded-2xl">
@@ -296,9 +305,9 @@ export function VideoDetailsPanel({
                           </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
-                          <Stat icon={Users} label="Subscribers" value={d.channel.subscribersHidden ? "Hidden" : d.channel.subscribers !== undefined ? compact.format(d.channel.subscribers) : "—"} />
-                          <Stat icon={Eye} label="Total views" value={d.channel.totalViews !== undefined ? compact.format(d.channel.totalViews) : "—"} />
-                          <Stat icon={Film} label="Videos" value={d.channel.videoCount !== undefined ? compact.format(d.channel.videoCount) : "—"} />
+                          <Stat icon={Users} label="Subscribers" value={d.channel.subscribersHidden ? "Hidden" : d.channel.subscribers !== undefined ? full.format(d.channel.subscribers) : "—"} />
+                          <Stat icon={Eye} label="Total views" value={d.channel.totalViews !== undefined ? full.format(d.channel.totalViews) : "—"} />
+                          <Stat icon={Film} label="Videos" value={d.channel.videoCount !== undefined ? full.format(d.channel.videoCount) : "—"} />
                         </div>
                         {d.channel.subscribers && d.stats.views ? (
                           <p className="text-xs text-muted-text">This video&apos;s views are {((d.stats.views / d.channel.subscribers) * 100).toFixed(0)}% of the channel&apos;s subscriber count.</p>
@@ -347,7 +356,7 @@ export function VideoDetailsPanel({
                           ["Definition", d.definition.toUpperCase() || "—"],
                           ["Captions", d.captions ? "Available" : "None"],
                           ["Language", d.defaultLanguage || "—"],
-                          ["Category ID", d.categoryId || "—"],
+                          ["Category", d.categoryId ? `${CATEGORIES[d.categoryId] ?? "Other"} (${d.categoryId})` : "—"],
                           ["Licensed content", d.licensedContent ? "Yes" : "No"],
                           ["Made for kids", d.madeForKids === null ? "—" : d.madeForKids ? "Yes" : "No"],
                           ["Embeddable", d.embeddable ? "Yes" : "No"],
@@ -368,5 +377,6 @@ export function VideoDetailsPanel({
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

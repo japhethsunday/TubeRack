@@ -1,5 +1,6 @@
 "use client";
 
+import { Portal } from "@/src/components/ui/Portal";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search as SearchIcon, CornerDownLeft, FolderKanban } from "lucide-react";
@@ -112,6 +113,7 @@ export function CommandMenu({
   }
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-[85] flex justify-center p-4 pt-[12vh]">
       <div aria-hidden="true" onClick={onClose} className="absolute inset-0 bg-black/50" />
       <div
@@ -181,5 +183,6 @@ export function CommandMenu({
         </ul>
       </div>
     </div>
+    </Portal>
   );
 }

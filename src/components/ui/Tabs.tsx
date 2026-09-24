@@ -51,7 +51,7 @@ export function Tabs({ tabs, defaultId }: { tabs: TabDef[]; defaultId?: string }
               tabIndex={selected ? 0 : -1}
               onClick={() => setActive(t.id)}
               className={cx(
-                "-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-[color,border-color] duration-200",
+                "-mb-px whitespace-nowrap rounded-t-md border-b-2 px-3 py-2 text-sm transition-[color,border-color,background-color] duration-200 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                 selected
                   ? "border-primary font-medium text-foreground"
                   : "border-transparent text-muted-text hover:text-foreground",

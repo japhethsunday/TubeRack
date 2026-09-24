@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { cx } from "@/src/components/ui/cx";
+import { Portal } from "@/src/components/ui/Portal";
 
 function useDismiss(onClose: () => void) {
   useEffect(() => {
@@ -38,6 +39,7 @@ export function Modal({
   useEffect(() => panelRef.current?.focus(), []);
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <div
         aria-hidden="true"
@@ -75,6 +77,7 @@ export function Modal({
         <div className="mt-4">{children}</div>
       </div>
     </div>
+    </Portal>
   );
 }
 
@@ -95,6 +98,7 @@ export function Drawer({
   useEffect(() => panelRef.current?.focus(), []);
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-[80]">
       <div
         aria-hidden="true"
@@ -129,5 +133,6 @@ export function Drawer({
         <div className="mt-4 flex-1 overflow-y-auto">{children}</div>
       </aside>
     </div>
+    </Portal>
   );
 }
