@@ -91,8 +91,9 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
             setReady(true);
             return;
           }
-        } catch {
-          // Fall through to device storage.
+        } catch (error) {
+          // Fall through to device storage, but never silently.
+          console.error("sync pull failed:", error instanceof Error ? error.message : error);
         }
       }
       if (!cancelled) {

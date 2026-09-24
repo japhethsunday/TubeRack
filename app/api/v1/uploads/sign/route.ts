@@ -7,9 +7,11 @@ import { isStorageConfigured, storageSignedUpload } from "@/src/server/storage";
 import { limiterFor } from "@/src/server/rate-limit";
 import { backendUnavailable, rateLimited, toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
+import { MAX_PARTS, PART_BYTES, partCount } from "@/src/lib/media/chunked";
 
-// Matches the storage plan's per-file limit; larger media stays on the device.
-const MAX_BYTES = 50 * 1024 * 1024;
+// The storage plan caps one object at 50 MB; bigger files upload as parts
+// (see src/lib/media/chunked.ts).
+const MAX_BYTES = PART_BYTES * MAX_PARTS;
 const EXT: Record<string, string> = {
   "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp",
   "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov", "audio/mp4": "m4a",
@@ -18,7 +20,7 @@ const EXT: Record<string, string> = {
 
 const body = z.object({
   mime: z.string().refine((m) => m in EXT, "Unsupported file type."),
-  size: z.number().int().positive().max(MAX_BYTES, "Cloud storage takes files up to 50 MB — larger files are kept on your device."),
+  size: z.number().int().positive().max(MAX_BYTES, "Files over 2.8 GB are kept on your device."),
 });
 
 /**
@@ -36,8 +38,14 @@ export async function POST(request: Request) {
     if (!isStorageConfigured()) throw backendUnavailable("File storage");
     const input = await parseBody(request, body);
     const file = `${crypto.randomUUID()}.${EXT[input.mime]}`;
-    const uploadUrl = await storageSignedUpload(`${workspaceId}/uploads/${file}`);
-    return NextResponse.json({ data: { uploadUrl, fileUrl: `/api/v1/uploads/${file}` } });
+    const parts = partCount(input.size);
+    if (parts === 1) {
+      const uploadUrl = await storageSignedUpload(`${workspaceId}/uploads/${file}`);
+      return NextResponse.json({ data: { uploadUrl, uploadUrls: [uploadUrl], partBytes: PART_BYTES, fileUrl: `/api/v1/uploads/${file}` } });
+    }
+    const uploadUrls: string[] = [];
+    for (let i = 0; i < parts; i++) uploadUrls.push(await storageSignedUpload(`${workspaceId}/uploads/${file}.part${i}`));
+    return NextResponse.json({ data: { uploadUrl: uploadUrls[0], uploadUrls, partBytes: PART_BYTES, fileUrl: `/api/v1/uploads/${file}?parts=${parts}` } });
   } catch (error) {
     return toErrorResponse(error);
   }

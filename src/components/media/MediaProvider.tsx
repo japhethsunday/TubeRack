@@ -1,6 +1,7 @@
 "use client";
 
 import { loadLocal, removeLocal, saveLocal } from "@/src/lib/media/local-store";
+import { downloadChunked, isChunked } from "@/src/lib/media/chunked";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ApprovalState,
@@ -43,6 +44,8 @@ export interface MediaContextValue {
   persistBlob: (id: string, blob: Blob, onProgress?: (ratio: number) => void, signal?: AbortSignal) => Promise<string>;
   /** Bumps when device-stored media finishes loading after a reload. */
   blobVersion: number;
+  /** Download progress (0–1) for media arriving from another device. */
+  downloads: Record<string, number>;
   voicesFor: (projectId: string) => VoiceProfile[];
   defaultVoiceFor: (projectId: string) => VoiceProfile | null;
   saveVoice: (input: Omit<VoiceProfile, "id" | "createdAt"> & { id?: string }) => VoiceProfile;
@@ -144,8 +147,9 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
             setReady(true);
             return;
           }
-        } catch {
-          // Fall through to device storage.
+        } catch (error) {
+          // Fall through to device storage, but never silently.
+          console.error("sync pull failed:", error instanceof Error ? error.message : error);
         }
       }
       if (!cancelled) {
@@ -161,26 +165,45 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     };
   }, [cloud]);
 
-  // Re-attach device-stored media (OPFS) after a reload.
+  // Re-attach device-stored media (OPFS) after a reload, and bring down
+  // multi-part cloud uploads made on another device (reassembled, then
+  // cached on this device so they play offline next time).
+  const fetching = useRef(new Set<string>());
+  const [downloads, setDownloads] = useState<Record<string, number>>({});
   useEffect(() => {
     if (!ready) return;
-    const missing = bundle.assets.filter((a) => a.source === "upload-session" && !blobs.current.has(a.id));
+    const missing = bundle.assets.filter(
+      (a) => a.status === "ready" && !blobs.current.has(a.id) && !fetching.current.has(a.id) && (a.source === "upload-session" || isChunked(a.payload)),
+    );
     if (!missing.length) return;
-    let cancelled = false;
+    for (const a of missing) fetching.current.add(a.id);
     void (async () => {
-      let found = 0;
       for (const a of missing) {
-        const file = await loadLocal(a.id);
-        if (cancelled || !file) continue;
-        blobs.current.set(a.id, { url: URL.createObjectURL(file), blob: file });
-        found++;
+        try {
+          let file: Blob | null = await loadLocal(a.id);
+          if (!file && cloud && isChunked(a.payload)) {
+            setDownloads((d) => ({ ...d, [a.id]: 0 }));
+            const whole = await downloadChunked(a.payload, a.mime, (r) => setDownloads((d) => ({ ...d, [a.id]: r })));
+            await saveLocal(a.id, whole).catch(() => undefined); // cache is best-effort
+            file = (await loadLocal(a.id)) ?? whole;
+          }
+          if (!file) continue;
+          blobs.current.set(a.id, { url: URL.createObjectURL(file), blob: file });
+          setBlobVersion((v) => v + 1);
+        } catch (error) {
+          console.error("media download failed:", error instanceof Error ? error.message : error);
+        } finally {
+          fetching.current.delete(a.id);
+          setDownloads((d) => {
+            if (!(a.id in d)) return d;
+            const next = { ...d };
+            delete next[a.id];
+            return next;
+          });
+        }
       }
-      if (found && !cancelled) setBlobVersion((v) => v + 1);
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [ready, bundle.assets]);
+  }, [ready, cloud, bundle.assets]);
 
   useEffect(() => {
     if (!ready) return;
@@ -276,6 +299,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         return url;
       },
       blobVersion,
+      downloads,
       voicesFor: (projectId) => bundle.voices.filter((v) => v.projectId === projectId),
       defaultVoiceFor: (projectId) =>
         bundle.voices.find((v) => v.projectId === projectId && v.isDefault) ??
@@ -323,7 +347,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         return { assets: incoming.assets.length, voices: incoming.voices.length };
       },
     }),
-    [bundle, ready, touchAsset, blobVersion],
+    [bundle, ready, touchAsset, blobVersion, downloads],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

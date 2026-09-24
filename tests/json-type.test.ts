@@ -21,3 +21,11 @@ describe("postgres json type", () => {
     assert.equal(parseJson('"plain"'), "plain");
   });
 });
+
+describe("postgres bigint type", () => {
+  it("returns numbers for safe integers", async () => {
+    const { bigintType } = await import("@/src/server/json-type");
+    assert.equal(bigintType.parse("63060157"), 63060157);
+    assert.equal(bigintType.parse("99999999999999999999"), "99999999999999999999");
+  });
+});

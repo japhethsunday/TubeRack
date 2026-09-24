@@ -1,5 +1,7 @@
 "use client";
 
+import { useMedia } from "@/src/components/media/MediaProvider";
+import { isChunked } from "@/src/lib/media/chunked";
 import { useState } from "react";
 import { Film, ImagePlus, Type, Captions, AlertTriangle, CheckCircle2, OctagonX, Download } from "lucide-react";
 import type { SceneSegment } from "@/src/lib/video/build";
@@ -74,6 +76,15 @@ export function MediaPanel({
 }) {
   const usable = assets.filter((a) => a.status === "ready" && a.source !== "provider-request");
   const [dragging, setDragging] = useState<string | null>(null);
+  const { blobUrlFor, downloads } = useMedia();
+  // Where the bytes are, so a clip never silently shows up blank.
+  const availability = (a: MediaAsset): { text: string; warn: boolean } | null => {
+    if (a.id in downloads) return { text: `Downloading from your account… ${Math.round(downloads[a.id] * 100)}%`, warn: false };
+    if (blobUrlFor(a.id)) return null;
+    if (a.source === "upload-session") return { text: "Only on the device it was imported on", warn: true };
+    if (isChunked(a.payload)) return { text: "Waiting to download…", warn: false };
+    return null;
+  };
   if (usable.length === 0) {
     return <EmptyState title="No placeable media" body="Generated media, drafts, and uploads appear here once they are ready." />;
   }
@@ -94,6 +105,10 @@ export function MediaPanel({
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">{a.title}</span>
             <span className="block text-[11px] text-muted-text">{a.kind} · {a.source === "local-draft" ? "draft" : "upload"}{a.durationSec ? ` · ${a.durationSec.toFixed(1)}s` : ""}</span>
+            {(() => {
+              const where = availability(a);
+              return where && <span className={cx("block text-[11px]", where.warn ? "text-warning" : "text-primary")}>{where.text}</span>;
+            })()}
           </span>
           <Button size="sm" variant="outline" onClick={() => onAddAtPlayhead(a)}>
             <ImagePlus className="size-3.5" aria-hidden="true" />

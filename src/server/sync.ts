@@ -60,10 +60,14 @@ async function projectWorkspace(projectId: string): Promise<string | null> {
   return row?.workspace_id ?? null;
 }
 
-/** SQL parameter: JSON for objects, null for undefined (the driver rejects undefined). */
+/**
+ * SQL parameter: null for undefined (the driver rejects undefined);
+ * everything else raw. The driver serializes by column type — JSON columns
+ * via json-type.ts, text[] columns as Postgres arrays. (Stringifying here
+ * broke text[] columns: "malformed array literal".)
+ */
 function toParam(v: unknown): unknown {
-  if (v === undefined) return null;
-  return typeof v === "object" && v !== null ? JSON.stringify(v, (_k, x) => (x === undefined ? null : x)) : v;
+  return v === undefined ? null : v;
 }
 
 async function upsertById(

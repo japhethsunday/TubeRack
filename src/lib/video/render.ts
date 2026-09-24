@@ -1,4 +1,5 @@
 "use client";
+import { isChunked } from "@/src/lib/media/chunked";
 
 import type { Composition, TimelineClip } from "@/src/lib/video/types";
 import { renderMusic, renderSfx, musicRecipe, type MusicMood, type SfxType } from "@/src/lib/media/audio";
@@ -105,7 +106,8 @@ export function assetUrl(a: RenderAsset | null, kind: string): string | null {
   if (a.source === "local-draft" && kind === "image" && a.payload.startsWith("<svg")) {
     return URL.createObjectURL(new Blob([a.payload], { type: "image/svg+xml" }));
   }
-  if (a.source === "provider-output") return a.payload || null;
+  // Multi-part uploads play from the reassembled copy on this device.
+  if (a.source === "provider-output") return isChunked(a.payload) ? a.blobUrl : a.blobUrl ?? (a.payload || null);
   return a.blobUrl;
 }
 

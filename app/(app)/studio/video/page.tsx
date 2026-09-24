@@ -1,5 +1,6 @@
 "use client";
 
+import { isChunked } from "@/src/lib/media/chunked";
 import { sanitizeSvg } from "@/src/lib/security/svg";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -646,7 +647,7 @@ function Studio() {
             const a = assets.find((x) => x.id === assetId);
             const r = renderAsset(assetId);
             if (!a || !r) return null;
-            const url = r.blobUrl ?? (a.source === "provider-output" && /^(https?:|\/)/.test(a.payload) ? a.payload : null);
+            const url = r.blobUrl ?? (a.source === "provider-output" && !isChunked(a.payload) && /^(https?:|\/)/.test(a.payload) ? a.payload : null);
             return { url, kind: a.kind, durationSec: a.durationSec, title: a.title };
           }}
           onDropAsset={(assetId, trackId, atSec) => {

@@ -9,9 +9,10 @@ import { api } from "@/src/lib/api";
 import type { MediaAsset } from "@/src/lib/media/types";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
+import { MAX_PARTS, PART_BYTES } from "@/src/lib/media/chunked";
 
-/** Cloud storage is used up to this size; larger files stay on this device. */
-export const CLOUD_MAX_BYTES = 50 * 1024 * 1024;
+/** Cloud storage takes files up to this size (large files upload in parts). */
+export const CLOUD_MAX_BYTES = PART_BYTES * MAX_PARTS;
 
 type JobState = "reading" | "importing" | "done" | "failed" | "cancelled" | "duplicate";
 
@@ -23,6 +24,8 @@ interface Job {
   progress: number;
   where: "cloud" | "device" | null;
   error: string;
+  /** Why a signed-in import stayed on this device (cloud unavailable). */
+  note: string;
   asset: MediaAsset | null;
 }
 
@@ -114,8 +117,8 @@ export function MediaImporter({
       }
       const tmpUrl = URL.createObjectURL(job.file);
       const meta = await probe(kind, tmpUrl).finally(() => URL.revokeObjectURL(tmpUrl));
-      const toCloud = session.status === "signed-in" && job.file.size <= CLOUD_MAX_BYTES && found.mime !== "video/quicktime" && found.mime !== "audio/mp4";
-      patch(job.id, { state: "importing", kind, progress: 5, where: toCloud ? "cloud" : "device" });
+      const toCloud = session.status === "signed-in" && job.file.size <= CLOUD_MAX_BYTES;
+      patch(job.id, { state: "importing", kind, progress: 5, where: toCloud ? "cloud" : "device", note: "" });
       created = addAsset({
         projectId,
         sceneIds: [],
@@ -132,11 +135,27 @@ export function MediaImporter({
         tags: ["import", kind, fingerprint],
         approval: "draft",
       });
+      let stored = false;
       if (toCloud) {
-        const signed = await api.post<{ uploadUrl: string; fileUrl: string }>("/api/v1/uploads/sign", { mime: found.mime, size: job.file.size });
-        await putWithProgress(signed.uploadUrl, job.file, found.mime, (r) => patch(job.id, { progress: 5 + Math.round(r * 93) }), ac.signal);
-        updateAsset(created.id, { source: "provider-output", payload: signed.fileUrl, status: "ready" });
-      } else {
+        try {
+          const signed = await api.post<{ uploadUrls: string[]; partBytes: number; fileUrl: string }>("/api/v1/uploads/sign", { mime: found.mime, size: job.file.size });
+          const n = signed.uploadUrls.length;
+          for (const [i, url] of signed.uploadUrls.entries()) {
+            const part = n === 1 ? job.file : job.file.slice(i * signed.partBytes, (i + 1) * signed.partBytes);
+            await putWithProgress(url, part, found.mime, (r) => patch(job.id, { progress: 5 + Math.round(((i + r) / n) * 93) }), ac.signal);
+          }
+          // Keep a device copy of multi-part files so this device plays them instantly.
+          if (n > 1) await persistBlob(created.id, job.file, undefined, ac.signal);
+          updateAsset(created.id, { source: "provider-output", payload: signed.fileUrl, status: "ready" });
+          stored = true;
+        } catch (cloudError) {
+          if (ac.signal.aborted) throw cloudError;
+          // Cloud refused (format, quota, network): keep it usable on this device.
+          const reason = cloudError instanceof Error ? cloudError.message : "Cloud upload failed.";
+          patch(job.id, { where: "device", progress: 5, note: `Saved on this device only — ${reason} It won't appear on your other devices.` });
+        }
+      }
+      if (!stored) {
         await persistBlob(created.id, job.file, (r) => patch(job.id, { progress: 5 + Math.round(r * 93) }), ac.signal);
         updateAsset(created.id, { status: "ready" });
       }
@@ -161,6 +180,7 @@ export function MediaImporter({
       progress: 0,
       where: null,
       error: "",
+      note: "",
       asset: null,
     }));
     setJobs((all) => [...next, ...all].slice(0, 12));
@@ -192,7 +212,7 @@ export function MediaImporter({
       >
         <UploadCloud className={cx("text-primary", compact ? "size-5" : "size-8")} aria-hidden="true" />
         <p className="text-sm font-medium">{compact ? "Drop media to import" : "Drop videos, audio, or images here"}</p>
-        {!compact && <p className="text-xs text-muted-text">MP4, MOV, WebM, MKV, MP3, M4A, WAV, PNG, JPEG — up to 20 GB. Originals are never modified.</p>}
+        {!compact && <p className="text-xs text-muted-text">MP4, MOV, WebM, MP3, M4A, WAV, PNG, JPEG. Saved to your account so every device sees it (up to 2.8 GB). Originals are never modified.</p>}
         <Button size="sm" variant="outline" onClick={() => inputRef.current?.click()}>
           <Plus className="size-3.5" aria-hidden="true" /> Choose files
         </Button>
@@ -242,6 +262,7 @@ export function MediaImporter({
                   </div>
                 )}
                 {j.state === "failed" && <p className="mt-1 text-xs text-destructive">{j.error}</p>}
+                {j.note && j.state === "done" && <p className="mt-1 text-xs text-warning">{j.note}</p>}
                 {j.state === "duplicate" && j.asset && (
                   <p className="mt-1 flex items-center gap-2 text-xs text-muted-text">
                     Already in this project.

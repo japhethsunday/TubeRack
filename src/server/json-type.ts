@@ -33,3 +33,18 @@ export function parseJson(x: string): unknown {
 }
 
 export const jsonType = { to: 114, from: [114, 3802], serialize: serializeJson, parse: parseJson };
+
+/**
+ * int8 (bigint) columns — file sizes, subscriber counts — come back from the
+ * driver as strings by default, which client schemas reject. Every such
+ * value in this app is far below 2^53, so plain numbers are exact.
+ */
+export const bigintType = {
+  to: 20,
+  from: [20],
+  serialize: (x: unknown) => String(x),
+  parse: (x: string) => {
+    const n = Number(x);
+    return Number.isSafeInteger(n) ? n : x;
+  },
+};
