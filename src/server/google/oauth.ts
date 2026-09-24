@@ -198,3 +198,19 @@ export async function deleteConnection(workspaceId: string): Promise<void> {
   }
   await db`DELETE FROM youtube_connections WHERE workspace_id = ${workspaceId}`;
 }
+
+/**
+ * True when another TubeRack account has connected the same YouTube channel
+ * (the owner's work is then split across two logins). Reveals no identity.
+ */
+export async function channelOnOtherAccount(channelId: string, userId: string): Promise<boolean> {
+  const db = getDb();
+  if (!db || !channelId) return false;
+  const rows = await db`
+    SELECT 1 FROM youtube_connections c
+    JOIN memberships m ON m.workspace_id = c.workspace_id
+    WHERE c.channel_id = ${channelId} AND m.user_id <> ${userId}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}

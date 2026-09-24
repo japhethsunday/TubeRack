@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { requireWorkspace } from "@/src/server/workspace";
-import { deleteConnection, FORCE_SSL_SCOPE, getConnection, hasScope, isOAuthConfigured } from "@/src/server/google/oauth";
+import { deleteConnection, FORCE_SSL_SCOPE, getConnection, hasScope, isOAuthConfigured, channelOnOtherAccount } from "@/src/server/google/oauth";
 import { toErrorResponse } from "@/src/server/errors";
 
 /** GET /api/v1/youtube/connection — connection status for the workspace. */
 export async function GET() {
   try {
-    const { workspaceId } = await requireWorkspace("viewer");
+    const { workspaceId, user } = await requireWorkspace("viewer");
     const connection = await getConnection(workspaceId);
-    return NextResponse.json({ data: { configured: isOAuthConfigured(), connection, canManage: hasScope(connection, FORCE_SSL_SCOPE) } });
+    // Same channel on another TubeRack login = the owner's work is split.
+    const splitAccount = connection ? await channelOnOtherAccount(connection.channelId, user.id).catch(() => false) : false;
+    return NextResponse.json({ data: { configured: isOAuthConfigured(), connection, canManage: hasScope(connection, FORCE_SSL_SCOPE), splitAccount } });
   } catch (error) {
     return toErrorResponse(error);
   }
