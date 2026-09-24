@@ -16,7 +16,6 @@ import {
   ChartLine,
   Settings,
   CreditCard,
-  Palette,
   LogIn,
   UserPlus,
   Activity,
@@ -205,15 +204,6 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "System",
     items: [
-      {
-        slug: "design",
-        label: "Design system",
-        href: "/design",
-        icon: Palette,
-        status: "live",
-        phase: "Phase 2",
-        blurb: "Components, tokens, patterns.",
-      },
       {
         slug: "settings",
         label: "Settings",

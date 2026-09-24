@@ -115,20 +115,21 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         </Drawer>
       )}
       {drawer === "help" && (
-        <Drawer title="Help & support" description="Docs and support channels." onClose={() => setDrawer("none")}>
+        <Drawer title="Help" description="Where to go for each task." onClose={() => setDrawer("none")}>
           <ul className="space-y-2 text-sm">
-            <li>
-              <a href="/design" className="block rounded-lg border border-border p-3 hover:bg-muted">
-                <span className="font-medium">Design system</span>
-                <span className="block text-muted-text">Components, tokens, and UX patterns.</span>
-              </a>
-            </li>
-            <li>
-              <span className="block rounded-lg border border-border p-3 opacity-60" aria-disabled="true">
-                <span className="font-medium">Support</span>
-                <span className="block text-muted-text">Account-linked help arrives with the backend.</span>
-              </span>
-            </li>
+            {[
+              { href: "/projects", title: "Start a project", body: "Create a project, then follow the pipeline stage by stage." },
+              { href: "/intelligence", title: "Content Intelligence", body: "Analyze ideas, audiences, titles, hooks, and retention with Gemini." },
+              { href: "/intelligence/research", title: "YouTube research", body: "Search live videos and pull references into your studios." },
+              { href: "/settings?tab=security", title: "Account & security", body: "Password, sessions, and email verification." },
+            ].map((l) => (
+              <li key={l.href}>
+                <a href={l.href} onClick={() => setDrawer("none")} className="block rounded-lg border border-border p-3 hover:bg-muted">
+                  <span className="font-medium">{l.title}</span>
+                  <span className="block text-muted-text">{l.body}</span>
+                </a>
+              </li>
+            ))}
           </ul>
         </Drawer>
       )}

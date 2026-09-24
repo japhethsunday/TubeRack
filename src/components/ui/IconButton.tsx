@@ -21,7 +21,7 @@ export function IconButton({
       {...rest}
       className={cx(
         "inline-flex items-center justify-center rounded-lg text-muted-text",
-        "transition-colors duration-150 hover:bg-muted hover:text-foreground",
+        "transition-[color,background-color,transform] duration-200 ease-out hover:-translate-y-px hover:bg-muted hover:text-foreground active:scale-90",
         "active:bg-muted disabled:cursor-not-allowed disabled:opacity-50",
         size === "sm" ? "size-8" : "size-10",
         className,

@@ -23,7 +23,7 @@ describe("navigation config", () => {
   it("exposes only real routes to search and never dead planned links", () => {
     assert.ok(!SEARCHABLE_ROUTES.some((i) => i.status === "planned"));
     assert.ok(SEARCHABLE_ROUTES.some((i) => i.href === "/dashboard"));
-    assert.ok(SEARCHABLE_ROUTES.some((i) => i.href === "/design"));
+    assert.ok(!SEARCHABLE_ROUTES.some((i) => i.href === "/design"));
     for (const item of ALL_NAV_ITEMS.filter((i) => i.status === "preview")) {
       assert.ok(
         item.href.startsWith("/projects/preview"),

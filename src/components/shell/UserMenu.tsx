@@ -56,16 +56,6 @@ export function UserMenu({ user, onClose }: { user: SessionInfo | null; onClose:
                 <span className="flex-1 truncate font-medium">{workspaceName}</span>
                 <Check className="size-4 text-success" aria-label="Current workspace" />
               </li>
-              <li>
-                <span
-                  aria-disabled="true"
-                  title="Multiple workspaces are not available yet"
-                  className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-text opacity-60"
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                  New workspace — coming soon
-                </span>
-              </li>
             </ul>
           </div>
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppBackdrop } from "@/src/components/shell/AppBackdrop";
+import { AppFooter } from "@/src/components/shell/AppFooter";
 import { Clapperboard, X } from "lucide-react";
 import { Sidebar } from "@/src/components/shell/Sidebar";
 import { Header } from "@/src/components/shell/Header";
@@ -90,6 +91,7 @@ export function AppShell({
               </aside>
             )}
           </div>
+          <AppFooter />
         </div>
       </div>
     </ToastProvider>

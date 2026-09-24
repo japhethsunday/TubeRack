@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { HeroMockup } from "@/src/components/home/HeroMockup";
 import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
+import { SiteFooter } from "@/src/components/home/SiteFooter";
 import { Reveal, CountUp } from "@/src/components/home/motion";
 
 const FEATURES = [
@@ -258,10 +259,7 @@ export default function HomePage() {
         </Reveal>
       </section>
 
-      <footer className="relative z-10 border-t border-foreground/10 py-8 text-center text-xs text-foreground/40">
-        © {new Date().getFullYear()} TubeRack · <Link href="/login" className="hover:text-foreground/70">Sign in</Link> ·{" "}
-        <Link href="/signup" className="hover:text-foreground/70">Create account</Link>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }
