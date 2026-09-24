@@ -212,7 +212,7 @@ export interface MediaDoc {
 }
 
 const MEDIA_KINDS = ["image", "video", "voice", "music", "sfx"];
-const MEDIA_SOURCES = ["local-draft", "upload-session", "provider-request"];
+const MEDIA_SOURCES = ["local-draft", "upload-session", "provider-request", "provider-output"];
 const MEDIA_STATUSES = ["pending", "preparing", "generating", "processing", "ready", "failed", "cancelled"];
 const MEDIA_APPROVALS = ["draft", "reviewed", "approved", "used", "rejected"];
 

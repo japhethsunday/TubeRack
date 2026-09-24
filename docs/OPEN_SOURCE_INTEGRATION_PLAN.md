@@ -10,7 +10,7 @@
   drafts; provider capability matrix (`on-device` vs gated `ai-provider`).
 - Video: composition model (tracks/clips/canvas/snapshots), presets,
   transitions, captions builder, render requests (saved drafts w/ validation).
-- Backend (CloudNivo Postgres): auth/sessions/RBAC, workspaces, sync, credits
+- Backend (Postgres, now on Supabase): auth/sessions/RBAC, workspaces, sync, credits
   ledger, audit log, notifications table, rate limits. No realtime, no
   background runner, no email delivery, no object storage configured.
 - Jobs: render requests are inert saved rows — no executor, no generic jobs.
@@ -73,6 +73,52 @@
   all optional, none wired).
 
 ## What this phase does NOT do
-No editor rebuild, no design-system change, no CloudNivo replacement, no
-GPU provisioning, no email provider, no realtime, no E2E harness. Adapters
+No editor rebuild, no design-system change, no GPU provisioning, no email provider, no realtime, no E2E harness. Adapters
 report unconfigured honestly; the app works fully without them.
+
+## Phase 13 — execution wiring (what changed)
+
+Phase 12 delivered adapters that nothing called. Phase 13 connects them
+without replacing any module:
+
+| Area | Before | After |
+|---|---|---|
+| Routing | Routes imported Gemini directly | `src/server/ai/gateway.ts` picks the adapter per capability |
+| Registry | Presence only | + live health probes (`?health=1`) |
+| Jobs | Table + CRUD, no executor | `POST /api/v1/generate`, runner, `npm run worker` |
+| Image studio | Gemini / on-device | + ComfyUI option (job) when healthy |
+| Voice studio | Gemini / system voice | + Piper option (job) when healthy |
+| Music studio | On-device synth | + ACE-Step option (job) when healthy |
+| Video Studio | Narration-derived captions, saved render requests | + WhisperX word-timed captions, + Rendiv render → MP4 (both jobs, shown only when healthy) |
+| Storage | Signed uploads + generated files | Job outputs use the same private bucket and owner-checked links |
+
+### Decisions (unchanged categories)
+
+- INTEGRATE NOW: FFmpeg service, provider contracts, registry + health, jobs + worker.
+- INTEGRATE THROUGH ADAPTER: WhisperX, Piper, ComfyUI, ACE-Step, Rendiv (all off unless configured).
+- REFERENCE ONLY: OpenMontage (AGPL), Vanta, VideoFlow, OpenCut.
+- DO NOT USE: Wav2Lip, V-Express, SadTalker, Remotion.
+
+### Supabase decisions
+
+- **Auth stays TubeRack's own** (users / hashed sessions / tokens in
+  Postgres). Migrating to Supabase Auth would mean a second auth system or
+  a rewrite of every route; the brief forbids both. Documented, not changed.
+- **RLS**: enabled on every public table; `anon` and `authenticated` hold
+  no grants and no policies, so the Supabase REST/GraphQL endpoints expose
+  nothing even with the public key. The app connects as the least-privilege
+  `tuberack_app` role (no superuser, no BYPASSRLS) and enforces tenant
+  isolation in `src/server/authz.ts` + workspace-scoped SQL. Row-level
+  tenant policies keyed to a per-request session variable would require
+  wrapping every query in a transaction — deferred, see "Known limitations".
+- **Storage**: one private bucket, workspace-prefixed keys, signed URLs only.
+
+### Known limitations
+
+- Execution needs infrastructure you run: a worker host and, for ComfyUI /
+  WhisperX / ACE-Step, a GPU host. Without them those options stay hidden.
+- Tenant isolation at the database layer is role-level (public roles
+  locked out), not per-workspace RLS; per-workspace isolation is enforced
+  by the application layer.
+- Render assumes a Rendiv-compatible worker API; Rendiv itself is not
+  vendored.

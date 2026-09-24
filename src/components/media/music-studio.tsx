@@ -2,7 +2,10 @@
 
 import { useRef, useState } from "react";
 import { Music, AudioLines } from "lucide-react";
-import { providerById, capabilityBlock, PROVIDERS } from "@/src/lib/media/providers";
+import { providerById, capabilityBlock, PROVIDERS, withAvailability, blockIn } from "@/src/lib/media/providers";
+import { useProviderRegistry } from "@/src/lib/jobs-client";
+import { useQueuedJobs } from "@/src/components/media/QueuedJobs";
+import { FilePreview } from "@/src/components/media/players";
 import {
   MUSIC_MOODS,
   musicRecipe,
@@ -15,7 +18,7 @@ import {
 } from "@/src/lib/media/audio";
 import { useMedia, runLocalJob, MediaStorageNote } from "@/src/components/media/MediaProvider";
 import { BufferPreview } from "@/src/components/media/players";
-import { Select, Input } from "@/src/components/ui/fields";
+import { Select, Input, Textarea } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
 import { Alert } from "@/src/components/ui/Alert";
 import { EmptyState } from "@/src/components/ui/states";
@@ -50,8 +53,33 @@ export function MusicStudio({
   const [render, setRender] = useState<{ buffer: AudioBuffer; context: AudioContext } | null>(null);
   const [running, setRunning] = useState(false);
 
-  const block = capabilityBlock(provider, "music");
-  const tracks = assetsFor(projectId).filter((a) => a.kind === "music" && a.source === "local-draft");
+  const registry = useProviderRegistry();
+  const providers = withAvailability(registry.usable);
+  const block = blockIn(providers, provider, "music");
+  const queued = useQueuedJobs(projectId);
+  const isAceStep = provider === "ace-step";
+  const [prompt, setPrompt] = useState("");
+  const tracks = assetsFor(projectId).filter(
+    (a) => a.kind === "music" && (a.source === "local-draft" || a.source === "provider-output"),
+  );
+
+  function queueAceStep() {
+    const secs = Number(seconds) || 15;
+    void queued.start(
+      "audio",
+      { kind: "music", prompt: prompt.trim() || `${mood} background music for a YouTube video, instrumental`, durationSec: Math.max(5, secs), provider: "ace-step" },
+      {
+        projectId,
+        sceneIds: [],
+        kind: "music",
+        title: title.trim() || `${mood} — ACE-Step (${secs}s)`,
+        mime: "audio/wav",
+        durationSec: secs,
+        tags: ["music", "ace-step", mood.toLowerCase()],
+        approval: "draft",
+      },
+    );
+  }
 
   function renderNow() {
     try {
@@ -106,13 +134,16 @@ export function MusicStudio({
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-4 rounded-xl border border-border bg-surface p-5">
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
-          {PROVIDERS.map((p) => (
+          {providers.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.label}{p.available ? "" : " — Phase 11"}
+              {p.label}
             </option>
           ))}
         </Select>
         {block && <Alert tone="warn" title="Music provider not connected">{block}</Alert>}
+        {isAceStep && (
+          <Textarea label="Describe the music" rows={2} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Warm lo-fi beat, soft piano, 90 BPM, no vocals…" />
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Select label="Mood" value={mood} onChange={(e) => setMood(e.target.value as MusicMood)}>
             {MUSIC_MOODS.map((m) => (
@@ -126,15 +157,23 @@ export function MusicStudio({
           </Select>
         </div>
         <Input label="Track title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`${mood} bed`} />
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => renderNow()} disabled={Boolean(block)}>
-            Render preview
-          </Button>
-          <Button onClick={saveTrack} disabled={running || Boolean(block)}>
+        {isAceStep ? (
+          <Button onClick={queueAceStep} disabled={Boolean(block) || queued.starting}>
             <Music className="size-4" aria-hidden="true" />
-            {running ? "Rendering…" : "Save track"}
+            Generate with ACE-Step
           </Button>
-        </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => renderNow()} disabled={Boolean(block)}>
+              Render preview
+            </Button>
+            <Button onClick={saveTrack} disabled={running || Boolean(block)}>
+              <Music className="size-4" aria-hidden="true" />
+              {running ? "Rendering…" : "Save track"}
+            </Button>
+          </div>
+        )}
+        {queued.view}
         <BufferPreview buffer={render?.buffer ?? null} context={render?.context ?? null} label="Music preview" />
         <p className="text-xs text-muted-text">Synthesized beds for planning and temp mixes — not licensed finals. Upload finished tracks in Uploads.</p>
       </div>
@@ -144,9 +183,22 @@ export function MusicStudio({
           <EmptyState title="No tracks yet" body="Render a mood, save the ones that fit, approve explicitly, assign to scenes from the Library." />
         ) : (
           <ul className="space-y-2" aria-label="Saved tracks">
-            {tracks.slice(0, 8).map((t) => (
-              <TrackRow key={t.id} assetId={t.id} payload={t.payload} title={t.title} recipeLabel={`${t.durationSec?.toFixed(0)}s`} />
-            ))}
+            {tracks.slice(0, 8).map((t) =>
+              t.source === "provider-output" ? (
+                <li key={t.id} className="rounded-xl border border-border bg-surface p-3">
+                  <p className="text-sm font-medium">{t.title}</p>
+                  <div className="mt-2">
+                    {t.status === "ready" ? (
+                      <FilePreview url={t.payload} mime={t.mime} label={t.title} />
+                    ) : (
+                      <p className="text-xs text-muted-text">{t.status === "failed" ? `Failed: ${t.error ?? "unknown error"}` : "Generating…"}</p>
+                    )}
+                  </div>
+                </li>
+              ) : (
+                <TrackRow key={t.id} assetId={t.id} payload={t.payload} title={t.title} recipeLabel={`${t.durationSec?.toFixed(0)}s`} />
+              ),
+            )}
           </ul>
         )}
         <MediaStorageNote compact />
@@ -251,7 +303,7 @@ export function SfxStudio({
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
           {PROVIDERS.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.label}{p.available ? "" : " — Phase 11"}
+              {p.label}
             </option>
           ))}
         </Select>
@@ -276,7 +328,7 @@ export function SfxStudio({
           ))}
         </ul>
         <BufferPreview buffer={render?.buffer ?? null} context={render?.context ?? null} label={renderLabel} />
-        <p className="text-xs text-muted-text">Placement happens on the Phase 8 timeline — here effects are previewed, saved, and assigned to scenes.</p>
+        <p className="text-xs text-muted-text">Placement happens on the Video Studio timeline — here effects are previewed, saved, and assigned to scenes.</p>
       </div>
       <div className="space-y-3">
         <h3 className="text-sm font-semibold">Saved effects ({effects.length})</h3>

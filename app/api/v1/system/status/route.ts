@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerEnv, backendStatus } from "@/src/lib/env";
 import { getDb } from "@/src/server/db";
+import { storagePing } from "@/src/server/storage";
 import packageJson from "@/package.json";
 
 /**
@@ -18,25 +19,13 @@ export async function GET() {
     try {
       await db`SELECT 1 AS ok`;
       databaseReachable = true;
-    } catch {
+    } catch (error) {
       databaseReachable = false;
+      // Server log only (no secrets: driver messages never include the password).
+      console.error("db-status: database unreachable:", error instanceof Error ? error.message : String(error));
     }
   }
-  if (status.storage) {
-    try {
-      const base = `${env.CLOUDNIVO_STORAGE_URL!.replace(/\/$/, "")}`;
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
-      const response = await fetch(
-        `${base}/buckets/${encodeURIComponent(env.CLOUDNIVO_BUCKET)}`,
-        { headers: { Authorization: `Bearer ${env.CLOUDNIVO_SECRET_KEY}` }, signal: controller.signal },
-      );
-      clearTimeout(timer);
-      storageReachable = response.status !== 401 && response.status !== 403 ? true : false;
-    } catch {
-      storageReachable = false;
-    }
-  }
+  if (status.storage) storageReachable = await storagePing();
 
   return NextResponse.json({
     service: "tuberack",

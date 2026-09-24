@@ -85,6 +85,22 @@ export function captionsFromNarration(narration: string, startSec: number, total
   });
 }
 
+/**
+ * Caption clips from real transcription timings (e.g. WhisperX segments),
+ * offset to where the voice clip starts on the timeline. Pure.
+ */
+export function captionsFromSegments(
+  segments: { startSec: number; endSec: number; text: string }[],
+  offsetSec: number,
+): TimelineClip[] {
+  return segments
+    .filter((s) => s.text.trim() && Number.isFinite(s.startSec) && s.endSec > s.startSec)
+    .map((s) => ({
+      ...clipBase("track_captions", "captions", s.text.trim().slice(0, 48), Math.round((offsetSec + s.startSec) * 10) / 10, s.endSec - s.startSec),
+      text: s.text.trim(),
+    }));
+}
+
 export interface SceneSegment {
   sceneId: string;
   title: string;

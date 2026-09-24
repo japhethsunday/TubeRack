@@ -59,7 +59,7 @@ export function VideoStudio({
       source: "provider-request",
       status: "pending",
       title: `Clip request — ${scene?.title ?? "standalone"}`,
-      payload: `Provider: ${providerById(provider).label}\nDuration: ${duration}s\nAspect: ${platform === "YouTube Shorts" ? "9:16" : "16:9"}\nMotion: ${motion}\n\n${prompt}\n\nStatus: request draft — not submitted. Submits in Phase 11.`,
+      payload: `Provider: ${providerById(provider).label}\nDuration: ${duration}s\nAspect: ${platform === "YouTube Shorts" ? "9:16" : "16:9"}\nMotion: ${motion}\n\n${prompt}\n\nStatus: request draft — not submitted to a video model.`,
       mime: "application/x-tuberack-request",
       durationSec: Number(duration) || 5,
       width: platform === "YouTube Shorts" ? 540 : 960,
@@ -76,7 +76,7 @@ export function VideoStudio({
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
           {PROVIDERS.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.label}{p.available ? "" : " — Phase 11"}
+              {p.label}
             </option>
           ))}
         </Select>
@@ -115,7 +115,7 @@ export function VideoStudio({
             Request saved to the library — parameters intact, nothing submitted.
           </p>
         )}
-        <p className="text-xs text-muted-text">No timeline editing here — clips assemble in Video Production (Phase 8).</p>
+        <p className="text-xs text-muted-text">No timeline editing here — clips assemble in the Video Studio.</p>
       </div>
       <div className="space-y-3">
         <h3 className="text-sm font-semibold">Saved requests ({requests.length})</h3>

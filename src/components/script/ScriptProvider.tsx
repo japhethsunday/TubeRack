@@ -18,6 +18,7 @@ import {
 import { InfoLine } from "@/src/components/ui/Toast";
 import { useBackend } from "@/src/components/shell/BackendStatus";
 import { pullBundle, pushBundle, mergeMaps } from "@/src/lib/sync";
+import { SyncNote } from "@/src/components/auth/SyncNote";
 
 interface ScriptContextValue {
   ready: boolean;
@@ -226,10 +227,5 @@ export function SaveStatus({ updatedAt, savedAt }: { updatedAt: string; savedAt:
 }
 
 export function ScriptStorageNote() {
-  return (
-    <InfoLine>
-      Scripts, scenes, versions, and loops are stored in this browser only. Server autosave and
-      collaboration arrive with the backend in Phase 11.
-    </InfoLine>
-  );
+  return <SyncNote what="Scripts, scenes, versions, and loops" />;
 }

@@ -1,6 +1,6 @@
 # Database
 
-PostgreSQL on CloudNivo (`CLOUDNIVO_DATABASE_URL`). Migrations are plain SQL,
+PostgreSQL on Supabase (project `tuberack`, `DATABASE_URL` = transaction pooler string). Migrations are plain SQL,
 applied in filename order inside transactions, recorded in
 `schema_migrations`. Never edited after merge — always add a new file.
 
@@ -19,7 +19,7 @@ applied in filename order inside transactions, recorded in
 ## Run migrations
 
 ```bash
-# .env.local must define CLOUDNIVO_DATABASE_URL (never commit it)
+# .env.local must define DATABASE_URL (never commit it)
 npm run db:migrate
 ```
 
@@ -29,13 +29,13 @@ Re-running is safe (applied versions are skipped).
 
 ```bash
 curl -b cookies.txt http://localhost:3000/api/v1/system/db-status
-# {"data":{"applied":["001_core","002_content","003_platform","004_project_extras","005_jobs"],"upToDate":true}}
+# {"data":{"applied":["001_core","002_content","003_platform","004_project_extras","005_jobs","006_supabase_lockdown"],"upToDate":true}}
 ```
 
 ## Backups & recovery (production configuration)
 
-CloudNivo project backups are managed in the CloudNivo console (Backups
-section) — enable scheduled backups there; this repo does not claim they
+Supabase project backups are managed in the Supabase dashboard (Database →
+Backups) — enable scheduled backups there; this repo does not claim they
 are active. Recovery procedure:
 
 1. Restore the project backup to a staging project first.
@@ -46,8 +46,8 @@ are active. Recovery procedure:
 
 ## What still needs production configuration
 
-- Real `CLOUDNIVO_DATABASE_URL` per environment (dev/staging/prod).
+- Real `DATABASE_URL` per environment (dev/staging/prod).
 - `JWT_SECRET` + `ENCRYPTION_KEY` generated per environment.
-- Scheduled backups enabled in the CloudNivo console.
+- Backups / PITR configured in the Supabase dashboard.
 - Email provider for verification/recovery delivery (tokens work; sending waits).
 - Storage bucket reachability confirmed via `/api/v1/system/status`.

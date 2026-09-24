@@ -36,7 +36,7 @@ export default function ActivityPage() {
             {events.length === 0
               ? "Every creation, edit, and stage completion will log here."
               : `${events.length} event(s) recorded on this device.`}{" "}
-            Real-time job updates attach in Phase 11.
+            Updates appear as you work.
           </p>
         </div>
         <Dropdown

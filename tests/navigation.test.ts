@@ -41,8 +41,8 @@ describe("navigation config", () => {
     assert.ok(!COMMAND_INDEX.some((i) => i.status === "planned"));
   });
 
-  it("exposes seven live intelligence pages under /intelligence", () => {
-    assert.equal(INTEL_PAGES.length, 7);
+  it("exposes eight live intelligence pages under /intelligence", () => {
+    assert.equal(INTEL_PAGES.length, 8);
     const slugs = [...ALL_NAV_ITEMS.map((i) => i.slug), ...AUTH_PAGES.map((i) => i.slug), ...INTEL_PAGES.map((i) => i.slug), ...STUDIO_PAGES.map((i) => i.slug)];
     assert.equal(new Set(slugs).size, slugs.length);
     for (const item of INTEL_PAGES) {

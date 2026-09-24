@@ -5,13 +5,13 @@ import Link from "next/link";
 import { AuthLayout } from "@/src/components/auth/AuthLayout";
 import { PasswordField } from "@/src/components/auth/PasswordField";
 import { PasswordStrength } from "@/src/components/auth/PasswordStrength";
-import { AuthBoundaryNotice } from "@/src/components/auth/AuthBoundaryNotice";
+import { api, ApiError } from "@/src/lib/api";
+import { CheckCircle2 } from "lucide-react";
 import { fieldErrors } from "@/src/components/auth/form";
 import { resetSchema } from "@/src/lib/auth/validation";
 import { authError } from "@/src/lib/auth/errors";
 import { ErrorState } from "@/src/components/ui/states";
 import { Button } from "@/src/components/ui/Button";
-import { InfoLine } from "@/src/components/ui/Toast";
 
 export function ResetForm({ token, expired }: { token: string; expired: boolean }) {
   const [password, setPassword] = useState("");
@@ -19,6 +19,7 @@ export function ResetForm({ token, expired }: { token: string; expired: boolean 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   if (expired) {
     const content = authError("expired-token");
@@ -34,7 +35,7 @@ export function ResetForm({ token, expired }: { token: string; expired: boolean 
     );
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const parsed = resetSchema.safeParse({ token, password, confirm });
     if (!parsed.success) {
@@ -42,11 +43,16 @@ export function ResetForm({ token, expired }: { token: string; expired: boolean 
       return;
     }
     setErrors({});
+    setFormError(null);
     setLoading(true);
-    window.setTimeout(() => {
-      setLoading(false);
+    try {
+      await api.post("/api/v1/auth/password/reset", { token, password, confirm });
       setDone(true);
-    }, 400);
+    } catch (error) {
+      setFormError(error instanceof ApiError ? error.details?.[0] ?? error.message : "Something went wrong. Try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -60,18 +66,17 @@ export function ResetForm({ token, expired }: { token: string; expired: boolean 
       }
     >
       {done ? (
-        <AuthBoundaryNotice
-          feature="Password reset"
-          validated="New password passed local validation."
-          returnTo="/login"
-        />
+        <div className="space-y-4">
+          <p role="status" className="flex items-center gap-2 text-sm font-medium">
+            <CheckCircle2 className="size-4 text-success" aria-hidden="true" />
+            Your password was changed. Other devices were signed out.
+          </p>
+          <Link href="/login" className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
+            Sign in with your new password
+          </Link>
+        </div>
       ) : (
         <form onSubmit={submit} noValidate className="space-y-4">
-          <InfoLine>
-            Link authenticity cannot be checked until the auth service exists
-            (Phase 11) — this form demonstrates the reset UX; nothing is verified
-            or saved.
-          </InfoLine>
           <div className="space-y-2">
             <PasswordField
               label="New password"
@@ -89,7 +94,13 @@ export function ResetForm({ token, expired }: { token: string; expired: boolean 
             onChange={(e) => setConfirm(e.target.value)}
             error={errors.confirm}
           />
-          <Button type="submit" loading={loading} className="w-full">
+          {formError && (
+            <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              {formError}{" "}
+              <Link href="/forgot-password" className="font-medium underline">Request a new link</Link>
+            </p>
+          )}
+          <Button type="submit" loading={loading} className="auth-sheen w-full">
             Set new password
           </Button>
         </form>

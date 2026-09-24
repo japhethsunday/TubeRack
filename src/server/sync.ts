@@ -60,6 +60,12 @@ async function projectWorkspace(projectId: string): Promise<string | null> {
   return row?.workspace_id ?? null;
 }
 
+/** SQL parameter: JSON for objects, null for undefined (the driver rejects undefined). */
+function toParam(v: unknown): unknown {
+  if (v === undefined) return null;
+  return typeof v === "object" && v !== null ? JSON.stringify(v, (_k, x) => (x === undefined ? null : x)) : v;
+}
+
 async function upsertById(
   table: string,
   row: Record<string, unknown>,
@@ -81,7 +87,7 @@ async function upsertById(
     const cols = Object.keys(row).filter((c) => c !== "id");
     const vals = cols.map((c) => {
       const v = row[c];
-      return typeof v === "object" && v !== null ? JSON.stringify(v) : v;
+      return toParam(v);
     });
     await db.unsafe(
       `UPDATE ${table} SET ${cols.map((c, i) => `${c} = $${i + 1}`).join(", ")}, updated_at = now() WHERE id = $${cols.length + 1}`,
@@ -92,7 +98,7 @@ async function upsertById(
   const cols = Object.keys(row);
   const vals = cols.map((c) => {
     const v = row[c];
-    return typeof v === "object" && v !== null ? JSON.stringify(v) : v;
+    return toParam(v);
   });
   await db.unsafe(
     `INSERT INTO ${table} (${cols.join(", ")}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")})`,
@@ -162,10 +168,10 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
       const exists = await db`SELECT id FROM project_events WHERE id = ${String(doc.id)} LIMIT 1`;
       if (exists.length > 0) continue;
       const row = toEventRow(doc as never, workspaceId);
-      if (row.project_id) {
-        const owner = await projectWorkspace(String(row.project_id));
-        if (owner !== workspaceId) continue;
-      }
+      // project_events requires a project; workspace-level events stay local.
+      if (!row.project_id) continue;
+      const owner = await projectWorkspace(String(row.project_id));
+      if (owner !== workspaceId) continue;
       await db.unsafe(
         `INSERT INTO project_events (id, project_id, workspace_id, actor_id, kind, detail) VALUES ($1,$2,$3,$4,$5,$6)`,
         [String(row.id), row.project_id, workspaceId, user.id, row.kind, JSON.stringify(row.detail)] as never[],
@@ -192,33 +198,43 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
   }
 
   if (kind === "scripts") {
-    const body = parsed.data as unknown as { projectId: string; script?: unknown; board?: unknown; loops?: unknown[]; deleted?: boolean };
-    const owner = await projectWorkspace(body.projectId);
-    if (owner !== workspaceId) throw forbiddenSync();
+    const body = parsed.data as unknown as {
+      scripts: Record<string, unknown>;
+      boards: Record<string, unknown>;
+      loops: Record<string, unknown[]>;
+      deletedScripts: string[];
+    };
     const result = { ...empty };
-    const s = body.script as Record<string, unknown> | undefined;
-    if (s) {
-      const row = toScriptRow(body.projectId, s as never);
-      result.inserted += (await upsertDoc("project_scripts", body.projectId, row)) ? 1 : 0;
+    // Only projects this workspace owns (and that already synced) are written.
+    const ids = [...new Set([...Object.keys(body.scripts), ...Object.keys(body.boards), ...Object.keys(body.loops)])];
+    const owned = new Set<string>();
+    for (const id of ids) {
+      if ((await projectWorkspace(id)) === workspaceId) owned.add(id);
+      else result.skipped += 1;
     }
-    const b = body.board as Record<string, unknown> | undefined;
-    if (b) {
-      const row = toBoardRow(body.projectId, b as never);
-      result.inserted += (await upsertDoc("project_boards", body.projectId, row)) ? 1 : 0;
+    for (const [pid, s] of Object.entries(body.scripts)) {
+      if (!owned.has(pid) || !s || typeof s !== "object") continue;
+      const created = await upsertDoc("project_scripts", pid, toScriptRow(pid, s as never));
+      result[created ? "inserted" : "updated"] += 1;
     }
-    if (Array.isArray(body.loops)) {
-      await upsertExtra(body.projectId, "loops", body.loops.slice(0, 200));
+    for (const [pid, b] of Object.entries(body.boards)) {
+      if (!owned.has(pid) || !b || typeof b !== "object") continue;
+      const created = await upsertDoc("project_boards", pid, toBoardRow(pid, b as never));
+      result[created ? "inserted" : "updated"] += 1;
+    }
+    for (const [pid, loops] of Object.entries(body.loops)) {
+      if (!owned.has(pid) || !Array.isArray(loops)) continue;
+      await upsertExtra(pid, "loops", loops.slice(0, 200));
       result.updated += 1;
     }
-    if (body.deleted === true) {
-      await db`DELETE FROM project_scripts WHERE project_id = ${body.projectId}`;
-      await db`DELETE FROM project_boards WHERE project_id = ${body.projectId}`;
-      await db`DELETE FROM project_extras WHERE project_id = ${body.projectId} AND key = 'loops'`;
+    for (const pid of body.deletedScripts) {
+      if ((await projectWorkspace(pid)) !== workspaceId) continue;
+      await db`DELETE FROM project_scripts WHERE project_id = ${pid}`;
+      await db`DELETE FROM project_boards WHERE project_id = ${pid}`;
       result.deleted += 1;
     }
     return result;
   }
-
   if (kind === "media") {
     const body = parsed.data as { assets: unknown[]; voices: unknown[]; consistency: unknown[]; deletedAssetIds: string[] };
     const result = { ...empty };
@@ -610,7 +626,7 @@ async function upsertDoc(table: string, projectId: string, row: Record<string, u
   const cols = Object.keys(row).filter((c) => c !== "project_id");
   const vals = cols.map((c) => {
     const v = row[c];
-    return typeof v === "object" && v !== null ? JSON.stringify(v) : v;
+    return toParam(v);
   });
   const existing = await db.unsafe(`SELECT project_id FROM ${table} WHERE project_id = $1 LIMIT 1`, [projectId] as never[]);
   if (existing.length > 0) {

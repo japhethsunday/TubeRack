@@ -3,12 +3,15 @@
 import { useRef, useState } from "react";
 import { ImagePlus, RefreshCw } from "lucide-react";
 import type { MediaAsset } from "@/src/lib/media/types";
-import { providerById, capabilityBlock, PROVIDERS } from "@/src/lib/media/providers";
+import { withAvailability, blockIn } from "@/src/lib/media/providers";
+import { useProviderRegistry } from "@/src/lib/jobs-client";
+import { useQueuedJobs } from "@/src/components/media/QueuedJobs";
 import { buildPoster, seedFromText, POSTER_STYLES, POSTER_DIMS } from "@/src/lib/media/svg";
 import type { PosterAspect } from "@/src/lib/media/svg";
 import { buildVisualPrompt, PROMPT_METHOD, type PromptSection } from "@/src/lib/media/prompts";
 import { useMedia, runLocalJob, MediaStorageNote } from "@/src/components/media/MediaProvider";
 import { DraftImage } from "@/src/components/media/players";
+import { generateProviderImage } from "@/src/lib/ai-client";
 import { MethodologyNote } from "@/src/components/intelligence/output";
 import { Select, Input, Textarea } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
@@ -67,6 +70,8 @@ export function ImageStudio({
   const [progress, setProgress] = useState(0);
   const [runIds, setRunIds] = useState<string[]>([]);
   const cancelRef = useRef({ cancelled: false });
+  const [genError, setGenError] = useState<string | null>(null);
+  const isGemini = provider === "ai-provider";
 
   const scene = scenes.find((s) => s.id === sceneId);
   const promptSections: PromptSection[] = buildVisualPrompt({
@@ -83,10 +88,91 @@ export function ImageStudio({
   });
   const [promptEdits, setPromptEdits] = useState<Record<string, string>>({});
 
-  const block = capabilityBlock(provider, "image");
+  const registry = useProviderRegistry();
+  const providers = withAvailability(registry.usable);
+  const block = blockIn(providers, provider, "image");
+  const queued = useQueuedJobs(projectId);
+  const isJobProvider = provider === "comfyui";
   const effectiveSeed = seed ?? seedFromText(`${title}|${sceneId}|${styleId}`);
 
+  function finalPrompt(): string {
+    return promptSections.map((s) => `${s.label}: ${promptEdits[s.label] ?? s.text}`).join("\n");
+  }
+
+  /** Gemini path: real images, one request per variation, stored server-side. */
+  async function launchGemini(count?: number) {
+    const n = Math.min(4, Math.max(1, count ?? variations));
+    cancelRef.current = { cancelled: false };
+    const flag = cancelRef.current;
+    setRunning(true);
+    setRunIds([]);
+    setGenError(null);
+    setProgress(5);
+    const baseTitle = title || scene?.title || "Untitled image";
+    const created: string[] = [];
+    const prompt = finalPrompt();
+    for (let i = 0; i < n; i++) {
+      if (flag.cancelled) break;
+      const asset = addAsset({
+        projectId,
+        sceneIds: [],
+        kind: "image",
+        source: "provider-output",
+        status: "generating",
+        title: n > 1 ? `${baseTitle} (v${i + 1})` : baseTitle,
+        payload: "",
+        mime: "image/png",
+        width: POSTER_DIMS[aspect].width,
+        height: POSTER_DIMS[aspect].height,
+        tags: ["gemini", aspect],
+        approval: "draft",
+      });
+      const variant = i === 0 ? prompt : `${prompt}\nVariation ${i + 1}: a distinctly different composition.`;
+      const outcome = await generateProviderImage(variant, aspect);
+      if (!outcome.ok) {
+        updateAsset(asset.id, { status: "failed", error: outcome.message });
+        setGenError(outcome.message);
+        break;
+      }
+      updateAsset(asset.id, { status: "ready", payload: outcome.data.url });
+      created.push(asset.id);
+      setRunIds([...created]);
+      setProgress(Math.round(((i + 1) / n) * 100));
+    }
+    setRunning(false);
+    setProgress(100);
+  }
+
   function launch(customSeed?: number, count?: number) {
+    if (isJobProvider) {
+      const n = Math.min(4, Math.max(1, count ?? variations));
+      const prompt = finalPrompt();
+      const baseTitle = title || scene?.title || "Untitled image";
+      void (async () => {
+        for (let i = 0; i < n; i++) {
+          await queued.start(
+            "generation",
+            { kind: "image", prompt: i === 0 ? prompt : `${prompt}\nVariation ${i + 1}: a distinctly different composition.`, aspectRatio: aspect, provider },
+            {
+              projectId,
+              sceneIds: [],
+              kind: "image",
+              title: n > 1 ? `${baseTitle} (v${i + 1})` : baseTitle,
+              mime: "image/png",
+              width: POSTER_DIMS[aspect].width,
+              height: POSTER_DIMS[aspect].height,
+              tags: [provider, aspect],
+              approval: "draft",
+            },
+          );
+        }
+      })();
+      return;
+    }
+    if (isGemini) {
+      void launchGemini(count);
+      return;
+    }
     const seedBase = customSeed ?? effectiveSeed;
     const n = Math.min(4, Math.max(1, count ?? variations));
     cancelRef.current = { cancelled: false };
@@ -175,15 +261,15 @@ export function ImageStudio({
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-4 rounded-xl border border-border bg-surface p-5">
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)} hint="Capability-gated: unsupported options explain themselves.">
-          {PROVIDERS.map((p) => (
+          {providers.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.label}{p.available ? "" : " — Phase 11"}
+              {p.label}
             </option>
           ))}
         </Select>
 
         {block ? (
-          <Alert tone="warn" title={providerById(provider).available ? "Not supported here" : "Provider not connected"}>
+          <Alert tone="warn" title={providers.find((p) => p.id === provider)?.available ? "Not supported here" : "Provider not connected"}>
             {block}
           </Alert>
         ) : null}
@@ -234,13 +320,13 @@ export function ImageStudio({
                 />
               </div>
             ))}
-            <MethodologyNote text="Local assembly from scene, script, DNA, and consistency. Edit freely — this direction travels with provider requests in Phase 11." />
+            <MethodologyNote text="Local assembly from scene, script, DNA, and consistency. Edit freely — Gemini receives exactly this direction." />
           </div>
         </details>
 
         {running ? (
           <div className="space-y-2">
-            <Progress value={progress} label="Generating drafts on-device" />
+            <Progress value={progress} label={isGemini ? "Generating with Gemini" : "Generating drafts on-device"} />
             <Button variant="outline" size="sm" onClick={() => { cancelRef.current.cancelled = true; }}>
               Cancel
             </Button>
@@ -248,8 +334,18 @@ export function ImageStudio({
         ) : (
           <Button onClick={() => launch()} disabled={Boolean(block)}>
             <ImagePlus className="size-4" aria-hidden="true" />
-            Generate {variations} draft{variations === 1 ? "" : "s"} — free, on-device
+            {isJobProvider
+              ? `Queue ${variations} image${variations === 1 ? "" : "s"} on ComfyUI`
+              : isGemini
+              ? `Generate ${variations} image${variations === 1 ? "" : "s"} with Gemini`
+              : `Generate ${variations} draft${variations === 1 ? "" : "s"} — free, on-device`}
           </Button>
+        )}
+        {queued.view}
+        {genError && (
+          <Alert tone="warn" title="Gemini could not generate">
+            {genError}
+          </Alert>
         )}
         <p className="text-xs text-muted-text">Seeds make drafts reproducible. Variations never replace approved work.</p>
       </div>
@@ -277,9 +373,16 @@ function RunResults({ assetIds, sceneId, onMore }: { assetIds: string[]; sceneId
       <ul className="grid gap-3 sm:grid-cols-2" aria-label="Generated drafts">
         {items.map((a) => (
           <li key={a.id} className="rounded-xl border border-border bg-surface p-3">
-            <DraftImage svg={a.payload} title={a.title} />
+            {a.source === "provider-output" ? (
+              // eslint-disable-next-line @next/next/no-img-element -- authenticated app URL; the optimizer cannot forward the session.
+              <img src={a.payload} alt={a.title} className="aspect-video w-full rounded-lg border border-border bg-black object-contain" />
+            ) : (
+              <DraftImage svg={a.payload} title={a.title} />
+            )}
             <p className="mt-2 truncate text-sm font-medium">{a.title}</p>
-            <p className="text-xs text-muted-text">Seed {a.seed} · {a.width}×{a.height}</p>
+            <p className="text-xs text-muted-text">
+              {a.source === "provider-output" ? "Gemini" : `Seed ${a.seed}`} · {a.width}×{a.height}
+            </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {a.approval !== "approved" ? (
                 <button type="button" onClick={() => setApproval(a.id, "approved")} className="h-8 rounded-lg border border-border px-2.5 text-xs font-medium hover:bg-muted">

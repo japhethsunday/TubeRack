@@ -227,7 +227,7 @@ export function ReportsPanel({
         )}
       </section>
       <div className="lg:col-span-2">
-        <MethodologyNote text="Reports assemble local state in your browser. Server-side PDF generation and scheduled summaries belong to Phase 11." />
+        <MethodologyNote text="Reports assemble local state in your browser. Export as CSV to share or archive." />
         <div className="mt-2">
           <LocalStorageNote compact />
         </div>

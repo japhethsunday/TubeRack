@@ -9,6 +9,8 @@ import { parseBody, emailSchema, passwordSchema, nameSchema } from "@/src/server
 import { limiterFor, clientKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
+import { randomToken, hashToken } from "@/src/server/crypto";
+import { sendVerificationEmail } from "@/src/server/email";
 
 const signupSchema = z
   .object({
@@ -61,6 +63,17 @@ export async function POST(request: Request) {
     const cookie = sessionCookie(token);
     const store = await cookies();
     store.set(cookie.name, cookie.value, cookie.options as never);
+    // Verification email (best effort; the account works before verifying).
+    try {
+      const verifyToken = randomToken(24);
+      await db`
+        INSERT INTO auth_tokens (user_id, purpose, token_hash, expires_at)
+        VALUES (${String(result.user.id)}, 'verify', ${hashToken(verifyToken)}, ${new Date(Date.now() + 24 * 3600000).toISOString()})
+      `;
+      await sendVerificationEmail(request, email, verifyToken);
+    } catch (mailError) {
+      console.error("verification email failed:", mailError instanceof Error ? mailError.message : String(mailError));
+    }
     await audit({ userId: String(result.user.id), workspaceId: String(result.workspace.id), action: "auth.signup", resourceType: "user", resourceId: String(result.user.id) });
     return NextResponse.json(
       { data: { user: { id: result.user.id, email: result.user.email, name: result.user.name }, workspace: result.workspace } },

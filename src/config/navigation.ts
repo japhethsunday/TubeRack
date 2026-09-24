@@ -95,9 +95,9 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         slug: "research",
         label: "Research",
-        href: "/projects/preview?stage=research",
+        href: "/intelligence/research",
         icon: FlaskConical,
-        status: "preview",
+        status: "live",
         phase: "Phase 6",
         blurb: "Sources, evidence, notes.",
       },
@@ -185,9 +185,9 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         slug: "publishing",
         label: "Publishing",
-        href: "/projects/preview?stage=publishing",
+        href: "/studio/package?tab=platforms",
         icon: Rocket,
-        status: "preview",
+        status: "live",
         phase: "Phase 9",
         blurb: "Schedule, export, release.",
       },
@@ -226,9 +226,9 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         slug: "billing",
         label: "Billing",
-        href: "/dashboard",
+        href: "/settings?tab=billing",
         icon: CreditCard,
-        status: "planned",
+        status: "live",
         phase: "Phase 10",
         blurb: "Credits, usage, subscription.",
       },
@@ -347,6 +347,15 @@ export const INTEL_PAGES: NavItem[] = [
     status: "live",
     phase: "Phase 5",
     blurb: "Catalog vs topic prompts.",
+  },
+  {
+    slug: "intel-research",
+    label: "YouTube research",
+    href: "/intelligence/research",
+    icon: Compass,
+    status: "live",
+    phase: "Phase 13",
+    blurb: "Live YouTube search with real view counts.",
   },
 ];
 

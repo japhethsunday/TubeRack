@@ -24,22 +24,23 @@
 
 .dark {
   color-scheme: dark;
-  --bg: #09090b;
-  --fg: #fafafa;
-  --surface: #101013;
-  --elevated: #18181b;
-  --muted: #1c1c21;
-  --border: #27272a;
-  --primary: #fafafa;
-  --primary-fg: #09090b;
-  --secondary: #1c1c21;
+  /* Brand night palette — matches the home page (#0b0714 violet-black). */
+  --bg: #0b0714;
+  --fg: #f5f3ff;
+  --surface: #120c1f;
+  --elevated: #1a1229;
+  --muted: #1d1530;
+  --border: #2c2143;
+  --primary: #c4b5fd;
+  --primary-fg: #0b0714;
+  --secondary: #1d1530;
   --success: #4ade80;
   --warning: #fbbf24;
   --destructive: #fb7185;
-  --info: #93c5fd;
-  --muted-text: #a1a1aa;
-  --disabled-text: #52525b;
-  --ring: #fafafa;
+  --info: #7dd3fc;
+  --muted-text: #a79cc4;
+  --disabled-text: #5b4f78;
+  --ring: #c4b5fd;
 }
 
 @theme inline {
@@ -124,3 +125,103 @@ body {
 .anim-pan-up > svg { width: 100%; height: 100%; display: block; }
 .anim-pan-down { animation: kb-pan-y 10s ease-in-out infinite alternate; }
 .anim-pan-down > svg { width: 100%; height: 100%; display: block; }
+
+/* ---------- Auth screens: brand panel motion + staged form entry ---------- */
+@keyframes auth-blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(8%, -6%) scale(1.12); }
+  66% { transform: translate(-6%, 8%) scale(0.92); }
+}
+@keyframes auth-float {
+  0%, 100% { transform: translateY(0) rotate(var(--tilt, 0deg)); }
+  50% { transform: translateY(-12px) rotate(var(--tilt, 0deg)); }
+}
+@keyframes auth-rise {
+  from { opacity: 0; transform: translateY(14px); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@keyframes auth-word {
+  0% { opacity: 0; transform: translateY(60%); filter: blur(6px); }
+  12%, 88% { opacity: 1; transform: translateY(0); filter: blur(0); }
+  100% { opacity: 0; transform: translateY(-60%); filter: blur(6px); }
+}
+@keyframes auth-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes auth-sheen {
+  from { transform: translateX(-120%) skewX(-20deg); }
+  to { transform: translateX(220%) skewX(-20deg); }
+}
+@keyframes auth-progress {
+  0% { width: 8%; }
+  60% { width: 86%; }
+  100% { width: 100%; }
+}
+@keyframes auth-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.auth-blob { animation: auth-blob 18s ease-in-out infinite; }
+.auth-float { animation: auth-float 6s ease-in-out infinite; }
+.auth-rise { animation: auth-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.auth-word { animation: auth-word 2.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.auth-marquee { animation: auth-marquee 32s linear infinite; }
+.auth-progress { animation: auth-progress 3.2s ease-in-out infinite; }
+.auth-shake { animation: auth-shake 0.4s ease-in-out; }
+.auth-sheen { position: relative; overflow: hidden; }
+.auth-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: auth-sheen 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.auth-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+/* Dark app shell: a faint brand glow behind every page. */
+.dark body {
+  background-image:
+    radial-gradient(60rem 40rem at 110% -10%, rgba(139, 92, 246, 0.10), transparent 60%),
+    radial-gradient(50rem 36rem at -10% 110%, rgba(56, 189, 248, 0.06), transparent 60%);
+  background-attachment: fixed;
+}
+
+/* ---------- Home page motion ---------- */
+@keyframes home-orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes home-pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@keyframes home-type { from { width: 0; } to { width: 100%; } }
+@keyframes home-bar { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
+@keyframes home-glow-border {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+@keyframes home-count { from { opacity: 0; transform: translateY(40%); } to { opacity: 1; transform: none; } }
+@keyframes home-scan { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
+.home-orbit { animation: home-orbit 40s linear infinite; }
+.home-orbit-rev { animation: home-orbit 28s linear infinite reverse; }
+.home-pulse-ring { animation: home-pulse-ring 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite; }
+.home-bar { animation: home-bar 1.1s ease-in-out infinite; transform-origin: bottom; }
+.home-scan { animation: home-scan 3s ease-in-out infinite; }
+.home-glow-border {
+  background: linear-gradient(90deg, #d946ef, #8b5cf6, #38bdf8, #d946ef);
+  background-size: 200% 100%;
+  animation: home-glow-border 6s linear infinite;
+}
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.reveal.is-visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; }
+}

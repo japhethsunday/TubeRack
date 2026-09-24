@@ -163,7 +163,7 @@ export default function DashboardPage() {
           <section aria-label="Usage and credits" className="rounded-xl border border-border bg-surface p-5 sm:p-6">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Usage & credits</h2>
-              <Badge tone="preview">Phase 10–11</Badge>
+              <Badge tone="neutral">Analytics</Badge>
             </div>
             <p className="mt-1 text-sm text-muted-text">
               Every generation, render, and research run will be metered here.
@@ -215,7 +215,7 @@ function PerformanceSnapshot() {
       </dl>
       {entries.length === 0 && (
         <p className="text-xs text-muted-text">
-          No channel connected and nothing logged — log platform numbers by hand or wait for Phase 11 ingestion. Charts are never fabricated.
+          No channel connected and nothing logged — log platform numbers by hand or import a YouTube video in Analytics. Charts are never fabricated.
         </p>
       )}
       <Link href="/analytics" className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90">

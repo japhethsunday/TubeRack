@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "TubeRack — AI Video Production & YouTube Intelligence platform (Phase 1: foundation)",
+  "description": "TubeRack \u2014 AI Video Production & YouTube Intelligence platform (Phase 1: foundation)",
   "engines": {
     "node": ">=20.18"
   },
@@ -14,7 +14,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts tests/*.test.tsx",
-    "db:migrate": "node db/migrate.mjs"
+    "db:migrate": "node db/migrate.mjs",
+    "worker": "tsx src/worker/index.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

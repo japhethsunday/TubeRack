@@ -331,3 +331,81 @@ export async function fetchVideoResearch(videoId: string): Promise<ResearchSourc
   }
   throw new Error("YouTube request failed: video unavailable from all configured sources.");
 }
+
+export interface YouTubeSearchResult {
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  channelId: string;
+  publishedAt: string;
+  description: string;
+  thumbnail: string;
+  views?: number;
+  likes?: number;
+  comments?: number;
+}
+
+/**
+ * Keyword search (Data API only): search.list (100 units) + one videos.list
+ * (1 unit) for statistics. Callers must meter it (expensive rate class).
+ */
+export async function searchVideos(query: string, maxResults = 10): Promise<YouTubeSearchResult[]> {
+  const q = query.trim().slice(0, 200);
+  if (!q) throw new Error("YouTube search failed: query cannot be empty.");
+  const key = requireKey();
+  const limit = String(Math.min(25, Math.max(1, Math.floor(maxResults))));
+  const search = await callApi("/search", { part: "snippet", type: "video", q, maxResults: limit, safeSearch: "moderate" }, key);
+  const items = Array.isArray(search.items) ? (search.items as Record<string, unknown>[]) : [];
+  const results: YouTubeSearchResult[] = [];
+  for (const item of items) {
+    const id = (item.id ?? {}) as { videoId?: string };
+    const sn = (item.snippet ?? {}) as Record<string, unknown>;
+    if (!id.videoId || !VIDEO_ID.test(id.videoId)) continue;
+    const thumbs = (sn.thumbnails ?? {}) as Record<string, { url?: string }>;
+    results.push({
+      videoId: id.videoId,
+      title: String(sn.title ?? ""),
+      channelTitle: String(sn.channelTitle ?? ""),
+      channelId: String(sn.channelId ?? ""),
+      publishedAt: String(sn.publishedAt ?? ""),
+      description: String(sn.description ?? ""),
+      thumbnail: thumbs.medium?.url ?? thumbs.default?.url ?? "",
+    });
+  }
+  if (results.length === 0) return results;
+  const stats = await callApi("/videos", { part: "statistics", id: results.map((r) => r.videoId).join(",") }, key);
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const v of (Array.isArray(stats.items) ? stats.items : []) as Record<string, unknown>[]) {
+    byId.set(String(v.id), (v.statistics ?? {}) as Record<string, unknown>);
+  }
+  for (const r of results) {
+    const s = byId.get(r.videoId);
+    if (!s) continue;
+    r.views = toNumber(s.viewCount);
+    r.likes = toNumber(s.likeCount);
+    r.comments = toNumber(s.commentCount);
+  }
+  return results;
+}
+
+/** Accepts a raw id or any common YouTube URL form; returns the 11-char id or null. */
+export function parseVideoId(input: string): string | null {
+  const raw = input.trim();
+  if (VIDEO_ID.test(raw)) return raw;
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.replace(/^www\.|^m\./, "");
+    let candidate: string | null = null;
+    if (host === "youtu.be") candidate = url.pathname.slice(1).split("/")[0];
+    else if (host.endsWith("youtube.com")) {
+      candidate = url.searchParams.get("v");
+      if (!candidate) {
+        const m = /^\/(?:shorts|embed|live)\/([^/?#]+)/.exec(url.pathname);
+        candidate = m?.[1] ?? null;
+      }
+    }
+    return candidate && VIDEO_ID.test(candidate) ? candidate : null;
+  } catch {
+    return null;
+  }
+}

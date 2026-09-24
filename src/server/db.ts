@@ -2,7 +2,7 @@ import postgres from "postgres";
 import { getServerEnv } from "@/src/lib/env";
 
 /**
- * CloudNivo Postgres client (lazy singleton). All queries are parameterized
+ * Supabase Postgres client (lazy singleton). All queries are parameterized
  * through the `postgres` tagged template — no string-built SQL anywhere.
  */
 
@@ -10,7 +10,7 @@ let client: ReturnType<typeof postgres> | null = null;
 let warned = false;
 
 export function isDbConfigured(env = getServerEnv()): boolean {
-  return Boolean(env.CLOUDNIVO_DATABASE_URL);
+  return Boolean(env.DATABASE_URL);
 }
 
 export function getDb(): ReturnType<typeof postgres> | null {
@@ -20,12 +20,14 @@ export function getDb(): ReturnType<typeof postgres> | null {
   } catch {
     return null;
   }
-  if (!env.CLOUDNIVO_DATABASE_URL) return null;
+  if (!env.DATABASE_URL) return null;
   if (!client) {
-    client = postgres(env.CLOUDNIVO_DATABASE_URL, {
+    client = postgres(env.DATABASE_URL, {
       max: 5,
       idle_timeout: 20,
       connect_timeout: 10,
+      // Supabase transaction pooler (port 6543) does not support prepared statements.
+      prepare: false,
       // Never log statements (could contain PII); errors surfaced via BackendError.
       onnotice: () => {},
     });

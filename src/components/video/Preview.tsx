@@ -60,6 +60,7 @@ export function Preview({
   const frame = useRef(0);
   const lastTick = useRef(0);
   const spokenRef = useRef<string | null>(null);
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const musicRef = useRef<{ assetId: string; stop: () => void } | null>(null);
   const sfxFired = useRef(new Set<string>());
   const boxRef = useRef<HTMLDivElement>(null);
@@ -80,7 +81,11 @@ export function Preview({
   const texts = atTime.filter((c) => c.kind === "text" && !hiddenTracks.has(c.trackId));
   const caption = [...atTime.filter((c) => c.kind === "captions" && !hiddenTracks.has(c.trackId))].pop();
   const visualAsset = visual?.assetId ? assetFor(visual.assetId) : null;
-  const visualBlob = visual?.assetId ? blobFor(visual.assetId) : null;
+  const visualBlob = visual?.assetId
+    ? visualAsset?.source === "provider-output"
+      ? visualAsset.payload
+      : blobFor(visual.assetId)
+    : null;
 
   function setPlayingState(next: boolean) {
     setPlaying(next);
@@ -89,6 +94,8 @@ export function Preview({
 
   function stopAudio() {
     stopSpeech();
+    voiceAudioRef.current?.pause();
+    voiceAudioRef.current = null;
     musicRef.current?.stop();
     musicRef.current = null;
     spokenRef.current = null;
@@ -113,8 +120,16 @@ export function Preview({
     if (voiceKey !== spokenRef.current) {
       stopSpeech();
       spokenRef.current = voiceKey;
+      voiceAudioRef.current?.pause();
+      voiceAudioRef.current = null;
       const payload = voice?.assetId ? s.assetFor(voice.assetId) : null;
-      try {
+      if (voice && payload?.source === "provider-output") {
+        const audio = new Audio(payload.payload);
+        audio.volume = Math.min(1, Math.max(0, voice.volume));
+        audio.currentTime = Math.max(0, t - voice.startSec);
+        voiceAudioRef.current = audio;
+        void audio.play().catch(() => {});
+      } else try {
         const params = payload ? (JSON.parse(payload.payload) as { text?: string; voiceName?: string; rate?: number; pitch?: number; lang?: string }) : null;
         if (voice && params?.text) {
           const release = claimPlayback(() => stopSpeech());
@@ -131,7 +146,15 @@ export function Preview({
       musicRef.current?.stop();
       musicRef.current = null;
       if (music?.assetId) {
-        try {
+        const stored = s.assetFor(music.assetId);
+        if (stored?.source === "provider-output") {
+          const audio = new Audio(stored.payload);
+          audio.loop = true;
+          audio.volume = Math.min(1, Math.max(0, music.volume * 0.8));
+          audio.currentTime = Math.max(0, t - music.startSec);
+          void audio.play().catch(() => {});
+          musicRef.current = { assetId: music.assetId, stop: () => audio.pause() };
+        } else try {
           const payload = s.assetFor(music.assetId);
           const recipe = payload ? (JSON.parse(payload.payload) as { mood: MusicMood; seconds: number }) : null;
           if (recipe?.mood) {

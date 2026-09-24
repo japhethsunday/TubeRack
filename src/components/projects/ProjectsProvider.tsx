@@ -32,6 +32,7 @@ import {
 import { InfoLine } from "@/src/components/ui/Toast";
 import { useBackend } from "@/src/components/shell/BackendStatus";
 import { pullBundle, pushBundle } from "@/src/lib/sync";
+import { SyncNote } from "@/src/components/auth/SyncNote";
 
 interface ProjectsContextValue {
   ready: boolean;
@@ -348,11 +349,6 @@ export type { DomainStage as ProjectStage };
 
 /** Honest storage disclosure used wherever local data appears. */
 export function LocalStorageNote({ compact }: { compact?: boolean }) {
-  return (
-    <InfoLine>
-      {compact
-        ? "Stored on this device only — cloud sync arrives in Phase 11."
-        : "Projects, channels, and activity are stored in this browser only (device-local). Cloud sync, sharing, and history across devices arrive with the backend in Phase 11."}
-    </InfoLine>
-  );
+  void compact;
+  return <SyncNote what="Projects, channels, and activity" />;
 }

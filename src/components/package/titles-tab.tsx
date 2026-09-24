@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, Star } from "lucide-react";
+import { Plus, Trash2, Star, Sparkles } from "lucide-react";
+import { suggestTitlesWithProvider } from "@/src/lib/ai-client";
+import { Alert } from "@/src/components/ui/Alert";
 import { generateTitleDirections } from "@/src/lib/intelligence/titles";
 import { usePackaging } from "@/src/components/package/PackagingProvider";
 import { ApprovalFlow } from "@/src/components/package/approval";
@@ -16,15 +18,40 @@ export function TitlesTab({
   projectId,
   topic,
   audience,
+  promise = "",
+  scriptText = "",
 }: {
   projectId: string;
   topic: string;
   audience: string;
+  promise?: string;
+  scriptText?: string;
 }) {
   const { titlesFor, addTitle, primaryTitleFor } = usePackaging();
   const [text, setText] = useState("");
   const [category, setCategory] = useState("Curiosity");
   const [showDirections, setShowDirections] = useState(false);
+  const [aiTitles, setAiTitles] = useState<{ text: string; category: string }[] | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  async function suggest() {
+    setAiBusy(true);
+    setAiError(null);
+    const outcome = await suggestTitlesWithProvider({
+      topic,
+      audience,
+      promise,
+      takeaway: "",
+      cta: "",
+      title: primaryTitleFor(projectId)?.text ?? "",
+      script: scriptText,
+      chapters: "",
+    });
+    setAiBusy(false);
+    if (outcome.ok) setAiTitles(outcome.data.titles);
+    else setAiError(outcome.message);
+  }
 
   const titles = titlesFor(projectId);
   const primary = primaryTitleFor(projectId);
@@ -54,10 +81,33 @@ export function TitlesTab({
             <Plus className="size-4" aria-hidden="true" />
             Save variation
           </Button>
+          <Button size="sm" variant="outline" onClick={() => void suggest()} disabled={aiBusy || !topic.trim()}>
+            <Sparkles className="size-4" aria-hidden="true" />
+            {aiBusy ? "Asking Gemini…" : "Suggest with Gemini"}
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setShowDirections((s) => !s)}>
             {showDirections ? "Hide" : "Browse"} 8 direction templates
           </Button>
         </div>
+        {aiError && (
+          <Alert tone="warn" title="Gemini unavailable">
+            {aiError}
+          </Alert>
+        )}
+        {aiTitles && (
+          <ul className="space-y-1.5" aria-label="Gemini title suggestions">
+            {aiTitles.map((t) => (
+              <li key={t.text} className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-2.5 py-2 text-sm">
+                <span>
+                  “{t.text}” <span className="text-xs text-muted-text">{t.category} · {t.text.length} chars</span>
+                </span>
+                <button type="button" onClick={() => addTitle(projectId, t.text, t.category)} className="shrink-0 text-xs font-medium underline">
+                  Save
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         {showDirections && (
           <ul className="space-y-2" aria-label="Title direction templates">
             {directions.map((d) => (

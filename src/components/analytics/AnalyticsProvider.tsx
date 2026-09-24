@@ -17,6 +17,7 @@ import {
 import { InfoLine } from "@/src/components/ui/Toast";
 import { useBackend } from "@/src/components/shell/BackendStatus";
 import { pullBundle, pushBundle, mergeById } from "@/src/lib/sync";
+import { SyncNote } from "@/src/components/auth/SyncNote";
 
 let seq = 0;
 function nextId(prefix: string): string {
@@ -214,13 +215,8 @@ export function useAnalyticsOptional(): AnalyticsContextValue | null {
 }
 
 export function AnalyticsStorageNote({ compact }: { compact?: boolean }) {
-  return (
-    <InfoLine>
-      {compact
-        ? "Manual entries + local production data on this device. Platform APIs connect in Phase 11."
-        : "Performance entries are self-reported by you (provenance: manual). Production metrics derive from local projects. Platform APIs, ingestion, and cloud history connect in Phase 11."}
-    </InfoLine>
-  );
+  void compact;
+  return <SyncNote what="Performance entries and reports" />;
 }
 
 export type { EntryInput as AnalyticsEntryInput };

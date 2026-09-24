@@ -6,6 +6,7 @@ import { Plus, Trash2, ArrowRight } from "lucide-react";
 import { useProjects } from "@/src/components/projects/ProjectsProvider";
 import { UsageNote } from "@/src/components/intelligence/chrome";
 import { TaskRunner } from "@/src/components/intelligence/TaskRunner";
+import { YouTubeResearch, decodeEntities } from "@/src/components/intelligence/YouTubeResearch";
 import { MethodologyNote } from "@/src/components/intelligence/output";
 import { findGaps, type CompetitorReference } from "@/src/lib/intelligence/gaps";
 import { Input, Select, Textarea } from "@/src/components/ui/fields";
@@ -104,6 +105,20 @@ function GapsBody() {
               </ul>
             )}
           </fieldset>
+          <details className="rounded-lg border border-border">
+            <summary className="cursor-pointer px-3 py-2 text-sm font-medium">Find references on YouTube</summary>
+            <div className="border-t border-border p-3">
+              <YouTubeResearch
+                initialQuery={topic}
+                onAdd={(r) =>
+                  setReferences((prev) => [
+                    ...prev,
+                    { title: decodeEntities(r.title), angle: `YouTube · ${r.channelTitle}`, depth: "solid" },
+                  ])
+                }
+              />
+            </div>
+          </details>
         </div>
 
         <div className="rounded-xl border border-border bg-surface p-5">

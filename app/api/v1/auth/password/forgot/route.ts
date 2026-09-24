@@ -6,7 +6,7 @@ import { toErrorResponse, backendUnavailable } from "@/src/server/errors";
 import { parseBody, emailSchema } from "@/src/server/validate";
 import { limiterFor, clientKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
-import { sendEmail, __recordAttempt } from "@/src/server/email";
+import { sendRecoveryEmail, __recordAttempt } from "@/src/server/email";
 
 /** POST /api/v1/auth/password/forgot — account-agnostic: identical response either way. */
 export async function POST(request: Request) {
@@ -27,8 +27,8 @@ export async function POST(request: Request) {
         INSERT INTO auth_tokens (user_id, purpose, token_hash, expires_at)
         VALUES (${row.id}, 'recovery', ${hashToken(token)}, ${new Date(Date.now() + 3600000).toISOString()})
       `;
-      __recordAttempt({ to: body.email, subject: "Reset your TubeRack password", text: "Recovery link (pending email provider).", kind: "recovery" });
-      await sendEmail({ to: body.email, subject: "Reset", text: "", kind: "recovery" });
+      __recordAttempt({ to: body.email, subject: "Reset your TubeRack password", text: "Recovery link.", kind: "recovery" });
+      await sendRecoveryEmail(request, body.email, token);
     }
     // Identical response whether or not the account exists.
     return NextResponse.json(

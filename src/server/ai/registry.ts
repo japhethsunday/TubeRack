@@ -21,6 +21,8 @@ export interface ProviderDescriptor {
   gpuRequired: boolean;
   configured: boolean;
   detail: string;
+  /** Present when the caller asked for live health (see withHealth). */
+  health?: "healthy" | "unreachable" | "not-configured" | "configured";
 }
 
 export function describeProviders(): ProviderDescriptor[] {
@@ -118,4 +120,28 @@ export function describeProviders(): ProviderDescriptor[] {
         : "No FFmpeg binary found (FFMPEG_PATH or PATH).",
     },
   ];
+}
+
+/** Registry plus live health for self-hosted services (3s probes, run in parallel). */
+export async function describeProvidersWithHealth(): Promise<ProviderDescriptor[]> {
+  const { probeHealth } = await import("@/src/server/ai/gateway");
+  const env = getServerEnv();
+  const urls: Record<string, string | undefined> = {
+    whisperx: env.WHISPERX_URL,
+    piper: env.PIPER_URL,
+    comfyui: env.COMFYUI_URL,
+    "ace-step": env.ACE_STEP_URL,
+    rendiv: env.RENDIV_URL,
+  };
+  const base = describeProviders();
+  return Promise.all(
+    base.map(async (p) => {
+      if (p.provider in urls) {
+        if (!p.configured) return { ...p, health: "not-configured" as const };
+        return { ...p, health: await probeHealth(urls[p.provider]) };
+      }
+      if (p.provider === "ffmpeg") return { ...p, health: p.configured ? ("healthy" as const) : ("not-configured" as const) };
+      return { ...p, health: p.configured ? ("configured" as const) : ("not-configured" as const) };
+    }),
+  );
 }

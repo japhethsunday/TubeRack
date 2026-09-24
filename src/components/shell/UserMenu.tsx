@@ -14,8 +14,8 @@ import {
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Drawer, Modal } from "@/src/components/ui/overlays";
 import { Badge } from "@/src/components/ui/Badge";
-import { AuthBoundaryNotice } from "@/src/components/auth/AuthBoundaryNotice";
-import { PREVIEW_IDENTITY, PREVIEW_WORKSPACE } from "@/src/config/identity";
+import { Button } from "@/src/components/ui/Button";
+import { signOut, type SessionInfo } from "@/src/components/auth/useSession";
 
 const MENU_LINKS = [
   { href: "/settings?tab=profile", icon: User, label: "Profile", blurb: "Name, email, username" },
@@ -25,27 +25,24 @@ const MENU_LINKS = [
 ];
 
 /**
- * Polished account menu: identity, workspace, settings, help, logout.
- * Identity is labeled preview; logout discloses the no-session boundary
- * instead of faking a sign-out.
+ * Account menu: real identity from the session, workspace, settings,
+ * and a working sign-out (revokes the server session).
  */
-export function UserMenu({ onClose }: { onClose: () => void }) {
+export function UserMenu({ user, onClose }: { user: SessionInfo | null; onClose: () => void }) {
   const [loggingOut, setLoggingOut] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const name = user?.name || "Your account";
+  const workspaceName = user?.name ? `${user.name}'s workspace` : "Workspace";
 
   return (
     <>
       <Drawer title="Account" description="Identity, workspace, and session controls." onClose={onClose}>
         <div className="space-y-4">
           <div className="flex items-center gap-3 rounded-xl border border-border p-3">
-            <Avatar name={PREVIEW_IDENTITY.name} />
+            <Avatar name={name} />
             <div className="min-w-0">
-              <p className="flex items-center gap-2 truncate text-sm font-medium">
-                {PREVIEW_IDENTITY.name}
-                <Badge tone="preview">Preview</Badge>
-              </p>
-              <p className="truncate text-xs text-muted-text">
-                {PREVIEW_IDENTITY.email} — no session yet
-              </p>
+              <p className="truncate text-sm font-medium">{name}</p>
+              <p className="truncate text-xs text-muted-text">{user?.email ?? ""}</p>
             </div>
           </div>
 
@@ -55,18 +52,18 @@ export function UserMenu({ onClose }: { onClose: () => void }) {
             </p>
             <ul className="mt-1.5 space-y-1">
               <li className="flex items-center gap-2.5 rounded-lg bg-muted px-3 py-2 text-sm">
-                <Avatar name={PREVIEW_WORKSPACE.name} size="sm" />
-                <span className="flex-1 truncate font-medium">{PREVIEW_WORKSPACE.name}</span>
+                <Avatar name={workspaceName} size="sm" />
+                <span className="flex-1 truncate font-medium">{workspaceName}</span>
                 <Check className="size-4 text-success" aria-label="Current workspace" />
               </li>
               <li>
                 <span
                   aria-disabled="true"
-                  title="Workspaces arrive in Phase 4"
+                  title="Multiple workspaces are not available yet"
                   className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-text opacity-60"
                 >
                   <Plus className="size-4" aria-hidden="true" />
-                  New workspace — Phase 4
+                  New workspace — coming soon
                 </span>
               </li>
             </ul>
@@ -98,7 +95,7 @@ export function UserMenu({ onClose }: { onClose: () => void }) {
                 >
                   <CircleHelp className="size-4 text-muted-text" aria-hidden="true" />
                   <span className="flex-1">Verify email</span>
-                  <Badge tone="warn">Unverified</Badge>
+                  {user?.email_verified_at ? <Badge tone="ok">Verified</Badge> : <Badge tone="warn">Unverified</Badge>}
                 </a>
               </li>
             </ul>
@@ -117,15 +114,24 @@ export function UserMenu({ onClose }: { onClose: () => void }) {
 
       {loggingOut && (
         <Modal title="Log out?" description="End the session on this device." onClose={() => setLoggingOut(false)}>
-          <AuthBoundaryNotice
-            feature="Logout"
-            validated="Logout intent confirmed."
-          />
-          <p className="mt-3 text-sm text-muted-text">
-            There is no session to end yet, so you stay exactly where you are.
-            Real sign-out — which returns you to the login screen — ships with
-            server sessions in Phase 11.
+          <p className="text-sm text-muted-text">
+            Your projects stay saved. You can sign back in anytime.
           </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setLoggingOut(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button
+              loading={busy}
+              onClick={() => {
+                setBusy(true);
+                void signOut();
+              }}
+            >
+              <LogOut className="size-4" aria-hidden="true" />
+              Log out
+            </Button>
+          </div>
         </Modal>
       )}
     </>

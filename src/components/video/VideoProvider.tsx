@@ -17,6 +17,7 @@ import {
 import { InfoLine } from "@/src/components/ui/Toast";
 import { useBackend } from "@/src/components/shell/BackendStatus";
 import { pullBundle, pushBundle, mergeById } from "@/src/lib/sync";
+import { SyncNote } from "@/src/components/auth/SyncNote";
 
 let seq = 0;
 function nextId(prefix: string): string {
@@ -263,10 +264,5 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function VideoStorageNote() {
-  return (
-    <InfoLine>
-      Compositions, snapshots, and render requests persist in this browser only. Worker rendering,
-      queues, and cloud storage connect in Phase 11.
-    </InfoLine>
-  );
+  return <SyncNote what="Compositions, snapshots, and render requests" />;
 }
