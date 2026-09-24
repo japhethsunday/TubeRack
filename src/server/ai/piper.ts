@@ -29,7 +29,11 @@ export class PiperTtsProvider implements TtsProvider {
     try {
       response = await fetch(`${base}/synthesize`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(env.PIPER_TOKEN ? { Authorization: `Bearer ${env.PIPER_TOKEN}` } : {}),
+        },
         body: JSON.stringify({ text, voice }),
         signal: AbortSignal.timeout(5 * 60 * 1000),
       });

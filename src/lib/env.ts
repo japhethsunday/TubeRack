@@ -52,6 +52,8 @@ const serverSchema = z.object({
   WHISPERX_URL: z.string().optional(),
   PIPER_URL: z.string().optional(),
   PIPER_VOICE: z.string().default("en_US-lessac-medium"),
+  // Optional bearer token shared with the Piper sidecar (services/piper).
+  PIPER_TOKEN: z.string().optional(),
   COMFYUI_URL: z.string().optional(),
   COMFYUI_WORKFLOW: z.string().optional(),
   // Optional bearer token for an authenticating proxy in front of ComfyUI.
