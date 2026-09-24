@@ -47,6 +47,9 @@ const serverSchema = z.object({
   RESEARCH_API_KEY: z.string().optional(),
   YOUTUBE_API_KEY: z.string().optional(),
   YOUTUBE_FALLBACK_BASE: z.string().optional(),
+  // Sent as Referer so keys restricted to "HTTP referrers (websites)" accept
+  // server calls. Must match an allowed referrer on the key. Defaults to APP_URL.
+  YOUTUBE_API_REFERER: z.string().optional(),
 
   // Google Gemini (server-only primary AI provider: text, intelligence, image, TTS)
   GEMINI_API_KEY: z.string().optional(),

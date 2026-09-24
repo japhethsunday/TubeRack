@@ -66,12 +66,23 @@ async function readJson(response: Response, label: string): Promise<Record<strin
   }
 }
 
+/** Referer for referrer-restricted keys (server requests send none by default). */
+export function apiReferer(env = getServerEnv()): string {
+  const raw = (env.YOUTUBE_API_REFERER || env.APP_URL || "").trim();
+  try {
+    return `${new URL(raw).origin}/`;
+  } catch {
+    return "";
+  }
+}
+
 async function callApi(path: string, params: Record<string, string>, key: string): Promise<Record<string, unknown>> {
   const query = new URLSearchParams({ ...params, key });
+  const referer = apiReferer();
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${path}?${query.toString()}`, {
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...(referer ? { Referer: referer } : {}) },
       signal: AbortSignal.timeout(15000),
     });
   } catch {
@@ -81,6 +92,13 @@ async function callApi(path: string, params: Record<string, string>, key: string
   if (!response.ok) {
     const err = (payload.error ?? {}) as { message?: string; errors?: { reason?: string }[] };
     const reason = err.errors?.[0]?.reason;
+    if (response.status === 403 && /referer|referrer/i.test(err.message ?? "")) {
+      throw new Error(
+        "YouTube rejected the API key: it is restricted to websites (HTTP referrers), which blocks server requests. " +
+          "In Google Cloud → Credentials → this key, set Application restrictions to None (keep API restrictions = YouTube Data API v3), " +
+          `or add ${referer || "your site URL"}* to its allowed referrers.`,
+      );
+    }
     // Never include the URL or key — status, reason, and Google's message only.
     throw new Error(
       `YouTube API request failed (${response.status}${reason ? `, ${reason}` : ""}): ${(err.message ?? `Request failed (${response.status}).`).slice(0, 200)}`,

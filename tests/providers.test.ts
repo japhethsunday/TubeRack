@@ -54,3 +54,12 @@ describe("captions from transcription", () => {
     assert.equal(clips[1].text, "General Kenobi.");
   });
 });
+
+describe("youtube referer", () => {
+  it("derives an origin referer for referrer-restricted keys", async () => {
+    const { apiReferer } = await import("@/src/server/youtube/client");
+    const { getServerEnv } = await import("@/src/lib/env");
+    assert.equal(apiReferer(getServerEnv({ YOUTUBE_API_REFERER: "https://tube-rack.vercel.app/some/path" } as unknown as NodeJS.ProcessEnv)), "https://tube-rack.vercel.app/");
+    assert.equal(apiReferer(getServerEnv({ APP_URL: "https://example.com" } as unknown as NodeJS.ProcessEnv)), "https://example.com/");
+  });
+});
