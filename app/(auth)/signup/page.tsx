@@ -1,5 +1,6 @@
 "use client";
 
+import { GoogleButton } from "@/src/components/auth/GoogleButton";
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -83,6 +84,10 @@ export default function SignupPage() {
           returnTo="/dashboard"
         />
       ) : (
+        <>
+        <div className="auth-rise mb-4">
+          <GoogleButton returnTo="/onboarding" label="Sign up with Google" />
+        </div>
         <form key={shake} onSubmit={submit} noValidate className={`space-y-4 ${shake > 0 ? "auth-shake" : ""}`}>
           <div className="auth-rise" style={stagger(0)}>
             <Input label="Name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} error={errors.name} placeholder="Ada Lovelace" />
@@ -124,6 +129,7 @@ export default function SignupPage() {
             </Button>
           </div>
         </form>
+        </>
       )}
     </AuthLayout>
   );

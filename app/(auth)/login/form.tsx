@@ -1,5 +1,6 @@
 "use client";
 
+import { GoogleButton } from "@/src/components/auth/GoogleButton";
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -14,7 +15,7 @@ import { Input } from "@/src/components/ui/fields";
 import { Checkbox } from "@/src/components/ui/choices";
 import { Button } from "@/src/components/ui/Button";
 
-export function LoginForm({ returnTo, expired }: { returnTo: string; expired: boolean }) {
+export function LoginForm({ returnTo, expired, externalError }: { returnTo: string; expired: boolean; externalError?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -85,6 +86,13 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
           returnTo={returnTo}
         />
       ) : (
+        <>
+        {externalError && (
+          <p role="alert" className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{externalError}</p>
+        )}
+        <div className="auth-rise mb-4" style={{ animationDelay: "180ms" }}>
+          <GoogleButton returnTo={returnTo} />
+        </div>
         <form key={shake} onSubmit={submit} noValidate className={`space-y-4 ${shake > 0 ? "auth-shake" : ""}`}>
           <div className="auth-rise" style={{ animationDelay: "240ms" }}>
           <Input
@@ -130,6 +138,7 @@ export function LoginForm({ returnTo, expired }: { returnTo: string; expired: bo
             </Button>
           </div>
         </form>
+        </>
       )}
     </AuthLayout>
   );
