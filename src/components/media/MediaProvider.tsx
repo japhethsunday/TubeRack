@@ -12,7 +12,7 @@ import type {
 } from "@/src/lib/media/types";
 import { emptyMediaBundle, parseMediaBundle, MEDIA_STORAGE_KEY, type MediaBundle } from "@/src/lib/media/storage";
 import { useBackend } from "@/src/components/shell/BackendStatus";
-import { pullBundle, pushBundle, mergeById } from "@/src/lib/sync";
+import { pullBundle, schedulePush, useRemoteRefresh, mergeById } from "@/src/lib/sync";
 import { InfoLine } from "@/src/components/ui/Toast";
 import { SyncNote } from "@/src/components/auth/SyncNote";
 
@@ -111,6 +111,16 @@ function mergeConsistency(local: ConsistencySettings[], remote: ConsistencySetti
   return [...merged.values()];
 }
 
+/** Server copy merged into a local copy: newest edit wins, deletions elsewhere respected. */
+function mergeRemoteBundle(local: ReturnType<typeof readBundle>, incoming: ReturnType<typeof readBundle>): ReturnType<typeof readBundle> {
+  return {
+              version: 1,
+              assets: mergeById(local.assets, incoming.assets, "media.assets"),
+              voices: mergeById(local.voices, incoming.voices, "media.voices"),
+              consistency: mergeConsistency(local.consistency, incoming.consistency),
+  };
+}
+
 export function MediaProvider({ children }: { children: React.ReactNode }) {
   const { mode } = useBackend();
   const cloud = mode === "cloud";
@@ -129,12 +139,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
           const remote = await pullBundle("media", true);
           if (!cancelled && remote) {
             const incoming = parseMediaBundle(remote);
-            setBundle((local) => ({
-              version: 1,
-              assets: mergeById(local.assets, incoming.assets),
-              voices: mergeById(local.voices, incoming.voices),
-              consistency: mergeConsistency(local.consistency, incoming.consistency),
-            }));
+            // Merge into the device copy — never replace it (unsynced work survives).
+            setBundle(() => mergeRemoteBundle(readBundle(), incoming));
             setReady(true);
             return;
           }
@@ -185,16 +191,23 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
     if (!cloud) return;
-    const timer = window.setTimeout(() => {
-      const tomb = { deletedAssetIds: [...new Set(tombstones.current.assets)] };
-      void pushBundle("media", true, { ...bundle, ...tomb }).then((result) => {
-        if (result) tombstones.current = { assets: [] };
-      }).catch(() => {
-        // Offline: local mirror holds; tombstones retry on the next push.
-      });
-    }, 800);
-    return () => window.clearTimeout(timer);
+    const tomb = { deletedAssetIds: [...new Set(tombstones.current.assets)] };
+    schedulePush("media", { ...bundle, ...tomb }, () => {
+      tombstones.current = { assets: [] };
+    });
   }, [bundle, ready, cloud]);
+
+  // Pick up changes made on other devices when this tab regains focus.
+  useRemoteRefresh("media", cloud && ready, () => {
+    void pullBundle("media", true)
+      .then((remote) => {
+        if (remote) {
+          const incoming = parseMediaBundle(remote);
+          setBundle((cur) => mergeRemoteBundle(cur, incoming));
+        }
+      })
+      .catch(() => undefined);
+  });
 
   const touchAsset = useCallback(
     (id: string, patch: Partial<MediaAsset>) =>

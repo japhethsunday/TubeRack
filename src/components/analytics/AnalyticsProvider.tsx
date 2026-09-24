@@ -16,7 +16,7 @@ import {
 } from "@/src/lib/analytics/storage";
 import { InfoLine } from "@/src/components/ui/Toast";
 import { useBackend } from "@/src/components/shell/BackendStatus";
-import { pullBundle, pushBundle, mergeById } from "@/src/lib/sync";
+import { pullBundle, schedulePush, useRemoteRefresh, mergeById } from "@/src/lib/sync";
 import { SyncNote } from "@/src/components/auth/SyncNote";
 
 let seq = 0;
@@ -72,6 +72,17 @@ function readBundle(): AnalyticsBundle {
   }
 }
 
+/** Server copy merged into a local copy: newest edit wins, deletions elsewhere respected. */
+function mergeRemoteBundle(local: ReturnType<typeof readBundle>, incoming: ReturnType<typeof readBundle>): ReturnType<typeof readBundle> {
+  return {
+              version: 1,
+              entries: mergeById(local.entries, incoming.entries, "analytics.entries"),
+              retention: mergeById(local.retention, incoming.retention, "analytics.retention"),
+              signals: mergeById(local.signals, incoming.signals, "analytics.signals"),
+              snapshots: mergeById(local.snapshots, incoming.snapshots, "analytics.snapshots"),
+  };
+}
+
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const { mode } = useBackend();
   const cloud = mode === "cloud";
@@ -93,13 +104,8 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
           const remote = await pullBundle("analytics", true);
           if (!cancelled && remote) {
             const incoming = parseAnalyticsBundle(remote);
-            setBundle((local) => ({
-              version: 1,
-              entries: mergeById(local.entries, incoming.entries),
-              retention: mergeById(local.retention, incoming.retention),
-              signals: mergeById(local.signals, incoming.signals),
-              snapshots: mergeById(local.snapshots, incoming.snapshots),
-            }));
+            // Merge into the device copy — never replace it (unsynced work survives).
+            setBundle(() => mergeRemoteBundle(readBundle(), incoming));
             setReady(true);
             return;
           }
@@ -125,21 +131,28 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
     if (!cloud) return;
-    const timer = window.setTimeout(() => {
-      const tomb = {
-        deletedEntryIds: [...new Set(tombstones.current.entries)],
-        deletedRetentionIds: [...new Set(tombstones.current.retention)],
-        deletedSignalIds: [...new Set(tombstones.current.signals)],
-        deletedSnapshotIds: [...new Set(tombstones.current.snapshots)],
-      };
-      void pushBundle("analytics", true, { ...bundle, ...tomb }).then((result) => {
-        if (result) tombstones.current = { entries: [], retention: [], signals: [], snapshots: [] };
-      }).catch(() => {
-        // Offline: local mirror holds; tombstones retry on the next push.
-      });
-    }, 800);
-    return () => window.clearTimeout(timer);
+    const tomb = {
+      deletedEntryIds: [...new Set(tombstones.current.entries)],
+      deletedRetentionIds: [...new Set(tombstones.current.retention)],
+      deletedSignalIds: [...new Set(tombstones.current.signals)],
+      deletedSnapshotIds: [...new Set(tombstones.current.snapshots)],
+    };
+    schedulePush("analytics", { ...bundle, ...tomb }, () => {
+      tombstones.current = { entries: [], retention: [], signals: [], snapshots: [] };
+    });
   }, [bundle, ready, cloud]);
+
+  // Pick up changes made on other devices when this tab regains focus.
+  useRemoteRefresh("analytics", cloud && ready, () => {
+    void pullBundle("analytics", true)
+      .then((remote) => {
+        if (remote) {
+          const incoming = parseAnalyticsBundle(remote);
+          setBundle((cur) => mergeRemoteBundle(cur, incoming));
+        }
+      })
+      .catch(() => undefined);
+  });
 
   const value = useMemo<AnalyticsContextValue>(() => {
     const touch = <T extends { id: string }>(rows: T[], id: string, patch: Partial<T>): T[] =>

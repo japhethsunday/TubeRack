@@ -30,7 +30,7 @@ import {
   setOpportunityStatus,
 } from "@/src/lib/intelligence/shelf";
 import { useBackend } from "@/src/components/shell/BackendStatus";
-import { pullBundle, pushBundle, mergeMaps } from "@/src/lib/sync";
+import { pullBundle, schedulePush, useRemoteRefresh, mergeMaps } from "@/src/lib/sync";
 
 const bundleSchema = z.object({
   version: z.literal(1),
@@ -121,6 +121,29 @@ export function useIntel(): IntelContextValue {
   return ctx;
 }
 
+function parseIntelRemote(remote: unknown): Omit<IntelBundle, "version"> | null {
+  const parsed = bundleSchema.safeParse(remote);
+  if (!parsed.success) return null;
+  const dna: Record<string, ChannelDNA> = {};
+  for (const [k, v] of Object.entries(parsed.data.dna)) {
+    try {
+      dna[k] = parseDNA(v);
+    } catch {
+      // Drop corrupt DNA entries.
+    }
+  }
+  return { dna, intel: parsed.data.intel as Record<string, ProjectIntel>, opportunities: parsed.data.opportunities as Opportunity[] };
+}
+
+function mergeIntel(local: IntelBundle, incoming: Omit<IntelBundle, "version">): IntelBundle {
+  return {
+    version: 1,
+    dna: mergeMaps(local.dna, incoming.dna, "intel.dna"),
+    intel: mergeMaps(local.intel, incoming.intel, "intel.intel"),
+    opportunities: mergeOpportunities(local.opportunities, incoming.opportunities),
+  };
+}
+
 export function IntelProvider({ children }: { children: React.ReactNode }) {
   const { mode } = useBackend();
   const cloud = mode === "cloud";
@@ -134,23 +157,11 @@ export function IntelProvider({ children }: { children: React.ReactNode }) {
       if (cloud) {
         try {
           const remote = await pullBundle("intel", true);
-          if (!cancelled && remote) {
-            const parsed = bundleSchema.safeParse(remote);
-            if (parsed.success) {
-              const dna: Record<string, ChannelDNA> = {};
-              for (const [k, v] of Object.entries(parsed.data.dna)) {
-                try {
-                  dna[k] = parseDNA(v);
-                } catch {
-                  // Drop corrupt DNA entries.
-                }
-              }
-              setBundle((local) => ({
-                version: 1,
-                dna: mergeMaps(local.dna, dna),
-                intel: mergeMaps(local.intel, parsed.data.intel as Record<string, ProjectIntel>),
-                opportunities: mergeOpportunities(local.opportunities, parsed.data.opportunities as Opportunity[]),
-              }));
+          const incoming = !cancelled && remote ? parseIntelRemote(remote) : null;
+          if (incoming) {
+            {
+              // Merge into the device copy — never replace it (unsynced work survives).
+              setBundle(() => mergeIntel(readIntel(), incoming));
               setReady(true);
               return;
             }
@@ -177,13 +188,18 @@ export function IntelProvider({ children }: { children: React.ReactNode }) {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
     if (!cloud) return;
-    const timer = window.setTimeout(() => {
-      void pushBundle("intel", true, { ...bundle, deletedOpportunityIds: [] }).catch(() => {
-        // Offline: local mirror holds.
-      });
-    }, 800);
-    return () => window.clearTimeout(timer);
+    schedulePush("intel", { ...bundle, deletedOpportunityIds: [] });
   }, [bundle, ready, cloud]);
+
+  // Pick up changes made on other devices when this tab regains focus.
+  useRemoteRefresh("intel", cloud && ready, () => {
+    void pullBundle("intel", true)
+      .then((remote) => {
+        const incoming = remote ? parseIntelRemote(remote) : null;
+        if (incoming) setBundle((cur) => mergeIntel(cur, incoming));
+      })
+      .catch(() => undefined);
+  });
 
   const patchIntel = useCallback(
     (projectId: string, fn: (i: ProjectIntel) => ProjectIntel) =>

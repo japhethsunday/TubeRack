@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/src/lib/api";
+import { clearSyncedMarks } from "@/src/lib/sync";
 
 export interface SessionInfo {
   id: string;
@@ -43,6 +44,7 @@ function claimDeviceData(userId: string): void {
     localStorage.setItem(OWNER_KEY, userId);
     if (owner && owner !== userId) {
       for (const k of ACCOUNT_KEYS) localStorage.removeItem(k);
+      clearSyncedMarks();
       window.location.reload();
     }
   } catch {

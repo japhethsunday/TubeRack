@@ -17,7 +17,7 @@ import {
 } from "@/src/lib/script/storage";
 import { InfoLine } from "@/src/components/ui/Toast";
 import { useBackend } from "@/src/components/shell/BackendStatus";
-import { pullBundle, pushBundle, mergeMaps } from "@/src/lib/sync";
+import { pullBundle, schedulePush, useRemoteRefresh, mergeMaps } from "@/src/lib/sync";
 import { SyncNote } from "@/src/components/auth/SyncNote";
 
 interface ScriptContextValue {
@@ -59,6 +59,16 @@ function readBundle(): ScriptBundle {
   }
 }
 
+/** Server copy merged into a local copy: newest edit wins, deletions elsewhere respected. */
+function mergeRemoteBundle(local: ReturnType<typeof readBundle>, incoming: ReturnType<typeof readBundle>): ReturnType<typeof readBundle> {
+  return {
+              version: 1,
+              scripts: mergeMaps(local.scripts, incoming.scripts, "scripts.scripts"),
+              boards: mergeMaps(local.boards, incoming.boards, "scripts.boards"),
+              loops: mergeMaps(local.loops, incoming.loops, "scripts.loops"),
+  };
+}
+
 export function ScriptProvider({ children }: { children: React.ReactNode }) {
   const { mode } = useBackend();
   const cloud = mode === "cloud";
@@ -76,12 +86,8 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
           const remote = await pullBundle("scripts", true);
           if (!cancelled && remote) {
             const incoming = parseScriptBundle(remote);
-            setBundle((local) => ({
-              version: 1,
-              scripts: mergeMaps(local.scripts, incoming.scripts),
-              boards: mergeMaps(local.boards, incoming.boards),
-              loops: mergeMaps(local.loops, incoming.loops),
-            }));
+            // Merge into the device copy — never replace it (unsynced work survives).
+            setBundle(() => mergeRemoteBundle(readBundle(), incoming));
             setReady(true);
             return;
           }
@@ -109,16 +115,23 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
     if (!cloud) return;
-    const timer = window.setTimeout(() => {
-      const tomb = { deletedScripts: [...new Set(tombstones.current.scripts)] };
-      void pushBundle("scripts", true, { ...bundle, ...tomb }).then((result) => {
-        if (result) tombstones.current = { scripts: [] };
-      }).catch(() => {
-        // Offline: local mirror holds; tombstones retry on the next push.
-      });
-    }, 800);
-    return () => window.clearTimeout(timer);
+    const tomb = { deletedScripts: [...new Set(tombstones.current.scripts)] };
+    schedulePush("scripts", { ...bundle, ...tomb }, () => {
+      tombstones.current = { scripts: [] };
+    });
   }, [bundle, ready, cloud]);
+
+  // Pick up changes made on other devices when this tab regains focus.
+  useRemoteRefresh("scripts", cloud && ready, () => {
+    void pullBundle("scripts", true)
+      .then((remote) => {
+        if (remote) {
+          const incoming = parseScriptBundle(remote);
+          setBundle((cur) => mergeRemoteBundle(cur, incoming));
+        }
+      })
+      .catch(() => undefined);
+  });
 
   const patchScript = useCallback(
     (projectId: string, fn: (s: Script) => Script) =>

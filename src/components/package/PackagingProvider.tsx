@@ -22,7 +22,7 @@ import {
 } from "@/src/lib/package/storage";
 import { InfoLine } from "@/src/components/ui/Toast";
 import { useBackend } from "@/src/components/shell/BackendStatus";
-import { pullBundle, pushBundle, mergeById } from "@/src/lib/sync";
+import { pullBundle, schedulePush, useRemoteRefresh, mergeById } from "@/src/lib/sync";
 
 let seq = 0;
 function nextId(prefix: string): string {
@@ -181,6 +181,19 @@ function mergePacks(local: StoredPack[], remote: StoredPack[]): StoredPack[] {
   return [...merged.values()];
 }
 
+/** Server copy merged into a local copy: newest edit wins, deletions elsewhere respected. */
+function mergeRemoteBundle(local: ReturnType<typeof readBundle>, incoming: ReturnType<typeof readBundle>): ReturnType<typeof readBundle> {
+  return {
+              version: 1,
+              concepts: mergeConcepts(local.concepts, incoming.concepts),
+              variants: mergeById(local.variants, incoming.variants, "packaging.variants"),
+              titles: mergeById(local.titles, incoming.titles, "packaging.titles"),
+              seo: mergeSeo(local.seo, incoming.seo),
+              packs: mergePacks(local.packs, incoming.packs),
+              items: mergeById(local.items, incoming.items, "packaging.items"),
+  };
+}
+
 export function PackagingProvider({ children }: { children: React.ReactNode }) {
   const { mode } = useBackend();
   const cloud = mode === "cloud";
@@ -197,15 +210,8 @@ export function PackagingProvider({ children }: { children: React.ReactNode }) {
           const remote = await pullBundle("packaging", true);
           if (!cancelled && remote) {
             const incoming = readBundleFrom(remote);
-            setBundle((local) => ({
-              version: 1,
-              concepts: mergeConcepts(local.concepts, incoming.concepts),
-              variants: mergeById(local.variants, incoming.variants),
-              titles: mergeById(local.titles, incoming.titles),
-              seo: mergeSeo(local.seo, incoming.seo),
-              packs: mergePacks(local.packs, incoming.packs),
-              items: mergeById(local.items, incoming.items),
-            }));
+            // Merge into the device copy — never replace it (unsynced work survives).
+            setBundle(() => mergeRemoteBundle(readBundle(), incoming));
             setReady(true);
             return;
           }
@@ -231,21 +237,28 @@ export function PackagingProvider({ children }: { children: React.ReactNode }) {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
     if (!cloud) return;
-    const timer = window.setTimeout(() => {
-      const tomb = {
-        deletedVariantIds: [...new Set(tombstones.current.variants)],
-        deletedTitleIds: [...new Set(tombstones.current.titles)],
-        deletedItemIds: [...new Set(tombstones.current.items)],
-        deletedProjects: [] as string[],
-      };
-      void pushBundle("packaging", true, { ...bundle, ...tomb }).then((result) => {
-        if (result) tombstones.current = { variants: [], titles: [], items: [] };
-      }).catch(() => {
-        // Offline: local mirror holds; tombstones retry on the next push.
-      });
-    }, 800);
-    return () => window.clearTimeout(timer);
+    const tomb = {
+      deletedVariantIds: [...new Set(tombstones.current.variants)],
+      deletedTitleIds: [...new Set(tombstones.current.titles)],
+      deletedItemIds: [...new Set(tombstones.current.items)],
+      deletedProjects: [] as string[],
+    };
+    schedulePush("packaging", { ...bundle, ...tomb }, () => {
+      tombstones.current = { variants: [], titles: [], items: [] };
+    });
   }, [bundle, ready, cloud]);
+
+  // Pick up changes made on other devices when this tab regains focus.
+  useRemoteRefresh("packaging", cloud && ready, () => {
+    void pullBundle("packaging", true)
+      .then((remote) => {
+        if (remote) {
+          const incoming = readBundleFrom(remote);
+          setBundle((cur) => mergeRemoteBundle(cur, incoming));
+        }
+      })
+      .catch(() => undefined);
+  });
 
   const value = useMemo<PackageContextValue>(() => {
     const scoped = <T extends { projectId: string }>(rows: T[], projectId: string): T[] =>

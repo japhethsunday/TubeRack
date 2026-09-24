@@ -31,7 +31,7 @@ import {
 } from "@/src/lib/projects/storage";
 import { InfoLine } from "@/src/components/ui/Toast";
 import { useBackend } from "@/src/components/shell/BackendStatus";
-import { pullBundle, pushBundle } from "@/src/lib/sync";
+import { pullBundle, schedulePush, mergeById, useRemoteRefresh } from "@/src/lib/sync";
 import { SyncNote } from "@/src/components/auth/SyncNote";
 
 interface ProjectsContextValue {
@@ -101,6 +101,15 @@ interface Snapshot {
   ready: boolean;
 }
 
+function mergeWorkspace(local: WorkspaceBundle, remote: WorkspaceBundle): WorkspaceBundle {
+  return {
+    ...remote,
+    projects: mergeById(local.projects, remote.projects, "workspace.projects"),
+    channels: mergeById(local.channels, remote.channels, "workspace.channels"),
+    events: mergeById(local.events, remote.events).sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 500),
+  };
+}
+
 export function ProjectsProvider({ children }: { children: React.ReactNode }) {
   const { mode } = useBackend();
   const cloud = mode === "cloud";
@@ -123,7 +132,8 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         try {
           const remote = await pullBundle("workspace", true);
           if (!cancelled && remote) {
-            setSnapshot({ bundle: parseBundle(remote), recents: readRecents(), ready: true });
+            // Merge into the device copy — never replace it (unsynced work survives).
+            setSnapshot({ bundle: mergeWorkspace(readStorage(), parseBundle(remote)), recents: readRecents(), ready: true });
             return;
           }
         } catch {
@@ -161,21 +171,34 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
     if (!cloud) return;
-    const timer = window.setTimeout(() => {
-      const tomb = { deletedProjectIds: tombstones.current.projects, deletedChannelIds: tombstones.current.channels };
-      void pushBundle("workspace", true, {
+    const sent = { projects: [...tombstones.current.projects], channels: [...tombstones.current.channels] };
+    schedulePush(
+      "workspace",
+      {
         projects: bundle.projects,
         channels: bundle.channels,
         events: bundle.events.slice(0, 200),
-        ...tomb,
-      }).then((result) => {
-        if (result) tombstones.current = { projects: [], channels: [] };
-      }).catch(() => {
-        // Offline: local mirror holds; tombstones retry on the next push.
-      });
-    }, 800);
-    return () => window.clearTimeout(timer);
+        deletedProjectIds: sent.projects,
+        deletedChannelIds: sent.channels,
+      },
+      () => {
+        // Only clear the tombstones this push actually carried.
+        tombstones.current = {
+          projects: tombstones.current.projects.filter((id) => !sent.projects.includes(id)),
+          channels: tombstones.current.channels.filter((id) => !sent.channels.includes(id)),
+        };
+      },
+    );
   }, [bundle, ready, cloud]);
+
+  // Pick up changes made on other devices when this tab regains focus.
+  useRemoteRefresh("workspace", cloud && ready, () => {
+    void pullBundle("workspace", true)
+      .then((remote) => {
+        if (remote) setSnapshot((s) => ({ ...s, bundle: mergeWorkspace(s.bundle, parseBundle(remote)) }));
+      })
+      .catch(() => undefined);
+  });
 
   const mutate = useCallback(
     (fn: (b: WorkspaceBundle) => WorkspaceBundle) => setBundle((b) => fn(b)),

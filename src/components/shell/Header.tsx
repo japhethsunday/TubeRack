@@ -8,6 +8,7 @@ import { Drawer } from "@/src/components/ui/overlays";
 import { NotificationsList, useUnreadCount } from "@/src/components/shell/NotificationsList";
 import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
 import { BackendBadge } from "@/src/components/shell/BackendStatus";
+import { SyncIndicator } from "@/src/components/shell/SyncIndicator";
 import { UserMenu } from "@/src/components/shell/UserMenu";
 import { useSession } from "@/src/components/auth/useSession";
 import Link from "next/link";
@@ -62,6 +63,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         </button>
         <span className="sm:hidden" aria-hidden="true" />
         <div className="ml-auto flex items-center gap-1">
+          <SyncIndicator />
           <BackendBadge />
           {session.status === "signed-in" && (
             <span className="hidden items-center gap-2 rounded-lg px-2 md:flex">

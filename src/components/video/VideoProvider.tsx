@@ -16,7 +16,7 @@ import {
 } from "@/src/lib/video/storage";
 import { InfoLine } from "@/src/components/ui/Toast";
 import { useBackend } from "@/src/components/shell/BackendStatus";
-import { pullBundle, pushBundle, mergeById } from "@/src/lib/sync";
+import { pullBundle, schedulePush, useRemoteRefresh, mergeById, stampOf } from "@/src/lib/sync";
 import { SyncNote } from "@/src/components/auth/SyncNote";
 
 let seq = 0;
@@ -73,10 +73,24 @@ function mergeCompositions(
   local: import("@/src/lib/video/types").Composition[],
   remote: import("@/src/lib/video/types").Composition[],
 ): import("@/src/lib/video/types").Composition[] {
+  // Newest edit wins per project; local-only timelines are kept.
   const merged = new Map<string, import("@/src/lib/video/types").Composition>();
   for (const c of local) merged.set(c.projectId, c);
-  for (const c of remote) merged.set(c.projectId, c);
+  for (const c of remote) {
+    const l = merged.get(c.projectId);
+    if (!l || stampOf(c) >= stampOf(l)) merged.set(c.projectId, c);
+  }
   return [...merged.values()];
+}
+
+/** Server copy merged into a local copy: newest edit wins, deletions elsewhere respected. */
+function mergeRemoteBundle(local: ReturnType<typeof readBundle>, incoming: ReturnType<typeof readBundle>): ReturnType<typeof readBundle> {
+  return {
+              version: 1,
+              compositions: mergeCompositions(local.compositions, incoming.compositions),
+              snapshots: mergeById(local.snapshots, incoming.snapshots, "video.snapshots"),
+              requests: mergeById(local.requests, incoming.requests, "video.requests"),
+  };
 }
 
 export function VideoProvider({ children }: { children: React.ReactNode }) {
@@ -97,12 +111,8 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
           const remote = await pullBundle("video", true);
           if (!cancelled && remote) {
             const incoming = parseVideoBundle(remote);
-            setBundle((local) => ({
-              version: 1,
-              compositions: mergeCompositions(local.compositions, incoming.compositions),
-              snapshots: mergeById(local.snapshots, incoming.snapshots),
-              requests: mergeById(local.requests, incoming.requests),
-            }));
+            // Merge into the device copy — never replace it (unsynced work survives).
+            setBundle(() => mergeRemoteBundle(readBundle(), incoming));
             setReady(true);
             return;
           }
@@ -130,19 +140,26 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
       // Quota/private mode: session continues in memory. Disclosed in UI.
     }
     if (!cloud) return;
-    const timer = window.setTimeout(() => {
-      const tomb = {
-        deletedRequestIds: [...new Set(tombstones.current.requests)],
-        deletedCompositions: [...new Set(tombstones.current.compositions)],
-      };
-      void pushBundle("video", true, { ...bundle, ...tomb }).then((result) => {
-        if (result) tombstones.current = { requests: [], compositions: [] };
-      }).catch(() => {
-        // Offline: local mirror holds; tombstones retry on the next push.
-      });
-    }, 800);
-    return () => window.clearTimeout(timer);
+    const tomb = {
+      deletedRequestIds: [...new Set(tombstones.current.requests)],
+      deletedCompositions: [...new Set(tombstones.current.compositions)],
+    };
+    schedulePush("video", { ...bundle, ...tomb }, () => {
+      tombstones.current = { requests: [], compositions: [] };
+    });
   }, [bundle, ready, cloud]);
+
+  // Pick up changes made on other devices when this tab regains focus.
+  useRemoteRefresh("video", cloud && ready, () => {
+    void pullBundle("video", true)
+      .then((remote) => {
+        if (remote) {
+          const incoming = parseVideoBundle(remote);
+          setBundle((cur) => mergeRemoteBundle(cur, incoming));
+        }
+      })
+      .catch(() => undefined);
+  });
 
   /** Meaningful-change commit with undo history (not per-keystroke). */
   const commit = useCallback((projectId: string, prev: TimelineClip[], next: TimelineClip[]) => {
