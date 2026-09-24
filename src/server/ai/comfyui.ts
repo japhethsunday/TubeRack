@@ -27,13 +27,14 @@ export class ComfyUIImageProvider implements ImageProvider {
     } catch {
       throw new Error("ComfyUI generation failed: COMFYUI_WORKFLOW is not valid JSON.");
     }
+    const auth: Record<string, string> = env.COMFYUI_API_KEY ? { Authorization: `Bearer ${env.COMFYUI_API_KEY}` } : {};
     const started = Date.now();
     const deadline = started + 10 * 60 * 1000;
     let promptId: string;
     try {
       const queued = await fetch(`${base}/prompt`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...auth },
         body: JSON.stringify({ prompt: workflow }),
         signal: AbortSignal.timeout(60000),
       });
@@ -51,7 +52,7 @@ export class ComfyUIImageProvider implements ImageProvider {
       let history: Record<string, { outputs?: Record<string, { images?: { filename?: string; subfolder?: string; type?: string }[] }> }> = {};
       try {
         const res = await fetch(`${base}/history/${encodeURIComponent(promptId)}`, {
-          headers: { Accept: "application/json" },
+          headers: { Accept: "application/json", ...auth },
           signal: AbortSignal.timeout(30000),
         });
         if (res.ok) history = (await res.json()) as typeof history;
@@ -63,7 +64,7 @@ export class ComfyUIImageProvider implements ImageProvider {
         const image = node.images?.[0];
         if (image?.filename) {
           const params = new URLSearchParams({ filename: image.filename, subfolder: image.subfolder ?? "", type: image.type ?? "output" });
-          const file = await fetch(`${base}/view?${params.toString()}`, { signal: AbortSignal.timeout(120000) });
+          const file = await fetch(`${base}/view?${params.toString()}`, { headers: auth, signal: AbortSignal.timeout(120000) });
           if (!file.ok) throw new Error(`ComfyUI generation failed: output fetch (${file.status}).`);
           const bytes = new Uint8Array(await file.arrayBuffer());
           if (bytes.length === 0) throw new Error("ComfyUI generation failed: empty output.");

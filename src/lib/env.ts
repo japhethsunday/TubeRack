@@ -54,6 +54,8 @@ const serverSchema = z.object({
   PIPER_VOICE: z.string().default("en_US-lessac-medium"),
   COMFYUI_URL: z.string().optional(),
   COMFYUI_WORKFLOW: z.string().optional(),
+  // Optional bearer token for an authenticating proxy in front of ComfyUI.
+  COMFYUI_API_KEY: z.string().optional(),
   ACE_STEP_URL: z.string().optional(),
   FFMPEG_PATH: z.string().optional(),
   RENDIV_URL: z.string().optional(),
@@ -70,10 +72,24 @@ export type ServerEnv = z.infer<typeof serverSchema>;
 
 let cached: ServerEnv | null = null;
 
+/**
+ * Accepted aliases (Supabase-standard names). Only non-secret values may
+ * come from NEXT_PUBLIC_*: the project URL is public by design; the DB URL
+ * and service-role key are read from server-only names exclusively.
+ */
+function withAliases(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const blank = (v: string | undefined) => !(v ?? "").trim();
+  return {
+    ...env,
+    DATABASE_URL: blank(env.DATABASE_URL) ? env.SUPABASE_DB_URL : env.DATABASE_URL,
+    SUPABASE_URL: blank(env.SUPABASE_URL) ? env.NEXT_PUBLIC_SUPABASE_URL : env.SUPABASE_URL,
+  };
+}
+
 /** Validate process.env once; throws with a clear message on misconfiguration. */
 export function getServerEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
   if (cached && env === process.env) return cached;
-  const parsed = serverSchema.safeParse(env);
+  const parsed = serverSchema.safeParse(withAliases(env));
   if (!parsed.success) {
     throw new Error(
       `Invalid server environment: ${parsed.error.issues

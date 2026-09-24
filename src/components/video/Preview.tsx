@@ -146,7 +146,15 @@ export function Preview({
       musicRef.current?.stop();
       musicRef.current = null;
       if (music?.assetId) {
-        try {
+        const stored = s.assetFor(music.assetId);
+        if (stored?.source === "provider-output") {
+          const audio = new Audio(stored.payload);
+          audio.loop = true;
+          audio.volume = Math.min(1, Math.max(0, music.volume * 0.8));
+          audio.currentTime = Math.max(0, t - music.startSec);
+          void audio.play().catch(() => {});
+          musicRef.current = { assetId: music.assetId, stop: () => audio.pause() };
+        } else try {
           const payload = s.assetFor(music.assetId);
           const recipe = payload ? (JSON.parse(payload.payload) as { mood: MusicMood; seconds: number }) : null;
           if (recipe?.mood) {

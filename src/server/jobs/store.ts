@@ -206,3 +206,20 @@ export async function listJobs(
     ORDER BY created_at DESC LIMIT ${limit}`;
   return rows.map((r) => rowOf(r as Record<string, unknown>));
 }
+
+/** Oldest runnable jobs across workspaces (worker use only; server-side). */
+export async function nextRunnableJobs(limit = 5): Promise<{ id: string; workspace_id: string }[]> {
+  const db = getDb();
+  if (!db) throw backendUnavailable("Database");
+  const rows = await db`
+    SELECT id, workspace_id FROM jobs
+    WHERE status IN ('queued', 'retrying')
+    ORDER BY created_at ASC LIMIT ${Math.min(20, Math.max(1, limit))}`;
+  return rows as unknown as { id: string; workspace_id: string }[];
+}
+
+/** True when a job was cancelled mid-run (runner checks between steps). */
+export async function isCancelled(id: string, workspaceId: string): Promise<boolean> {
+  const job = await getJob(id, workspaceId);
+  return job?.status === "cancelled";
+}

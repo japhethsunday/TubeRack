@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { GeminiImageProvider } from "@/src/server/ai/gemini";
+import { gateway, SELF_HOSTED } from "@/src/server/ai/gateway";
 import { guardProviderCall, providerFailure, recordUsage, storeGenerated, type ProviderCaller } from "@/src/server/ai/guard";
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
@@ -18,7 +18,10 @@ export async function POST(request: Request) {
   try {
     caller = await guardProviderCall();
     const input = await parseBody(request, body);
-    const result = await new GeminiImageProvider().generateImage(input);
+    // Instant path: cloud providers only. Self-hosted ones go through /api/v1/generate jobs.
+    const routed = gateway.image("gemini");
+    if (SELF_HOSTED.has(routed.name)) throw new Error("Use a generation job for self-hosted providers.");
+    const result = await routed.provider.generateImage(input);
     // Store bytes in the bucket; the client keeps only a short URL.
     const match = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(result.url);
     if (match) {

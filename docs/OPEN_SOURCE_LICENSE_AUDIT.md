@@ -1,7 +1,9 @@
 # Open-source license audit
 
-Verified September 2026 against each project's license file / repository
-metadata. Rule applied throughout: nothing is integrated merely because a
+Originally verified in the Phase 12 audit against each project's license
+file / repository metadata; carried forward unchanged in the Phase 13
+integration pass (the build environment could not re-fetch GitHub pages,
+so re-check before any code is vendored). Rule applied throughout: nothing is integrated merely because a
 GitHub page says "open source" — the license text decides.
 
 | Project | Repository | License | Commercial SaaS compatible | What we use | What we do NOT use | Required attribution / notices | Deployment implications | Decision |
@@ -49,3 +51,11 @@ not link, import, or derive from their code, so no copyleft obligations
 attach to TubeRack. If either were ever vendored or linked, this decision
 must be revisited. ComfyUI checkpoint/diffusion models and Piper voice
 models each carry their own licenses — verify per model before use.
+
+## Phase 13 status
+
+No third-party source code was vendored or linked in this pass. All
+integrations talk to separate processes over HTTP (ComfyUI, Piper,
+WhisperX, ACE-Step, the render worker) or shell out to the FFmpeg binary,
+so the GPL/AGPL positions above are unchanged. npm dependencies added in
+this pass: none.

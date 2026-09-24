@@ -3,7 +3,9 @@
 import { useRef, useState } from "react";
 import { ImagePlus, RefreshCw } from "lucide-react";
 import type { MediaAsset } from "@/src/lib/media/types";
-import { providerById, capabilityBlock, PROVIDERS } from "@/src/lib/media/providers";
+import { withAvailability, blockIn } from "@/src/lib/media/providers";
+import { useProviderRegistry } from "@/src/lib/jobs-client";
+import { useQueuedJobs } from "@/src/components/media/QueuedJobs";
 import { buildPoster, seedFromText, POSTER_STYLES, POSTER_DIMS } from "@/src/lib/media/svg";
 import type { PosterAspect } from "@/src/lib/media/svg";
 import { buildVisualPrompt, PROMPT_METHOD, type PromptSection } from "@/src/lib/media/prompts";
@@ -86,7 +88,11 @@ export function ImageStudio({
   });
   const [promptEdits, setPromptEdits] = useState<Record<string, string>>({});
 
-  const block = capabilityBlock(provider, "image");
+  const registry = useProviderRegistry();
+  const providers = withAvailability(registry.usable);
+  const block = blockIn(providers, provider, "image");
+  const queued = useQueuedJobs(projectId);
+  const isJobProvider = provider === "comfyui";
   const effectiveSeed = seed ?? seedFromText(`${title}|${sceneId}|${styleId}`);
 
   function finalPrompt(): string {
@@ -138,6 +144,31 @@ export function ImageStudio({
   }
 
   function launch(customSeed?: number, count?: number) {
+    if (isJobProvider) {
+      const n = Math.min(4, Math.max(1, count ?? variations));
+      const prompt = finalPrompt();
+      const baseTitle = title || scene?.title || "Untitled image";
+      void (async () => {
+        for (let i = 0; i < n; i++) {
+          await queued.start(
+            "generation",
+            { kind: "image", prompt: i === 0 ? prompt : `${prompt}\nVariation ${i + 1}: a distinctly different composition.`, aspectRatio: aspect, provider },
+            {
+              projectId,
+              sceneIds: [],
+              kind: "image",
+              title: n > 1 ? `${baseTitle} (v${i + 1})` : baseTitle,
+              mime: "image/png",
+              width: POSTER_DIMS[aspect].width,
+              height: POSTER_DIMS[aspect].height,
+              tags: [provider, aspect],
+              approval: "draft",
+            },
+          );
+        }
+      })();
+      return;
+    }
     if (isGemini) {
       void launchGemini(count);
       return;
@@ -230,7 +261,7 @@ export function ImageStudio({
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-4 rounded-xl border border-border bg-surface p-5">
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)} hint="Capability-gated: unsupported options explain themselves.">
-          {PROVIDERS.map((p) => (
+          {providers.map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
             </option>
@@ -238,7 +269,7 @@ export function ImageStudio({
         </Select>
 
         {block ? (
-          <Alert tone="warn" title={providerById(provider).available ? "Not supported here" : "Provider not connected"}>
+          <Alert tone="warn" title={providers.find((p) => p.id === provider)?.available ? "Not supported here" : "Provider not connected"}>
             {block}
           </Alert>
         ) : null}
@@ -303,11 +334,14 @@ export function ImageStudio({
         ) : (
           <Button onClick={() => launch()} disabled={Boolean(block)}>
             <ImagePlus className="size-4" aria-hidden="true" />
-            {isGemini
+            {isJobProvider
+              ? `Queue ${variations} image${variations === 1 ? "" : "s"} on ComfyUI`
+              : isGemini
               ? `Generate ${variations} image${variations === 1 ? "" : "s"} with Gemini`
               : `Generate ${variations} draft${variations === 1 ? "" : "s"} — free, on-device`}
           </Button>
         )}
+        {queued.view}
         {genError && (
           <Alert tone="warn" title="Gemini could not generate">
             {genError}

@@ -60,20 +60,42 @@ export function providerFailure(error: unknown, what: string): BackendError {
 }
 
 /**
- * Persist provider output to the private bucket under the caller's
- * workspace and return an app URL (served with an ownership check).
- * Returns null when storage is not configured so callers can inline.
+ * Persist provider output to the private bucket under a workspace and
+ * return an app URL (served with an ownership check). Returns null when
+ * storage is not configured so callers can inline.
  */
-export async function storeGenerated(
-  caller: ProviderCaller,
+export async function storeBytes(
+  workspaceId: string,
   bytes: Uint8Array,
   mime: string,
-  ext: "png" | "jpg" | "webp" | "wav" | "mp3",
+  ext: GeneratedExt,
 ): Promise<string | null> {
   const { isStorageConfigured, storagePut, objectKey } = await import("@/src/server/storage");
   if (!isStorageConfigured()) return null;
   const id = crypto.randomUUID();
-  const key = objectKey(caller.workspaceId, "generated", `output.${ext}`, id);
+  const key = objectKey(workspaceId, "generated", `output.${ext}`, id);
   await storagePut(key, bytes, mime);
   return `/api/v1/generated/${key.split("/").pop()}`;
+}
+
+export type GeneratedExt = "png" | "jpg" | "webp" | "wav" | "mp3" | "mp4" | "webm" | "srt" | "vtt";
+
+export function extForMime(mime: string): GeneratedExt {
+  const m = mime.toLowerCase();
+  if (m.includes("jpeg")) return "jpg";
+  if (m.includes("webp")) return "webp";
+  if (m.includes("png")) return "png";
+  if (m.includes("mpeg") || m.includes("mp3")) return "mp3";
+  if (m.includes("mp4")) return "mp4";
+  if (m.includes("webm")) return "webm";
+  return "wav";
+}
+
+export async function storeGenerated(
+  caller: ProviderCaller,
+  bytes: Uint8Array,
+  mime: string,
+  ext: GeneratedExt,
+): Promise<string | null> {
+  return storeBytes(caller.workspaceId, bytes, mime, ext);
 }

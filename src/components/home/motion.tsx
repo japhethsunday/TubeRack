@@ -10,6 +10,7 @@ export function Reveal({ children, delay = 0, className = "" }: { children: Reac
     const el = ref.current;
     if (!el) return;
     if (typeof IntersectionObserver === "undefined") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- no observer support: show content immediately.
       setVisible(true);
       return;
     }
@@ -41,6 +42,7 @@ export function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
     if (!el) return;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (reduce || typeof IntersectionObserver === "undefined") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reduced motion: jump to the final value.
       setValue(to);
       return;
     }

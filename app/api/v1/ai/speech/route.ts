@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { GeminiTtsProvider } from "@/src/server/ai/gemini";
+import { gateway } from "@/src/server/ai/gateway";
 import { guardProviderCall, providerFailure, recordUsage, storeGenerated, type ProviderCaller } from "@/src/server/ai/guard";
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   try {
     caller = await guardProviderCall();
     const input = await parseBody(request, body);
-    const result = await new GeminiTtsProvider().synthesizeSpeech(input);
+    const result = await gateway.tts("gemini").provider.synthesizeSpeech(input);
     const ext = result.mimeType === "audio/mpeg" ? "mp3" : "wav";
     const stored = await storeGenerated(caller, Buffer.from(result.audioBase64, "base64"), result.mimeType, ext).catch(() => null);
     await recordUsage(caller, { kind: "tts", provider: "gemini", model: result.model, status: "completed" });

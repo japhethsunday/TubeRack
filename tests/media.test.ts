@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { buildPoster, seedFromText, mulberry32, POSTER_DIMS, POSTER_STYLES, styleById } from "@/src/lib/media/svg";
 import { validateUpload, UPLOAD_LIMITS } from "@/src/lib/media/validation";
 import { buildVisualPrompt, promptToText, PROMPT_METHOD } from "@/src/lib/media/prompts";
-import { providerById, capabilityBlock, PROVIDERS } from "@/src/lib/media/providers";
+import { providerById, capabilityBlock, PROVIDERS, withAvailability, blockIn, JOB_PROVIDERS } from "@/src/lib/media/providers";
 import { musicRecipe, progressionFor, noteFrequency, sfxRecipe, MUSIC_MOODS, SFX_TYPES } from "@/src/lib/media/audio";
 import { emptyMediaBundle, parseMediaBundle } from "@/src/lib/media/storage";
 import { runLocalJob } from "@/src/components/media/MediaProvider";
@@ -75,7 +75,7 @@ describe("prompt assistant", () => {
 
 describe("provider capabilities", () => {
   it("gates operations with reasons, never silent controls", () => {
-    assert.equal(PROVIDERS.length, 2);
+    assert.equal(PROVIDERS.length, 5);
     assert.equal(capabilityBlock("on-device", "image"), null);
     assert.equal(capabilityBlock("on-device", "tts"), null);
     assert.ok((capabilityBlock("on-device", "video") ?? "").length > 0);
@@ -84,6 +84,18 @@ describe("provider capabilities", () => {
     assert.equal(capabilityBlock("ai-provider", "tts"), null);
     assert.ok((capabilityBlock("ai-provider", "video") ?? "").length > 0);
     assert.equal(providerById("unknown").id, "on-device");
+  });
+
+  it("self-hosted providers stay unavailable until the registry reports them usable", () => {
+    const none = withAvailability(() => false);
+    assert.match(blockIn(none, "comfyui", "image") ?? "", /not configured/);
+    assert.match(blockIn(none, "ace-step", "music") ?? "", /not configured/);
+    const all = withAvailability(() => true);
+    assert.equal(blockIn(all, "comfyui", "image"), null);
+    assert.equal(blockIn(all, "piper", "tts"), null);
+    assert.equal(blockIn(all, "ace-step", "music"), null);
+    assert.ok((blockIn(all, "piper", "music") ?? "").length > 0);
+    assert.ok(JOB_PROVIDERS.has("comfyui") && !JOB_PROVIDERS.has("ai-provider"));
   });
 });
 

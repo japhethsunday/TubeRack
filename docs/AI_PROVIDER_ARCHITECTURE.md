@@ -1,43 +1,51 @@
 # AI provider architecture
 
-The UI never depends on a specific provider. Server code depends on
-capability contracts; concrete providers register behind them.
+The UI never depends on a specific provider.
 
 ```
-UI / route handler
-  → AIGateway (src/lib/ai-gateway/registry.ts)
-  → TextProvider | ImageProvider | TtsProvider | MusicProvider
-    | TranscriptionProvider | RenderingProvider
-    (src/lib/ai-gateway/types.ts)
-  → Adapter (src/server/ai/*)
-  → Vendor / self-hosted service
+UI (studios)
+  → API route (/api/v1/ai/*  instant cloud calls | /api/v1/generate  queued jobs)
+  → Gateway  src/server/ai/gateway.ts   (capability → first configured adapter, or a named one)
+  → Contract src/lib/ai-gateway/types.ts (Text | Image | Tts | Music | Transcription | Rendering)
+  → Adapter  src/server/ai/*.ts          (gemini, comfyui, piper, ace-step, whisperx, rendiv)
+  → Vendor API / self-hosted service
 ```
 
 ## Capability → adapters
 
-| Capability | Contract | Adapters (primary first) | Env |
-|---|---|---|---|
-| text | TextProvider | gemini | GEMINI_API_KEY (+GEMINI_TEXT_MODEL) |
-| intelligence | requestIntelligence → text | gemini | GEMINI_API_KEY |
-| image | ImageProvider | gemini, comfyui | GEMINI_API_KEY / COMFYUI_URL + COMFYUI_WORKFLOW |
-| tts | TtsProvider | gemini, piper | GEMINI_API_KEY / PIPER_URL (+PIPER_VOICE) |
-| music | MusicProvider | ace-step | ACE_STEP_URL |
-| transcription | TranscriptionProvider | whisperx | WHISPERX_URL |
-| video (rendering) | RenderingProvider | rendiv (external worker) | RENDIV_URL |
-| ingestion/research | PlatformSnapshot / ResearchSource | youtube (Data API → oEmbed → Invidious) | YOUTUBE_API_KEY (+YOUTUBE_FALLBACK_BASE) |
+| Capability | Contract | Adapters | Path | Env |
+|---|---|---|---|---|
+| text / intelligence / script / packaging | TextProvider | gemini | instant (`/api/v1/ai/*`) | GEMINI_API_KEY |
+| image | ImageProvider | gemini (instant), comfyui (job) | both | GEMINI_API_KEY / COMFYUI_URL + COMFYUI_WORKFLOW (+COMFYUI_API_KEY) |
+| tts | TtsProvider | gemini (instant), piper (job) | both | GEMINI_API_KEY / PIPER_URL (+PIPER_VOICE) |
+| music | MusicProvider | ace-step | job | ACE_STEP_URL |
+| transcription | TranscriptionProvider | whisperx | job | WHISPERX_URL |
+| rendering | RenderingProvider | rendiv-compatible worker | job | RENDIV_URL |
+| research / ingestion | YouTube client | Data API → oEmbed → Invidious | instant | YOUTUBE_API_KEY (+YOUTUBE_FALLBACK_BASE) |
+| media processing | FFmpeg service | local binary | worker | FFMPEG_PATH |
+
+## Provider registry
+
+`describeProviders()` (`src/server/ai/registry.ts`) lists provider, type,
+capabilities, models, local/external, GPU requirement, configured, and a
+human detail line. `GET /api/v1/system/providers?health=1` adds live
+health: self-hosted services get a 3-second probe (`healthy` /
+`unreachable`); cloud APIs report `configured` without spending quota.
+No URLs, keys, or secrets are ever returned.
+
+The media studios merge this into their provider pickers
+(`withAvailability()` in `src/lib/media/providers.ts`): ComfyUI, Piper,
+and ACE-Step only become selectable when configured **and** healthy;
+otherwise the option explains exactly which variable is missing.
 
 ## Rules
 
-- Unconfigured capability → `ProviderNotConfiguredError` (or
-  `IntelligenceNotConfiguredError`). Never a fake response, never a
-  silent failure, never fake progress.
-- `registerGeminiProviders()` registers text/image/tts when the key
-  exists; self-hosted adapters construct on demand inside routes/jobs.
-- `GET /api/v1/system/providers` exposes the presence-only catalog
-  (`describeProviders()`); UI gates features on `configured`.
-- Model names resolve from env with documented defaults; per-call
-  overrides stay inside server code.
-- Generation requests that cost money or quota belong in jobs
-  (`src/server/jobs/store.ts`), never awaited inside request handlers.
-- Checkpoint/diffusion/TTS voice models carry their own licenses —
-  verify per model before use (see OPEN_SOURCE_LICENSE_AUDIT.md).
+- Unconfigured → `ProviderNotConfiguredError` → HTTP 503
+  `BACKEND_UNAVAILABLE` with a precise message. Never fake output,
+  never fake progress, never silent failure.
+- Paid/quota calls require sign-in, are rate-limited per user
+  (`expensive` class), and are recorded in `usage_events`.
+- Self-hosted providers (slow, GPU) never run inside a request: they go
+  through `/api/v1/generate` → `jobs` → worker.
+- Model licenses (checkpoints, voices) are verified per model — see
+  OPEN_SOURCE_LICENSE_AUDIT.md.

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Mic, Plus } from "lucide-react";
-import { providerById, capabilityBlock, PROVIDERS } from "@/src/lib/media/providers";
+import { withAvailability, blockIn } from "@/src/lib/media/providers";
+import { useProviderRegistry } from "@/src/lib/jobs-client";
+import { useQueuedJobs } from "@/src/components/media/QueuedJobs";
 import { listSystemVoices, speakText } from "@/src/lib/media/audio";
 import { useMedia, runLocalJob, MediaStorageNote } from "@/src/components/media/MediaProvider";
 import { SpeechPreview, FilePreview } from "@/src/components/media/players";
@@ -54,7 +56,10 @@ export function VoiceStudio({
 
   const profiles = voicesFor(projectId);
   const profile = profiles.find((p) => p.id === profileId) ?? defaultVoiceFor(projectId) ?? profiles[0] ?? null;
-  const block = capabilityBlock(provider, "tts");
+  const registry = useProviderRegistry();
+  const providers = withAvailability(registry.usable);
+  const block = blockIn(providers, provider, "tts");
+  const queued = useQueuedJobs(projectId);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -135,6 +140,23 @@ export function VoiceStudio({
       void saveGeminiTake();
       return;
     }
+    if (provider === "piper") {
+      void queued.start(
+        "audio",
+        { kind: "tts", text: text.trim().slice(0, 5000), provider: "piper" },
+        {
+          projectId,
+          sceneIds: [],
+          kind: "voice",
+          title: `Piper take — ${(source?.label ?? "custom").slice(0, 40)}`,
+          mime: "audio/wav",
+          durationSec: estSec,
+          tags: ["take", "piper"],
+          approval: "draft",
+        },
+      );
+      return;
+    }
     const settings = currentSettings();
     const flag = { cancelled: false };
     setRunning(true);
@@ -174,7 +196,7 @@ export function VoiceStudio({
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-4 rounded-xl border border-border bg-surface p-5">
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
-          {PROVIDERS.map((p) => (
+          {providers.map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
             </option>
@@ -281,12 +303,13 @@ export function VoiceStudio({
               <p className="max-h-28 overflow-y-auto rounded-lg bg-muted/40 p-3 text-sm text-muted-text">{source?.text.slice(0, 500)}</p>
             )}
             <p className="text-xs text-muted-text" aria-live="polite">
-              {words} words · ~{estSec}s at current rate. Provider: {providerById(provider).label}.
+              {words} words · ~{estSec}s at current rate. Provider: {providers.find((p) => p.id === provider)?.label ?? provider}.
             </p>
             <Button onClick={saveTake} disabled={!text.trim() || running || Boolean(block)}>
               <Mic className="size-4" aria-hidden="true" />
-              {running ? "Synthesizing…" : isGemini ? "Generate take with Gemini" : "Preview + save take"}
+              {running ? "Synthesizing…" : isGemini ? "Generate take with Gemini" : provider === "piper" ? "Queue take on Piper" : "Preview + save take"}
             </Button>
+            {queued.view}
             {genError && (
               <Alert tone="warn" title="Gemini could not synthesize">
                 {genError}
