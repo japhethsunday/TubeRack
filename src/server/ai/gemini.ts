@@ -286,6 +286,10 @@ const TASK_LABELS: Record<string, string> = {
   "retention-analysis": "Identify retention risks and suggest pacing improvements.",
   "content-gap-analysis": "Find content gaps: unanswered questions and uncovered angles.",
   "brief-generation": "Write a concise production brief from this context.",
+  "thumbnail-concepts": "Propose 4 distinct YouTube thumbnail concepts. For each: focal subject, facial emotion or object, 2-4 word text overlay, color/contrast plan, composition, and why it earns the click honestly. End each with a one-line image-generation prompt prefixed 'PROMPT:'.",
+  "repurpose-plan": "Repurpose this video into ready-to-post pieces: 3 short-form clip scripts (hook, beats, on-screen text, CTA), one X/Twitter thread, one LinkedIn post, and one community post. Write the final copy, not advice.",
+  "platform-copy": "Write publish-ready copy for each platform listed (default: YouTube, YouTube Shorts, TikTok, Instagram Reels, X, LinkedIn): title or first line, caption/description within that platform's limits, and 3-8 relevant hashtags. Label each platform clearly.",
+  "storyboard-plan": "Create a shot-by-shot storyboard for these scenes: for each scene list shots with visual description, camera framing/motion, b-roll ideas, on-screen text, sound/music cue, and transition. Keep it filmable on a creator budget.",
 };
 
 export interface IntelligenceResponse {

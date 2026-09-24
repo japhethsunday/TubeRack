@@ -1,5 +1,6 @@
 "use client";
 
+import { GeminiAssist } from "@/src/components/intelligence/GeminiAssist";
 import { useState } from "react";
 import { PLATFORMS, platformById } from "@/src/lib/package/platforms";
 import type { PlatformId } from "@/src/lib/package/types";
@@ -43,6 +44,13 @@ export function PlatformsPanel({
   const overLimit = def.fields.filter((f) => f.maxLength && (fields[f.key] ?? "").length > f.maxLength);
 
   return (
+    <div className="space-y-4">
+    <GeminiAssist
+      task="platform-copy"
+      title="Platform copy with Gemini"
+      blurb="Publish-ready titles, captions, and hashtags for every platform, within each one's limits."
+      context={{ title: defaults.title, description: defaults.description.slice(0, 2000), hashtags: defaults.hashtags, currentPlatform: platform }}
+    />
     <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
       <ul className="flex gap-1 overflow-x-auto lg:flex-col" role="tablist" aria-label="Platforms">
         {PLATFORMS.map((p) => (
@@ -115,6 +123,7 @@ export function PlatformsPanel({
         </p>
         <LocalStorageNote compact />
       </div>
+    </div>
     </div>
   );
 }

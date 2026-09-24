@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sparkles, Copy, Trash2 } from "lucide-react";
 import { PLATFORMS, ADAPTATION_RULES, findMoments, adaptMoment, checkConsistency, type Moment } from "@/src/lib/package/platforms";
 import type { RepurposeKind } from "@/src/lib/package/types";
+import { GeminiAssist } from "@/src/components/intelligence/GeminiAssist";
 import { usePackaging } from "@/src/components/package/PackagingProvider";
 import { ApprovalFlow } from "@/src/components/package/approval";
 import { Select, Input, Textarea } from "@/src/components/ui/fields";
@@ -72,6 +73,21 @@ export function RepurposeWorkspace({ projectId, context }: { projectId: string; 
   }
 
   return (
+    <div className="space-y-4">
+    <GeminiAssist
+      task="repurpose-plan"
+      title="Repurpose with Gemini"
+      blurb="Writes ready-to-post Shorts scripts, a thread, a LinkedIn post, and a community post from this script."
+      disabledReason={context.sections.length === 0 ? "Write the script first — Gemini repurposes your real sections." : undefined}
+      context={{
+        source: context.sourceLabel,
+        hooks: context.hooks.map((h) => h.text),
+        sections: context.sections.map((s) => ({ heading: s.heading, text: s.text.slice(0, 700) })),
+        hashtags: context.hashtags,
+        cta: context.cta,
+        avoidWords: context.avoidWords.filter(Boolean),
+      }}
+    />
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-4 rounded-xl border border-border bg-surface p-5">
         <h3 className="text-sm font-semibold">1 · Pick a moment ({moments.length} found)</h3>
@@ -185,6 +201,7 @@ export function RepurposeWorkspace({ projectId, context }: { projectId: string; 
         )}
         <LocalStorageNote compact />
       </div>
+    </div>
     </div>
   );
 }

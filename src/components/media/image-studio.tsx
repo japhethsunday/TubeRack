@@ -57,7 +57,7 @@ export function ImageStudio({
   initialSceneId?: string;
 }) {
   const { addAsset, updateAsset, setApproval, assignScenes } = useMedia();
-  const [provider, setProvider] = useState("on-device");
+  const [provider, setProvider] = useState("ai-provider");
   const [sceneId, setSceneId] = useState(initialSceneId || scenes[0]?.id || "");
   const [title, setTitle] = useState("");
   const [styleId, setStyleId] = useState(POSTER_STYLES[0].id);

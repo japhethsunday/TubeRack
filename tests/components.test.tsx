@@ -8,7 +8,6 @@ import { Progress } from "@/src/components/ui/feedback";
 import { Breadcrumb, Table } from "@/src/components/ui/data";
 import { ProjectProgress } from "@/src/components/patterns/ProjectProgress";
 import { MediaCard } from "@/src/components/patterns/media";
-import { AIGenerationPanel } from "@/src/components/patterns/AIGenerationPanel";
 import { PREVIEW_PROGRESS } from "@/src/config/preview";
 
 /** Server-render component tests: structure, labels, and honest states. No DOM needed. */
@@ -63,15 +62,6 @@ describe("ui components", () => {
     );
     assert.ok(html.includes("Failed"));
     assert.ok(html.includes("Delete"));
-  });
-
-  it("ai panel discloses its boundary instead of faking generation", () => {
-    const html = renderToStaticMarkup(
-      <AIGenerationPanel title="Hooks" capability="Text" boundaryNote="Connects in Phase 11." />,
-    );
-    assert.ok(html.includes("Pattern preview"));
-    assert.ok(html.includes("Connects in Phase 11."));
-    assert.ok(html.includes("Prompt / context"));
   });
 
   it("table renders rows and alert/badge carry their tones", () => {

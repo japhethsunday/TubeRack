@@ -18,6 +18,10 @@ export const INTELLIGENCE_TASKS = [
   "retention-analysis",
   "content-gap-analysis",
   "brief-generation",
+  "thumbnail-concepts",
+  "repurpose-plan",
+  "platform-copy",
+  "storyboard-plan",
 ] as const;
 
 export type IntelligenceTaskType = (typeof INTELLIGENCE_TASKS)[number];
@@ -100,6 +104,34 @@ export const INTELLIGENCE_TASK_DEFS: Record<IntelligenceTaskType, IntelligenceTa
     blurb: "Assembles idea, audience, strategy, and DNA into a production brief.",
     usageKind: "text",
     route: "/intelligence/strategy",
+  },
+  "thumbnail-concepts": {
+    type: "thumbnail-concepts",
+    label: "Thumbnail concepts",
+    blurb: "Gemini thumbnail concepts: focal subject, text overlay, contrast, emotion.",
+    usageKind: "text",
+    route: "/studio/package?tab=thumbnail",
+  },
+  "repurpose-plan": {
+    type: "repurpose-plan",
+    label: "Repurposing",
+    blurb: "Ready-to-post clips, threads, and posts cut from the script.",
+    usageKind: "text",
+    route: "/studio/package?tab=repurpose",
+  },
+  "platform-copy": {
+    type: "platform-copy",
+    label: "Platform copy",
+    blurb: "Publish-ready titles, captions, and hashtags per platform.",
+    usageKind: "text",
+    route: "/studio/package?tab=platforms",
+  },
+  "storyboard-plan": {
+    type: "storyboard-plan",
+    label: "Storyboard",
+    blurb: "Shot-by-shot visuals, b-roll, on-screen text, and transitions per scene.",
+    usageKind: "text",
+    route: "/studio/storyboard",
   },
 };
 

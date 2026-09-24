@@ -15,6 +15,7 @@ import { Modal } from "@/src/components/ui/overlays";
 import { formatDuration } from "@/src/lib/script/measure";
 import { scenesFromSections, sceneNeedsReview, markSceneSynced, blankScene } from "@/src/lib/script/engine";
 import { cx } from "@/src/components/ui/cx";
+import { GeminiAssist } from "@/src/components/intelligence/GeminiAssist";
 
 export default function StoryboardPage() {
   return (
@@ -175,6 +176,16 @@ function Board() {
         />
       ) : (
         <>
+          <GeminiAssist
+            task="storyboard-plan"
+            title="Shot list with Gemini"
+            blurb="Turns every scene into filmable shots: framing, b-roll, on-screen text, sound cues, and transitions."
+            context={{
+              project: project.name,
+              topic: project.topic,
+              scenes: scenes.map((s) => ({ number: s.number, title: s.title, durationSec: s.durationSec, script: s.scriptText.slice(0, 600), visual: s.visual, onScreenText: s.onScreenText })),
+            }}
+          />
           <div>
             <p className="text-xs font-medium text-muted-text" id="timeline-label">Sequence timeline</p>
             <div className="mt-1.5 flex gap-1" role="img" aria-labelledby="timeline-label" aria-label={`${scenes.length} scenes, ${formatDuration(totalSec)} total`}>

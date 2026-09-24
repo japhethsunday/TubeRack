@@ -38,7 +38,7 @@ export function VoiceStudio({
   initialSourceId?: string;
 }) {
   const { voicesFor, defaultVoiceFor, saveVoice, removeVoice, addAsset, updateAsset, assetsFor } = useMedia();
-  const [provider, setProvider] = useState("on-device");
+  const [provider, setProvider] = useState("ai-provider");
   const [profileId, setProfileId] = useState<string>("");
   const [profileName, setProfileName] = useState("Narrator A");
   const [language, setLanguage] = useState("en-US");

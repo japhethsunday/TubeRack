@@ -17,13 +17,13 @@ import type { UsageKind } from "@/src/types/domain";
 const VALID_KINDS: UsageKind[] = ["text", "image", "video", "voice", "music", "render", "transcription", "research"];
 
 describe("intelligence tasks", () => {
-  it("registers ten provider-independent tasks with routes and usage kinds", () => {
-    assert.equal(INTELLIGENCE_TASKS.length, 10);
+  it("registers fourteen provider-independent tasks with routes and usage kinds", () => {
+    assert.equal(INTELLIGENCE_TASKS.length, 14);
     for (const t of INTELLIGENCE_TASKS) {
       const def = INTELLIGENCE_TASK_DEFS[t];
       assert.equal(def.type, t);
       assert.ok(def.label.length > 0 && def.blurb.length > 0, t);
-      assert.ok(def.route.startsWith("/intelligence"), t);
+      assert.ok(def.route.startsWith("/intelligence") || def.route.startsWith("/studio"), t);
       assert.ok(VALID_KINDS.includes(def.usageKind), t);
     }
   });

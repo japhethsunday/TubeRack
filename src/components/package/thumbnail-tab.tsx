@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, ImagePlus } from "lucide-react";
+import { Plus, ImagePlus, Sparkles } from "lucide-react";
+import { generateProviderImage } from "@/src/lib/ai-client";
+import { GeminiAssist } from "@/src/components/intelligence/GeminiAssist";
+import { DownloadButton } from "@/src/components/ui/DownloadButton";
+import { downloadStored, safeFileName } from "@/src/lib/download";
 import type { MediaAsset } from "@/src/lib/media/types";
 import { solidBase } from "@/src/lib/package/thumbnails";
 import { usePackaging } from "@/src/components/package/PackagingProvider";
@@ -15,6 +19,7 @@ import { Badge } from "@/src/components/ui/Badge";
 /** Downscale an upload to a data-URL base (real bytes embedded for export). */
 async function uploadToBase(url: string): Promise<string> {
   const img = new Image();
+  img.crossOrigin = "anonymous";
   img.src = url;
   await img.decode();
   const scale = Math.min(1, 1280 / img.naturalWidth);
@@ -47,6 +52,37 @@ export function ThumbnailTab({
   const [variantName, setVariantName] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [importingId, setImportingId] = useState<string | null>(null);
+  const [artPrompt, setArtPrompt] = useState("");
+  const [artBusy, setArtBusy] = useState(false);
+  const [artUrl, setArtUrl] = useState<string | null>(null);
+  const [artError, setArtError] = useState<string | null>(null);
+
+  const defaultArtPrompt = `Eye-catching YouTube thumbnail background for a video titled "${primaryTitle || context.title}". Bold focal subject, high contrast, clean negative space on one side for large text, no words or letters in the image.`;
+
+  async function generateArt() {
+    setArtBusy(true);
+    setArtError(null);
+    const outcome = await generateProviderImage(artPrompt.trim() || defaultArtPrompt, "16:9");
+    if (!outcome.ok) {
+      setArtError(outcome.message);
+      setArtBusy(false);
+      return;
+    }
+    setArtUrl(outcome.data.url);
+    try {
+      const svg = await uploadToBase(outcome.data.url);
+      const variant = addVariant(projectId, {
+        name: `Gemini art ${variants.length + 1}`,
+        baseKind: "upload",
+        baseSvg: svg,
+        overlays: [],
+      });
+      setSelectedId(variant.id);
+    } catch {
+      setArtError("The image was generated but could not be loaded into the editor. You can still download it below.");
+    }
+    setArtBusy(false);
+  }
 
   const variants = variantsFor(projectId);
   const selected = variants.find((v) => v.id === selectedId) ?? variants[0] ?? null;
@@ -102,6 +138,33 @@ export function ThumbnailTab({
 
   return (
     <div className="space-y-6">
+      <GeminiAssist
+        task="thumbnail-concepts"
+        title="Thumbnail concepts with Gemini"
+        blurb="Four distinct, honest thumbnail concepts built from this project's title, audience, and angle."
+        context={{ ...context, title: primaryTitle || context.title }}
+      />
+
+      <section aria-label="Gemini thumbnail art" className="space-y-3 rounded-xl border border-border bg-surface p-4">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <Input label="Thumbnail art prompt (Gemini image)" value={artPrompt} onChange={(e) => setArtPrompt(e.target.value)} placeholder={defaultArtPrompt} />
+          </div>
+          <Button loading={artBusy} onClick={() => void generateArt()}>
+            <Sparkles className="size-4" aria-hidden="true" /> Generate art
+          </Button>
+        </div>
+        <p className="text-xs text-muted-text">Generates a real 16:9 image with Gemini and opens it as a new variant, ready for your text overlays.</p>
+        {artError && <p role="alert" className="text-xs text-destructive">{artError}</p>}
+        {artUrl && (
+          <div className="ui-panel flex flex-wrap items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL. */}
+            <img src={artUrl} alt="Gemini thumbnail art" className="aspect-video w-60 rounded-lg border border-border object-cover" />
+            <DownloadButton onDownload={() => downloadStored(artUrl, safeFileName(primaryTitle || "thumbnail", "png"))} />
+          </div>
+        )}
+      </section>
+
       <ConceptBuilder projectId={projectId} context={context} onUseConcept={(conceptId) => createVariant(conceptId)} />
 
       <section aria-label="New variant" className="rounded-xl border border-border bg-surface p-4">

@@ -29,7 +29,7 @@ export interface ProviderDef {
 export const PROVIDERS: ProviderDef[] = [
   {
     id: "on-device",
-    label: "On-device drafts",
+    label: "On-device (offline, no AI)",
     blurb: "SVG visuals, system-voice TTS, synthesized music/SFX. Free, instant, clearly labeled drafts.",
     available: true,
     unavailableReason: "",
