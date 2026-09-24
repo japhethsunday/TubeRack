@@ -32,6 +32,15 @@ function stamp(at?: string): string {
   return at ?? new Date().toISOString();
 }
 
+
+const FAILED_KEY = "tuberack:failed-media-downloads";
+const failedDownloads: Set<string> = (() => {
+  try {
+    return new Set<string>(typeof window === "undefined" ? [] : JSON.parse(sessionStorage.getItem(FAILED_KEY) ?? "[]"));
+  } catch {
+    return new Set<string>();
+  }
+})();
 export interface MediaContextValue {
   ready: boolean;
   assets: MediaAsset[];
@@ -174,6 +183,16 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   // multi-part cloud uploads made on another device (reassembled, then
   // cached on this device so they play offline next time).
   const fetching = useRef(new Set<string>());
+  const [, bumpFailed] = useState(0);
+  const markFailed = (id: string) => {
+    failedDownloads.add(id);
+    try {
+      sessionStorage.setItem(FAILED_KEY, JSON.stringify([...failedDownloads]));
+    } catch {
+      // storage unavailable; the in-memory set still stops retries in this tab
+    }
+    bumpFailed((n) => n + 1);
+  };
   const [downloads, setDownloads] = useState<Record<string, number>>({});
   useEffect(() => {
     if (!ready) return;
@@ -182,6 +201,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         a.status === "ready" &&
         !blobs.current.has(a.id) &&
         !fetching.current.has(a.id) &&
+        !failedDownloads.has(a.id) &&
         (a.source === "upload-session" || isChunked(a.payload) || (TIMED.has(a.kind) && isStoredUpload(a.payload))),
     );
     if (!missing.length) return;
@@ -200,6 +220,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
           blobs.current.set(a.id, { url: URL.createObjectURL(file), blob: file });
           setBlobVersion((v) => v + 1);
         } catch (error) {
+          // A missing file won't appear by retrying; don't request it again this session.
+          markFailed(a.id);
           console.error("media download failed:", error instanceof Error ? error.message : error);
         } finally {
           fetching.current.delete(a.id);
