@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sharedLimit } from "@/src/server/shared-limit";
 import { z } from "zod";
 import { getDb } from "@/src/server/db";
 import { hashToken, randomToken } from "@/src/server/crypto";
@@ -14,6 +15,8 @@ export async function POST(request: Request) {
     const limit = limiterFor("auth").take(`auth:${clientKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const body = await parseBody(request, z.object({ email: emailSchema }));
+    await sharedLimit(`forgot:${clientKey(request)}`, 10, 3600);
+    await sharedLimit(`forgot:email:${body.email.toLowerCase()}`, 3, 3600);
     const db = getDb();
     if (!db) throw backendUnavailable("Database");
 

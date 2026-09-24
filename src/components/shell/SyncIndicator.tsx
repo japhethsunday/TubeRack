@@ -8,6 +8,13 @@ import { onSyncStatus, syncStatus } from "@/src/lib/sync";
 export function SyncIndicator() {
   const status = useSyncExternalStore(onSyncStatus, syncStatus, () => "idle" as const);
   if (status === "idle") return null;
+  if (status === "too-large") {
+    return (
+      <span role="alert" title="Some changes are too large to save to your account (usually many uploaded thumbnail images). They're kept on this device." className="hidden items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive sm:inline-flex">
+        <CloudOff className="size-3.5" aria-hidden="true" /> Some changes not synced
+      </span>
+    );
+  }
   const retrying = status === "retrying";
   return (
     <span

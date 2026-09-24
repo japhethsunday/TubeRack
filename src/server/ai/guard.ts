@@ -1,4 +1,5 @@
 import { getDb } from "@/src/server/db";
+import { sharedLimit } from "@/src/server/shared-limit";
 import { requireUser, type SessionUser } from "@/src/server/auth";
 import { requireMembership } from "@/src/server/authz";
 import { defaultWorkspace } from "@/src/server/sync";
@@ -23,6 +24,8 @@ export async function guardProviderCall(): Promise<ProviderCaller> {
   const user = await requireUser();
   const limit = limiterFor("expensive").take(`expensive:${user.id}`);
   if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
+  // Hard cap across all instances: protects Gemini/YouTube quota and cost.
+  await sharedLimit(`ai:${user.id}`, 300, 3600);
   const workspaceId = await defaultWorkspace(user);
   await requireMembership(workspaceId, user, "editor");
   return { user, workspaceId };

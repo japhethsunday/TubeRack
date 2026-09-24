@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { sharedLimit } from "@/src/server/shared-limit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/src/server/db";
@@ -15,12 +16,18 @@ const loginSchema = z.object({
   password: z.string().min(1, "Enter your password."),
 });
 
+// A valid scrypt hash of a random string, used to equalize timing.
+const DUMMY_HASH = "scrypt$00000000000000000000000000000000$" + "0".repeat(128);
+
 /** POST /api/v1/auth/login — generic failure message (no account oracle). */
 export async function POST(request: Request) {
   try {
     const limit = limiterFor("auth").take(`auth:${clientKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const body = await parseBody(request, loginSchema);
+    // Shared across all server instances: per IP and per account.
+    await sharedLimit(`login:${clientKey(request)}`, 30, 15 * 60);
+    await sharedLimit(`login:email:${body.email.toLowerCase()}`, 10, 15 * 60);
     const db = getDb();
     if (!db) throw backendUnavailable("Database");
 
@@ -30,7 +37,11 @@ export async function POST(request: Request) {
     `;
     const row = rows[0] as Record<string, unknown> | undefined;
     const fail = unauthorized("Email or password is incorrect.");
-    if (!row || row.status !== "active") throw fail;
+    if (!row || row.status !== "active") {
+      // Same work as a real check so response time doesn't reveal which emails exist.
+      await verifyPassword(body.password, DUMMY_HASH);
+      throw fail;
+    }
     const ok = await verifyPassword(body.password, String(row.password_hash));
     if (!ok) throw fail;
 

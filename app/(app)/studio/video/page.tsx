@@ -1,5 +1,6 @@
 "use client";
 
+import { sanitizeSvg } from "@/src/lib/security/svg";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Undo2, Redo2, Wand2, Camera, UploadCloud, Film, Plus, Clipboard, ClipboardPaste } from "lucide-react";
@@ -330,7 +331,7 @@ function Studio() {
     if (clip.kind === "image" && clip.assetId) {
       const asset = assets.find((a) => a.id === clip.assetId);
       if (asset?.source === "local-draft" && asset.payload.startsWith("<svg")) {
-        return <span aria-hidden="true" className="h-8 w-12 shrink-0 overflow-hidden rounded [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: asset.payload }} />;
+        return <span aria-hidden="true" className="h-8 w-12 shrink-0 overflow-hidden rounded [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: sanitizeSvg(asset.payload) }} />;
       }
     }
     return null;

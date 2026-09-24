@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { sharedLimit } from "@/src/server/shared-limit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/src/server/db";
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
   try {
     const limit = limiterFor("auth").take(`auth:${clientKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
+    await sharedLimit(`signup:${clientKey(request)}`, 10, 3600);
     const body = await parseBody(request, signupSchema);
     const db = getDb();
     if (!db) throw backendUnavailable("Database");

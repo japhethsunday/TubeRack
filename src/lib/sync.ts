@@ -161,7 +161,7 @@ interface Pending {
 
 const queue = new Map<SyncKind, Pending>();
 const listeners = new Set<() => void>();
-let status: "idle" | "saving" | "retrying" = "idle";
+let status: "idle" | "saving" | "retrying" | "too-large" = "idle";
 
 function setStatus(next: typeof status) {
   if (status === next) return;
@@ -184,7 +184,7 @@ export function hasPendingPush(kind: SyncKind): boolean {
 }
 
 function refreshStatus() {
-  if (queue.size === 0) setStatus("idle");
+  if (queue.size === 0) setStatus(status === "too-large" ? "too-large" : "idle");
   else setStatus([...queue.values()].some((p) => p.attempt > 0) ? "retrying" : "saving");
 }
 
@@ -196,17 +196,25 @@ async function flush(kind: SyncKind) {
   p.inFlight = true;
   const body = p.body;
   let ok = false;
+  let fatal = false;
   try {
     const result = await pushBundle(kind, true, body);
     if (result) {
       ok = true;
       p.onResult?.(result);
     }
-  } catch {
-    ok = false;
+  } catch (error) {
+    // Payload too large or rejected as invalid: retrying the same body can't succeed.
+    fatal = error instanceof ApiError && (error.status === 413 || error.code === "VALIDATION_ERROR");
+    if (fatal) console.error(`sync ${kind} rejected:`, error instanceof Error ? error.message : error);
   }
   p.inFlight = false;
   const latest = queue.get(kind);
+  if (fatal && latest && latest.body === body) {
+    queue.delete(kind);
+    setStatus("too-large");
+    return;
+  }
   if (ok && latest && latest.body === body) {
     queue.delete(kind);
   } else if (latest) {

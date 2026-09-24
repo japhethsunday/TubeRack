@@ -6,7 +6,7 @@ import { storageSignedUrl } from "@/src/server/storage";
 import { limiterFor, clientKey } from "@/src/server/rate-limit";
 import { notFound, rateLimited, toErrorResponse, validationError } from "@/src/server/errors";
 
-const FILE = /^[0-9a-f-]{36}\.(png|jpg|gif|webp|mp4|webm|mp3|wav|ogg)$/;
+const FILE = /^[0-9a-f-]{36}\.(png|jpg|gif|webp|mp4|webm|mov|mp3|m4a|wav|ogg)$/;
 
 /** GET /api/v1/uploads/:file — owner-only; redirects to a 1-hour signed link (supports video seeking). */
 export async function GET(request: Request, { params }: { params: Promise<{ file: string }> }) {

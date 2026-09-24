@@ -1,5 +1,6 @@
 "use client";
 
+import { sanitizeSvg } from "@/src/lib/security/svg";
 import { useState } from "react";
 import { Plus, Trash2, Copy, Download, Check } from "lucide-react";
 import type { ThumbnailVariant, TextOverlay } from "@/src/lib/package/types";
@@ -180,6 +181,7 @@ export function VariantEditor({
     || baseOptions[0]?.svg
     || "";
   const composed = composeThumbnail(base, variant.overlays);
+  const safeComposed = sanitizeSvg(composed);
   const review = reviewThumbnail(variant.overlays);
   const pairing = reviewPairing(primaryTitle, variant.overlays.map((o) => o.text).join(" "));
 
@@ -200,7 +202,7 @@ export function VariantEditor({
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-3">
-        <div className="overflow-hidden rounded-xl border border-border [&>svg]:block [&>svg]:h-auto [&>svg]:w-full" role="img" aria-label={`Thumbnail variant: ${variant.name}`} dangerouslySetInnerHTML={{ __html: composed }} />
+        <div className="overflow-hidden rounded-xl border border-border [&>svg]:block [&>svg]:h-auto [&>svg]:w-full" role="img" aria-label={`Thumbnail variant: ${variant.name}`} dangerouslySetInnerHTML={{ __html: safeComposed }} />
         <div className="grid grid-cols-3 gap-2" aria-label="Preview sizes">
           {[
             { label: "Feed ~120px", width: 120 },
@@ -208,7 +210,7 @@ export function VariantEditor({
             { label: "Full", width: 320 },
           ].map((p) => (
             <figure key={p.label} className="rounded-lg border border-border bg-surface p-2">
-              <div className="mx-auto overflow-hidden rounded [&>svg]:block [&>svg]:h-auto [&>svg]:w-full" style={{ width: p.width }} dangerouslySetInnerHTML={{ __html: composed }} />
+              <div className="mx-auto overflow-hidden rounded [&>svg]:block [&>svg]:h-auto [&>svg]:w-full" style={{ width: p.width }} dangerouslySetInnerHTML={{ __html: safeComposed }} />
               <figcaption className="mt-1 text-center text-[11px] text-muted-text">{p.label}</figcaption>
             </figure>
           ))}
@@ -217,10 +219,10 @@ export function VariantEditor({
           <p className="text-xs font-medium">Surroundings check</p>
           <div className="mt-1.5 grid grid-cols-2 gap-2">
             <div className="rounded bg-white p-2" aria-label="On light">
-              <div className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: composed }} />
+              <div className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: safeComposed }} />
             </div>
             <div className="rounded bg-zinc-900 p-2" aria-label="On dark">
-              <div className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: composed }} />
+              <div className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: safeComposed }} />
             </div>
           </div>
         </div>

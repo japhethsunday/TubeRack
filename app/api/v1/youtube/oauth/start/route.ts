@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   try {
     await requireWorkspace("editor");
   } catch {
-    return NextResponse.redirect(`${origin}/login?next=/youtube`);
+    return NextResponse.redirect(`${origin}/login?returnTo=/youtube`);
   }
   if (!isOAuthConfigured()) {
     return NextResponse.redirect(`${origin}/youtube?error=${encodeURIComponent("Google sign-in is not configured yet (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).")}`);

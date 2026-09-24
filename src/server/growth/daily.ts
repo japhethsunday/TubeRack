@@ -1,4 +1,5 @@
 import { getDb } from "@/src/server/db";
+import { pruneSharedLimits } from "@/src/server/shared-limit";
 import { getServerEnv } from "@/src/lib/env";
 import { sendEmail, actionEmail } from "@/src/server/email";
 import { rotateDueTests } from "@/src/server/growth/abtests";
@@ -131,5 +132,6 @@ export async function runDaily() {
     reminders: await safe("reminders", calendarReminders),
     competitors: await safe("competitors", competitorAlerts),
     trends: await safe("trends", trendDigests),
+    housekeeping: await safe("housekeeping", pruneSharedLimits),
   };
 }

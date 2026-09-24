@@ -44,6 +44,8 @@ export async function PATCH(request: Request) {
     assertCanManageMembers(membership);
     if (target.user_id === user.id) throw forbidden("You cannot change your own role.");
     if ((body.role as string) === "owner") throw forbidden("Ownership transfers separately.");
+    // Only owners can change another owner's role.
+    if (target.role === "owner" && membership.role !== "owner") throw forbidden("Only an owner can change an owner's role.");
     if (target.role === "owner" && (body.role as string) !== "owner") {
       await lastOwnerGuard(target.workspace_id, target.id);
     }
@@ -74,6 +76,7 @@ export async function DELETE(request: Request) {
     if (!self) {
       const membership = await requireMembership(target.workspace_id, user, "member");
       assertCanManageMembers(membership);
+      if (target.role === "owner" && membership.role !== "owner") throw forbidden("Only an owner can remove an owner.");
     } else {
       await requireMembership(target.workspace_id, user, "viewer");
     }

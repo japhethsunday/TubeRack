@@ -25,6 +25,10 @@ export function createMemoryLimiter(options: { capacity: number; refillPerSecond
   return {
     take(key: string): RateLimitResult {
       const now = Date.now();
+      // Bound memory on long-lived instances: drop buckets idle > 10 minutes.
+      if (buckets.size > 10_000) {
+        for (const [k, b] of buckets) if (now - b.updatedAt > 600_000) buckets.delete(k);
+      }
       const bucket = buckets.get(key) ?? { tokens: options.capacity, updatedAt: now };
       const elapsed = Math.max(0, (now - bucket.updatedAt) / 1000);
       bucket.tokens = Math.min(options.capacity, bucket.tokens + elapsed * options.refillPerSecond);

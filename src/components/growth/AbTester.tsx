@@ -12,6 +12,32 @@ import { cx } from "@/src/components/ui/cx";
 const full = new Intl.NumberFormat("en");
 const STATUS_TONE = { draft: "neutral", running: "info", completed: "ok", stopped: "warn" } as const;
 
+/** Re-encode any image as a YouTube-ready 1280×720 JPEG (≤ ~1 MB). */
+async function toThumbnailJpeg(file: File): Promise<File> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = 1280;
+    canvas.height = 720;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas unavailable.");
+    const k = Math.max(1280 / img.naturalWidth, 720 / img.naturalHeight);
+    const w = img.naturalWidth * k;
+    const h = img.naturalHeight * k;
+    ctx.drawImage(img, (1280 - w) / 2, (720 - h) / 2, w, h);
+    for (const q of [0.9, 0.8, 0.7, 0.6]) {
+      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", q));
+      if (blob && (blob.size <= 1_000_000 || q === 0.6)) return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+    }
+    throw new Error("Encoding failed.");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 function NewTest({ videos, onCreated }: { videos: MyVideo[]; onCreated: (t: AbTest) => void }) {
   const [videoId, setVideoId] = useState(videos[0]?.id ?? "");
   const [rotate, setRotate] = useState("24");
@@ -20,12 +46,18 @@ function NewTest({ videos, onCreated }: { videos: MyVideo[]; onCreated: (t: AbTe
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  function addFiles(list: FileList | null) {
+  async function addFiles(list: FileList | null) {
     if (!list) return;
     const next = [...files];
     for (const f of Array.from(list)) {
       if (next.length >= 4) break;
-      next.push({ file: f, label: `Variant ${String.fromCharCode(65 + next.length)}`, url: URL.createObjectURL(f) });
+      // Normalize to a 1280×720 JPEG under ~1 MB so four variants fit in one request.
+      const file = await toThumbnailJpeg(f).catch(() => null);
+      if (!file) {
+        setError(`“${f.name}” isn't a readable image.`);
+        continue;
+      }
+      next.push({ file, label: `Variant ${String.fromCharCode(65 + next.length)}`, url: URL.createObjectURL(file) });
     }
     setFiles(next);
   }
@@ -87,7 +119,7 @@ function NewTest({ videos, onCreated }: { videos: MyVideo[]; onCreated: (t: AbTe
         {files.length < 4 && (
           <label className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-xs text-muted-text transition-colors hover:bg-muted">
             <ImagePlus className="size-5" aria-hidden="true" /> Add thumbnail
-            <input type="file" accept="image/jpeg,image/png" multiple className="sr-only" onChange={(e) => addFiles(e.target.files)} />
+            <input type="file" accept="image/jpeg,image/png" multiple className="sr-only" onChange={(e) => void addFiles(e.target.files)} />
           </label>
         )}
       </div>

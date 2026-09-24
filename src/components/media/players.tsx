@@ -1,5 +1,6 @@
 "use client";
 
+import { sanitizeSvg } from "@/src/lib/security/svg";
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, RotateCcw, Volume2 } from "lucide-react";
 import { stopSpeech } from "@/src/lib/media/audio";
@@ -296,7 +297,7 @@ export function DraftImage({ svg, title }: { svg: string; title: string }) {
       role="img"
       aria-label={`Draft visual: ${title}`}
       className="overflow-hidden rounded-lg border border-border [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-      dangerouslySetInnerHTML={{ __html: svg }}
+      dangerouslySetInnerHTML={{ __html: sanitizeSvg(svg) }}
     />
   );
 }
