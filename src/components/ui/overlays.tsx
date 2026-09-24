@@ -42,7 +42,7 @@ export function Modal({
       <div
         aria-hidden="true"
         onClick={onClose}
-        className="absolute inset-0 bg-black/50"
+        className="ui-overlay absolute inset-0 bg-black/50 backdrop-blur-sm"
       />
       <div
         ref={panelRef}
@@ -51,7 +51,7 @@ export function Modal({
         aria-label={title}
         tabIndex={-1}
         className={cx(
-          "relative max-h-[90vh] w-full overflow-y-auto rounded-xl border border-border bg-surface p-6 shadow-xl",
+          "ui-modal relative max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-border bg-elevated p-6 shadow-2xl",
           wide ? "max-w-2xl" : "max-w-md",
         )}
       >
@@ -99,7 +99,7 @@ export function Drawer({
       <div
         aria-hidden="true"
         onClick={onClose}
-        className="absolute inset-0 bg-black/50"
+        className="ui-overlay absolute inset-0 bg-black/50 backdrop-blur-sm"
       />
       <aside
         ref={panelRef}
@@ -107,7 +107,7 @@ export function Drawer({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="absolute right-0 top-0 flex h-full w-full max-w-sm flex-col border-l border-border bg-surface p-6 shadow-xl"
+        className="ui-drawer absolute right-0 top-0 flex h-full w-full max-w-sm flex-col border-l border-border bg-elevated p-6 shadow-2xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>

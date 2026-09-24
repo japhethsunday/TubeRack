@@ -6,7 +6,7 @@ type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-primary text-primary-foreground hover:opacity-90 active:opacity-80",
+    "bg-primary text-primary-foreground shadow-sm shadow-violet-900/20 hover:opacity-90 hover:shadow-md hover:shadow-violet-700/30 active:opacity-80",
   secondary: "bg-muted text-foreground hover:bg-border/60 active:bg-border",
   outline:
     "border border-border bg-surface text-foreground hover:bg-muted active:bg-muted",
@@ -44,7 +44,8 @@ export function Button({
       aria-busy={loading || undefined}
       className={cx(
         "inline-flex items-center justify-center gap-2 rounded-lg font-medium",
-        "transition-[opacity,background-color] duration-150",
+        "transition-[opacity,background-color,border-color,box-shadow,transform] duration-200 ease-out",
+        "hover:-translate-y-px active:translate-y-0 active:scale-[0.97] disabled:translate-y-0 disabled:scale-100",
         "disabled:cursor-not-allowed disabled:opacity-50",
         variants[variant],
         sizes[size],

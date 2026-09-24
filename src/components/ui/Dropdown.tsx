@@ -79,7 +79,7 @@ export function Dropdown({
         <ul
           role="listbox"
           aria-label={label}
-          className="absolute z-50 mt-1 min-w-44 rounded-lg border border-border bg-elevated p-1 shadow-lg"
+          className="ui-menu absolute z-50 mt-1 min-w-44 rounded-lg border border-border bg-elevated p-1 shadow-xl"
         >
           {options.map((o, i) => (
             <li key={o.id}>

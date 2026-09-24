@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { Container } from "@/src/components/ui/Container";
+import { AppBackdrop } from "@/src/components/shell/AppBackdrop";
 
 export default function NotFound() {
   return (
     <main id="main">
-      <Container className="py-14">
+      <AppBackdrop />
+      <Container className="ui-page py-14">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-text">
           404
         </p>

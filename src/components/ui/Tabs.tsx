@@ -51,7 +51,7 @@ export function Tabs({ tabs, defaultId }: { tabs: TabDef[]; defaultId?: string }
               tabIndex={selected ? 0 : -1}
               onClick={() => setActive(t.id)}
               className={cx(
-                "-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors duration-150",
+                "-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-[color,border-color] duration-200",
                 selected
                   ? "border-primary font-medium text-foreground"
                   : "border-transparent text-muted-text hover:text-foreground",
@@ -73,7 +73,9 @@ export function Tabs({ tabs, defaultId }: { tabs: TabDef[]; defaultId?: string }
         aria-labelledby={`${baseId}-tab-${active}`}
         className="pt-4"
       >
-        {current?.content}
+        <div key={active} className="ui-panel">
+          {current?.content}
+        </div>
       </div>
     </div>
   );

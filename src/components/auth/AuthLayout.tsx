@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Clapperboard, Sparkles, FileText, Search, Mic, CheckCircle2 } from "lucide-react";
+import { AppBackdrop } from "@/src/components/shell/AppBackdrop";
 
 const WORDS = ["scripts", "thumbnails", "voiceovers", "titles", "research", "videos"];
 const STAGES = [
@@ -132,10 +133,10 @@ export function AuthLayout({
   footer?: React.ReactNode;
 }) {
   return (
-    <main id="main" className="grid min-h-screen bg-background lg:grid-cols-[1.05fr_1fr]">
+    <main id="main" className="relative grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
+      <AppBackdrop />
       <BrandPanel />
       <div className="relative flex items-center justify-center overflow-hidden px-4 py-12 sm:px-8">
-        <div className="auth-blob pointer-events-none absolute -right-40 -top-40 size-96 rounded-full bg-violet-500/10 blur-3xl lg:hidden" />
         <div className="relative w-full max-w-md">
           <Link href="/" aria-label="TubeRack home" className="auth-rise flex items-center gap-2 lg:hidden">
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
@@ -150,7 +151,7 @@ export function AuthLayout({
             {subtitle}
           </p>
           <div
-            className="auth-rise mt-7 rounded-2xl border border-border bg-surface p-6 shadow-xl shadow-black/[0.04] sm:p-7"
+            className="auth-rise mt-7 rounded-2xl border border-border bg-surface p-6 shadow-xl shadow-violet-900/[0.08] backdrop-blur-xl sm:p-7"
             style={{ animationDelay: "180ms" }}
           >
             {children}

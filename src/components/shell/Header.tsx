@@ -45,7 +45,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
 
   return (
     <>
-      <div className="flex h-16 items-center gap-2 border-b border-border bg-surface px-4">
+      <div className="flex h-16 items-center gap-2 border-b border-border bg-surface px-4 backdrop-blur-xl">
         <span className="lg:hidden">
           <IconButton icon={Menu} label="Open navigation" onClick={onMenu} />
         </span>

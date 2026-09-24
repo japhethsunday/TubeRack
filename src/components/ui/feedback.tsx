@@ -26,7 +26,7 @@ export function Progress({
         className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"
       >
         <div
-          className="h-full rounded-full bg-primary transition-[width] duration-200"
+          className="h-full rounded-full bg-gradient-to-r from-fuchsia-500 via-violet-500 to-sky-400 transition-[width] duration-500 ease-out"
           style={{ width: `${clamped}%` }}
         />
       </div>
@@ -38,7 +38,7 @@ export function Skeleton({ className }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
-      className={cx("animate-pulse rounded-md bg-muted", className ?? "h-4 w-full")}
+      className={cx("ui-shimmer rounded-md", className ?? "h-4 w-full")}
     />
   );
 }

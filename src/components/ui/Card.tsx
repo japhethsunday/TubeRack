@@ -17,7 +17,7 @@ export function Card({
     <section
       aria-label={title}
       className={cx(
-        "rounded-xl border border-border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)]",
+        "ui-lift rounded-xl border border-border bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)]",
         spacing.cardPadding,
         className,
       )}

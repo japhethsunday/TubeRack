@@ -43,16 +43,16 @@ function Item({
   const Icon = item.icon;
 
   const cls = cx(
-    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors duration-150",
+    "group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-[color,background-color] duration-200",
     active
-      ? "bg-muted font-medium text-foreground"
+      ? "bg-muted font-medium text-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-gradient-to-b before:from-fuchsia-500 before:to-sky-400"
       : "text-muted-text hover:bg-muted/60 hover:text-foreground",
     item.status === "planned" && "cursor-not-allowed opacity-60",
   );
 
   const inner = (
     <>
-      <Icon className="size-4 shrink-0" aria-hidden="true" />
+      <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
       <span className="flex-1 truncate text-left">{item.label}</span>
       {item.status === "preview" && (
         <Badge tone="preview" className="px-1.5 py-0 text-[10px]">

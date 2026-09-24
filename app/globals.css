@@ -4,22 +4,24 @@
 
 :root {
   color-scheme: light;
-  --bg: #fafafa;
-  --fg: #18181b;
-  --surface: #ffffff;
+  /* Brand day palette — same system as the dark home page, on a light canvas. */
+  --bg: #f8f6fc;
+  --fg: #16111f;
+  --surface: rgba(255, 255, 255, 0.82);
   --elevated: #ffffff;
-  --muted: #f4f4f5;
-  --border: #e4e4e7;
-  --primary: #18181b;
-  --primary-fg: #fafafa;
-  --secondary: #f4f4f5;
+  --muted: #f1edf8;
+  --border: #e4dcf0;
+  --primary: #5b21b6;
+  --primary-fg: #ffffff;
+  --secondary: #f1edf8;
   --success: #15803d;
   --warning: #b45309;
   --destructive: #be123c;
   --info: #1d4ed8;
-  --muted-text: #52525b;
-  --disabled-text: #a1a1aa;
-  --ring: #18181b;
+  --muted-text: #5f5673;
+  --disabled-text: #a59cb8;
+  --ring: #7c3aed;
+  --grid-line: rgba(76, 29, 149, 0.06);
 }
 
 .dark {
@@ -27,7 +29,7 @@
   /* Brand night palette — matches the home page (#0b0714 violet-black). */
   --bg: #0b0714;
   --fg: #f5f3ff;
-  --surface: #120c1f;
+  --surface: rgba(18, 12, 31, 0.78);
   --elevated: #1a1229;
   --muted: #1d1530;
   --border: #2c2143;
@@ -41,6 +43,7 @@
   --muted-text: #a79cc4;
   --disabled-text: #5b4f78;
   --ring: #c4b5fd;
+  --grid-line: rgba(255, 255, 255, 0.05);
 }
 
 @theme inline {
@@ -188,14 +191,6 @@ body {
   mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
 }
 
-/* Dark app shell: a faint brand glow behind every page. */
-.dark body {
-  background-image:
-    radial-gradient(60rem 40rem at 110% -10%, rgba(139, 92, 246, 0.10), transparent 60%),
-    radial-gradient(50rem 36rem at -10% 110%, rgba(56, 189, 248, 0.06), transparent 60%);
-  background-attachment: fixed;
-}
-
 /* ---------- Home page motion ---------- */
 @keyframes home-orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes home-pulse-ring {
@@ -224,4 +219,79 @@ body {
 .reveal.is-visible { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; }
+}
+
+/* ================= App-wide motion system =================
+   Subtle, fast, and interruptible. The global reduced-motion rule above
+   collapses every animation and transition to ~0ms. */
+
+:root {
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+html { scroll-behavior: smooth; }
+body { transition: background-color 300ms var(--ease-out), color 300ms var(--ease-out); }
+
+/* Smooth state changes on every interactive element. */
+:where(a, button, [role="tab"], [role="menuitem"], [role="option"], summary, select, input, textarea) {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 180ms;
+  transition-timing-function: var(--ease-out);
+}
+:where(button, [role="button"]):not(:disabled):active { transform: scale(0.97); }
+
+@keyframes ui-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ui-page { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes ui-scale-in { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes ui-slide-right { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes ui-slide-left { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes ui-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes ui-tip { from { opacity: 0; transform: translate(-50%, 4px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes ui-shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+
+.ui-page { animation: ui-page 360ms var(--ease-out) both; }
+.ui-overlay { animation: ui-fade-in 200ms var(--ease-out) both; }
+.ui-modal { animation: ui-scale-in 260ms var(--ease-spring) both; }
+.ui-drawer { animation: ui-slide-right 300ms var(--ease-out) both; }
+.ui-drawer-left { animation: ui-slide-left 280ms var(--ease-out) both; }
+.ui-menu { animation: ui-pop 160ms var(--ease-out) both; transform-origin: top; }
+.ui-tip { animation: ui-tip 140ms var(--ease-out) both; }
+.ui-panel { animation: ui-fade-in 220ms var(--ease-out) both; }
+
+/* Cards: gentle lift on hover. */
+.ui-lift { transition: transform 220ms var(--ease-out), box-shadow 220ms var(--ease-out), border-color 220ms var(--ease-out); }
+.ui-lift:hover { transform: translateY(-2px); box-shadow: 0 10px 30px -12px rgba(91, 33, 182, 0.25); }
+.dark .ui-lift:hover { box-shadow: 0 12px 36px -14px rgba(139, 92, 246, 0.45); border-color: rgba(196, 181, 253, 0.28); }
+
+/* Loading skeleton shimmer. */
+.ui-shimmer {
+  background: linear-gradient(90deg, var(--muted) 0%, var(--border) 50%, var(--muted) 100%);
+  background-size: 200% 100%;
+  animation: ui-shimmer 1.4s linear infinite;
+}
+
+/* Brand backdrop grid, theme-aware (home page uses the dark variant). */
+.app-grid {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at top, black 20%, transparent 70%);
+}
+
+/* Clickable card links anywhere in the app lift on hover (no per-page edits). */
+a[class*="rounded-xl"][class*="border"],
+a[class*="rounded-2xl"][class*="border"] {
+  transition: transform 220ms var(--ease-out), box-shadow 220ms var(--ease-out), border-color 220ms var(--ease-out), background-color 220ms var(--ease-out);
+}
+a[class*="rounded-xl"][class*="border"]:hover,
+a[class*="rounded-2xl"][class*="border"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px -14px rgba(91, 33, 182, 0.3);
+}
+.dark a[class*="rounded-xl"][class*="border"]:hover,
+.dark a[class*="rounded-2xl"][class*="border"]:hover {
+  box-shadow: 0 12px 36px -14px rgba(139, 92, 246, 0.45);
+  border-color: rgba(196, 181, 253, 0.3);
 }
