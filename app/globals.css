@@ -46,6 +46,29 @@
   --grid-line: rgba(255, 255, 255, 0.05);
 }
 
+/* Video studio: neutral editing-suite palette (footage reads true against
+   grey, not tinted violet), cyan accent. Used with .dark on the studio root. */
+.studio-theme {
+  color-scheme: dark;
+  --bg: #0f0f11;
+  --fg: #ededf0;
+  --surface: #17171a;
+  --elevated: #202024;
+  --muted: #26262b;
+  --border: #2c2c31;
+  --primary: #22d3ee;
+  --primary-fg: #041316;
+  --secondary: #26262b;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --destructive: #f87171;
+  --info: #7dd3fc;
+  --muted-text: #9b9ba6;
+  --disabled-text: #55555e;
+  --ring: #22d3ee;
+  --grid-line: transparent;
+}
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);

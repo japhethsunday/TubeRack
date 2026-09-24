@@ -150,7 +150,7 @@ export function PublishButton({ source, prerendered, openSignal }: { source: Pub
         </a>
       )}
       <Button size="sm" onClick={() => setOpen(true)}>
-        <MonitorPlay className="size-4" aria-hidden="true" /> Publish to YouTube
+        <MonitorPlay className="size-4" aria-hidden="true" /> <span className="sm:hidden">Publish</span><span className="hidden sm:inline">Publish to YouTube</span>
       </Button>
       {open && <PublishDialog source={source} prerendered={prerendered ?? null} onClose={() => setOpen(false)} />}
     </>

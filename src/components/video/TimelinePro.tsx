@@ -161,6 +161,8 @@ export function TimelinePro({
   playing,
   locked,
   onToggleLock,
+  leading,
+  fill = false,
 }: {
   clips: TimelineClip[];
   tracks: TimelineTrack[];
@@ -187,6 +189,10 @@ export function TimelinePro({
   playing: boolean;
   locked: Set<string>;
   onToggleLock: (trackId: string) => void;
+  /** Extra controls placed at the start of the toolbar. */
+  leading?: React.ReactNode;
+  /** Fill the parent (studio layout) and hide empty secondary tracks. */
+  fill?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const laneRefs = useRef(new Map<string, HTMLDivElement>());
@@ -257,11 +263,15 @@ export function TimelinePro({
     window.addEventListener("pointerup", up);
   }
 
+  // Photos and video share visual lanes (main track or overlays), like CapCut.
+  const visual = (k: TimelineClip["kind"]) => k === "video" || k === "image";
+  const sameLane = (a: TimelineClip["kind"], b: TimelineClip["kind"]) => a === b || (visual(a) && visual(b));
+
   function trackAtY(clientY: number, kind: TimelineClip["kind"]): string | null {
     for (const [id, el] of laneRefs.current) {
       const r = el.getBoundingClientRect();
       const t = tracks.find((x) => x.id === id);
-      if (t && t.kind === kind && clientY >= r.top && clientY <= r.bottom && !locked.has(id)) return id;
+      if (t && sameLane(t.kind, kind) && clientY >= r.top && clientY <= r.bottom && !locked.has(id)) return id;
     }
     return null;
   }
@@ -325,9 +335,11 @@ export function TimelinePro({
   const btn = "flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
 
   return (
-    <section aria-label="Timeline" className="overflow-hidden rounded-xl border border-border bg-surface">
+    <section aria-label="Timeline" className={cx("overflow-hidden bg-surface", fill ? "flex h-full flex-col" : "rounded-xl border border-border")}>
       {/* Edit toolbar */}
-      <div className="flex flex-wrap items-center gap-0.5 border-b border-border px-2 py-1.5">
+      <div className={cx("flex items-center gap-0.5 border-b border-border px-2 py-1", fill ? "shrink-0 overflow-x-auto" : "flex-wrap py-1.5")}>
+        {leading}
+        {leading && <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />}
         <button type="button" className={btn} disabled={!selected} onClick={onSplit} title="Split at playhead (S)"><Scissors className="size-4" aria-hidden="true" /> Split</button>
         <button type="button" className={btn} disabled={!selected} onClick={onDuplicate} title="Duplicate (D)"><Copy className="size-4" aria-hidden="true" /> Duplicate</button>
         <button type="button" className={cx(btn, "hover:text-destructive")} disabled={!selected} onClick={onDelete} title="Delete (Del)"><Trash2 className="size-4" aria-hidden="true" /> Delete</button>
@@ -349,7 +361,7 @@ export function TimelinePro({
           <span className="mr-1 font-mono text-xs tabular-nums text-muted-text">{fmtRuler(playhead)}.{String(Math.floor((playhead % 1) * 100)).padStart(2, "0")}</span>
           <button type="button" onClick={onToggleSnap} aria-pressed={snap} title="Snapping" className={cx(btn, snap && "text-primary")}><Magnet className="size-4" aria-hidden="true" /></button>
           <button type="button" onClick={() => onZoom(Math.max(4, Math.round(pxPerSec / 1.4)))} aria-label="Zoom out" className={btn}><ZoomOut className="size-4" aria-hidden="true" /></button>
-          <input type="range" min={4} max={400} value={pxPerSec} onChange={(e) => onZoom(Number(e.target.value))} aria-label="Timeline zoom" className="w-24 accent-violet-500" />
+          <input type="range" min={4} max={400} value={pxPerSec} onChange={(e) => onZoom(Number(e.target.value))} aria-label="Timeline zoom" className="w-24 accent-cyan-400" />
           <button type="button" onClick={() => onZoom(Math.min(400, Math.round(pxPerSec * 1.4)))} aria-label="Zoom in" className={btn}><ZoomIn className="size-4" aria-hidden="true" /></button>
           <button
             type="button"
@@ -368,7 +380,7 @@ export function TimelinePro({
 
       <div
         ref={scrollRef}
-        className="relative max-h-[46vh] overflow-auto overscroll-contain bg-[color-mix(in_oklab,var(--color-surface)_92%,black)]"
+        className={cx("relative overflow-auto overscroll-contain bg-[color-mix(in_oklab,var(--surface)_92%,black)]", fill ? "min-h-0 flex-1" : "max-h-[46vh]")}
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes("application/x-tuberack-asset")) e.preventDefault();
         }}
@@ -399,8 +411,8 @@ export function TimelinePro({
             </div>
           </div>
 
-          {/* Tracks */}
-          {tracks.map((track) => {
+          {/* Tracks (studio: main track + tracks that have clips) */}
+          {tracks.filter((track, i) => !fill || track.kind === "video" && tracks.findIndex((t) => t.kind === "video") === i || clips.some((c) => c.trackId === track.id)).map((track) => {
             const Icon = KIND_ICON[track.kind];
             const h = TRACK_H[track.kind];
             const isLocked = locked.has(track.id);
@@ -457,7 +469,7 @@ export function TimelinePro({
                           className={cx(
                             "group absolute top-1 bottom-1 cursor-grab select-none overflow-hidden rounded-md border text-white shadow-sm transition-[box-shadow] active:cursor-grabbing",
                             KIND_STYLE[clip.kind],
-                            isSel && "ring-2 ring-white ring-offset-1 ring-offset-violet-500",
+                            isSel && "ring-2 ring-cyan-400 ring-offset-1 ring-offset-black",
                             clip.muted && "opacity-60",
                             drag?.id === clip.id && "z-10 shadow-xl",
                           )}
@@ -493,7 +505,7 @@ export function TimelinePro({
           {snapLine !== null && <div className="pointer-events-none absolute bottom-0 top-7 z-30 w-px bg-amber-300" style={{ left: HEADER_W + snapLine * pxPerSec }} aria-hidden="true" />}
         </div>
       </div>
-      <p className="flex flex-wrap items-center gap-x-3 border-t border-border px-3 py-1.5 text-[11px] text-muted-text">
+      <p className={cx("flex-wrap items-center gap-x-3 border-t border-border px-3 py-1 text-[11px] text-muted-text", fill ? "hidden shrink-0 md:flex" : "flex")}>
         <span>Drag clips to move (across tracks) · drag edges to trim</span>
         <span>Space play · S split · Del delete · ⌘C/⌘V · ⌘+wheel zoom</span>
         <Plus className="hidden" aria-hidden="true" />

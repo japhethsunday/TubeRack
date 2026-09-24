@@ -1,5 +1,6 @@
 "use client";
 
+import { defaultFit } from "@/src/lib/video/compositor";
 import { useState } from "react";
 import { ChevronDown, RotateCcw, FlipHorizontal2, FlipVertical2, Scissors, Copy, Trash2, Rewind } from "lucide-react";
 import type { ClipFilters, ClipTransform, TextStyle, TimelineClip, TimelineTrack } from "@/src/lib/video/types";
@@ -47,7 +48,7 @@ function Slider({ label, value, min, max, step = 1, onChange, format, onReset, n
           )}
         </span>
       </span>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="mt-1 w-full accent-violet-500" aria-label={label} />
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="mt-1 w-full accent-cyan-400" aria-label={label} />
     </label>
   );
 }
@@ -181,7 +182,7 @@ export function ClipInspector({
             <button type="button" onClick={() => onPatch({ transform: IDENTITY_TRANSFORM })} className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-text hover:bg-muted hover:text-foreground"><RotateCcw className="size-3" aria-hidden="true" /> Reset</button>
           </div>
           {isMedia && (
-            <Pick label="Fit" value={clip.fit ?? (clip.kind === "image" ? "cover" : "contain")} options={[["contain", "Fit (letterbox)"], ["cover", "Fill (crop to frame)"], ["fill", "Stretch"]] as const} onChange={(fit) => onPatch({ fit })} />
+            <Pick label="Fit" value={defaultFit(clip)} options={[["contain", "Fit (letterbox)"], ["cover", "Fill (crop to frame)"], ["fill", "Stretch"]] as const} onChange={(fit) => onPatch({ fit })} />
           )}
         </Section>
       )}

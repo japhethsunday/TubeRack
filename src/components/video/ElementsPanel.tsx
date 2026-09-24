@@ -1,5 +1,6 @@
 "use client";
 
+import { BLUR_BACKGROUND } from "@/src/lib/video/compositor";
 import type { TextStyle } from "@/src/lib/video/types";
 
 const STICKERS = ["🔥", "⭐", "👉", "✅", "❌", "💡", "🎯", "🚀", "💰", "❤️", "😂", "😮", "👀", "📌", "⚠️", "🎉", "👍", "🤯"];
@@ -48,12 +49,15 @@ export function ElementsPanel({
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-text">Background</p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <button type="button" onClick={() => onBackground(BLUR_BACKGROUND)} aria-pressed={background === BLUR_BACKGROUND} className={`h-7 rounded-full border-2 px-2.5 text-[11px] font-semibold ${background === BLUR_BACKGROUND ? "border-primary text-primary" : "border-border text-muted-text hover:text-foreground"}`}>
+            Blur
+          </button>
           {BACKGROUNDS.map((c) => (
-            <button key={c} type="button" onClick={() => onBackground(c)} aria-label={`Background ${c}`} aria-pressed={background === c} className="size-7 rounded-full border-2 transition-transform hover:scale-110" style={{ background: c, borderColor: background === c ? "var(--color-primary, #7c3aed)" : "transparent", boxShadow: "inset 0 0 0 1px rgba(128,128,128,0.4)" }} />
+            <button key={c} type="button" onClick={() => onBackground(c)} aria-label={`Background ${c}`} aria-pressed={background === c} className="size-7 rounded-full border-2 transition-transform hover:scale-110" style={{ background: c, borderColor: background === c ? "var(--primary)" : "transparent", boxShadow: "inset 0 0 0 1px rgba(128,128,128,0.4)" }} />
           ))}
-          <input type="color" value={background} onChange={(e) => onBackground(e.target.value)} aria-label="Custom background" className="h-7 w-9 rounded border border-border" />
+          <input type="color" value={background === BLUR_BACKGROUND ? "#000000" : background} onChange={(e) => onBackground(e.target.value)} aria-label="Custom background" className="h-7 w-9 rounded border border-border" />
         </div>
-        <p className="mt-1 text-[11px] text-muted-text">Shows behind every layer — visible around scaled or letterboxed media.</p>
+        <p className="mt-1 text-[11px] text-muted-text">Shows around media that doesn’t fill the frame. Blur uses a soft copy of the footage.</p>
       </div>
     </div>
   );

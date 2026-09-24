@@ -130,6 +130,24 @@ function sourceSize(src: VisualSource): { w: number; h: number } {
   return { w: src.width || 1, h: src.height || 1 };
 }
 
+/** Default fit when the user hasn't chosen one (shared with the inspector). */
+export function defaultFit(clip: Pick<TimelineClip, "fit" | "kind">, draft = false): "contain" | "cover" | "fill" {
+  return clip.fit ?? (draft ? "cover" : "contain");
+}
+
+/** Background mode "blur": the frame behind media is a blurred, dimmed copy of it (CapCut-style). */
+export const BLUR_BACKGROUND = "blur";
+
+/** Fill the frame with a blurred cover-scaled copy of the source. */
+function drawBlurBackdrop(ctx: CanvasRenderingContext2D, src: VisualSource, W: number, H: number) {
+  const { w, h } = sourceSize(src);
+  const k = Math.max(W / w, H / h) * 1.08;
+  ctx.save();
+  ctx.filter = `blur(${Math.round(W / 45)}px) brightness(0.62) saturate(1.15)`;
+  ctx.drawImage(src, (W - w * k) / 2, (H - h * k) / 2, w * k, h * k);
+  ctx.restore();
+}
+
 function drawMedia(ctx: CanvasRenderingContext2D, src: VisualSource, clip: TimelineClip, t: number, W: number, H: number, draft: boolean) {
   const { w: sw, h: sh } = sourceSize(src);
   const crop = clip.crop ?? { top: 0, right: 0, bottom: 0, left: 0 };
@@ -137,7 +155,7 @@ function drawMedia(ctx: CanvasRenderingContext2D, src: VisualSource, clip: Timel
   const cy = sh * crop.top;
   const cw = Math.max(1, sw * (1 - crop.left - crop.right));
   const ch = Math.max(1, sh * (1 - crop.top - crop.bottom));
-  const fit = clip.fit ?? (draft ? "cover" : "contain");
+  const fit = defaultFit(clip, draft);
   let dw = W;
   let dh = H;
   if (fit !== "fill") {
@@ -302,14 +320,22 @@ export function drawComposition(ctx: CanvasRenderingContext2D, comp: Composition
   ctx.save();
   ctx.globalAlpha = 1;
   ctx.filter = "none";
-  ctx.fillStyle = comp.canvas.background || "#000000";
+  const bg = comp.canvas.background ?? BLUR_BACKGROUND;
+  ctx.fillStyle = bg === BLUR_BACKGROUND ? "#000000" : bg || "#000000";
   ctx.fillRect(0, 0, W, H);
+  let backdropDone = bg !== BLUR_BACKGROUND;
   for (const clip of visualStack(comp, t)) {
     if (clip.kind === "text") drawText(ctx, clip, t, W, H);
     else if (clip.kind === "captions") drawCaption(ctx, clip, W, H);
     else {
       const src = o.sourceFor(clip);
-      if (src) drawMedia(ctx, src, clip, t, W, H, o.isDraft?.(clip) ?? false);
+      if (!src) continue;
+      // Bottom media layer: fill empty frame space with its own blurred copy.
+      if (!backdropDone) {
+        drawBlurBackdrop(ctx, src, W, H);
+        backdropDone = true;
+      }
+      drawMedia(ctx, src, clip, t, W, H, o.isDraft?.(clip) ?? false);
     }
   }
   ctx.restore();

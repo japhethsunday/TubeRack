@@ -35,6 +35,7 @@ export function Preview({
   fps = 30,
   onPlayingChange,
   selectedId,
+  variant = "card",
 }: {
   comp: Composition;
   segments: SceneSegment[];
@@ -45,6 +46,8 @@ export function Preview({
   fps?: number;
   onPlayingChange?: (playing: boolean) => void;
   selectedId?: string | null;
+  /** "viewer" fills its container (full-screen studio); "card" is a standalone block. */
+  variant?: "card" | "viewer";
 }) {
   const [playing, setPlaying] = useState(false);
   const [masterMuted, setMasterMuted] = useState(false);
@@ -390,41 +393,27 @@ export function Preview({
   const segment = sceneAt(segments, playhead);
   const empty = comp.clips.length === 0;
 
+  const viewer = variant === "viewer";
+  const iconBtn = "rounded-md p-1.5 text-zinc-300 transition-colors hover:bg-white/10 hover:text-white";
   return (
-    <section aria-label="Preview" className="overflow-hidden rounded-xl border border-border bg-surface">
-      <div ref={boxRef} className="bg-black">
-        <div className="relative flex items-center justify-center p-2 sm:p-3">
+    <section aria-label="Preview" className={cx("flex flex-col overflow-hidden", viewer ? "h-full bg-[#0b0b0d]" : "rounded-xl border border-border bg-black")}>
+      <div ref={boxRef} className="flex min-h-0 flex-1 flex-col bg-[#0b0b0d]">
+        <div className={cx("relative flex min-h-0 flex-1 items-center justify-center", viewer ? "p-4" : "p-2 sm:p-3")}>
           <canvas
             ref={canvasRef}
             width={PW}
             height={PH}
             onClick={toggle}
-            className="max-h-[62vh] w-full max-w-full cursor-pointer rounded-md bg-zinc-950 object-contain shadow-2xl"
-            style={{ aspectRatio: `${W} / ${H}` }}
+            className={cx("cursor-pointer bg-black shadow-[0_8px_40px_rgba(0,0,0,0.6)]", viewer ? "max-h-full max-w-full" : "max-h-[62vh] w-full max-w-full object-contain")}
+            style={viewer ? { width: "auto", height: "auto", aspectRatio: `${W} / ${H}` } : { aspectRatio: `${W} / ${H}` }}
             aria-label={`Preview frame at ${fmtTimecode(playhead, fps)}${segment ? `, scene ${segment.number}` : ""}`}
             role="img"
           />
           {empty && (
-            <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-zinc-400">Import a video or add clips to start editing</p>
+            <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-zinc-500">Import a video or add clips to start editing</p>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-zinc-800 px-3 py-2 text-zinc-200">
-          <button type="button" onClick={() => onPlayhead(0)} aria-label="Go to start" className="rounded-md p-1.5 hover:bg-zinc-800"><SkipBack className="size-4" aria-hidden="true" /></button>
-          <button type="button" onClick={() => onPlayhead(Math.max(0, playhead - 1 / fps))} aria-label="Previous frame" className="rounded-md p-1.5 hover:bg-zinc-800"><ChevronLeft className="size-4" aria-hidden="true" /></button>
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={playing ? "Pause (Space)" : "Play (Space)"}
-            aria-pressed={playing}
-            className="flex size-9 items-center justify-center rounded-full bg-white text-black transition-transform hover:scale-105 active:scale-95"
-          >
-            {playing ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4 translate-x-px" aria-hidden="true" />}
-          </button>
-          <button type="button" onClick={() => onPlayhead(Math.min(duration, playhead + 1 / fps))} aria-label="Next frame" className="rounded-md p-1.5 hover:bg-zinc-800"><ChevronRight className="size-4" aria-hidden="true" /></button>
-          <button type="button" onClick={() => onPlayhead(duration)} aria-label="Go to end" className="rounded-md p-1.5 hover:bg-zinc-800"><SkipForward className="size-4" aria-hidden="true" /></button>
-          <span className="ml-1 font-mono text-xs tabular-nums text-zinc-300" aria-live="off">
-            {fmtTimecode(playhead, fps)} <span className="text-zinc-500">/ {fmtTimecode(duration, fps)}</span>
-          </span>
+        {!viewer && (
           <input
             type="range"
             min={0}
@@ -436,27 +425,49 @@ export function Preview({
               spokenRef.current = null;
             }}
             aria-label="Seek"
-            className="mx-2 min-w-24 flex-1 accent-violet-500"
+            className="mx-3 accent-cyan-400"
           />
-          <button type="button" onClick={() => setLoop((l) => !l)} aria-pressed={loop} aria-label="Loop playback" className={cx("rounded-md p-1.5 hover:bg-zinc-800", loop && "text-violet-400")}>
-            <Repeat className="size-4" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMasterMuted((m) => !m);
-              if (!masterMuted) stopAudio();
-            }}
-            aria-label={masterMuted ? "Unmute" : "Mute"}
-            aria-pressed={masterMuted}
-            className="rounded-md p-1.5 hover:bg-zinc-800"
-          >
-            {masterMuted ? <VolumeX className="size-4" aria-hidden="true" /> : <Volume2 className="size-4" aria-hidden="true" />}
-          </button>
-          <input type="range" min={0} max={1} step={0.05} value={volume} onChange={(e) => setVolume(Number(e.target.value))} aria-label="Preview volume" className="w-20 accent-violet-500" />
-          <button type="button" onClick={() => boxRef.current?.requestFullscreen?.().catch(() => {})} aria-label="Fullscreen" className="rounded-md p-1.5 hover:bg-zinc-800">
-            <Maximize className="size-4" aria-hidden="true" />
-          </button>
+        )}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-white/5 px-3 py-1.5">
+          <span className="whitespace-nowrap font-mono text-[10px] tabular-nums text-zinc-300 sm:text-[11px]" aria-live="off">
+            {fmtTimecode(playhead, fps)} <span className="text-zinc-600">/ {fmtTimecode(duration, fps)}</span>
+          </span>
+          <div className="flex items-center gap-0.5">
+            <button type="button" onClick={() => onPlayhead(0)} aria-label="Go to start" className={iconBtn}><SkipBack className="size-4" aria-hidden="true" /></button>
+            <button type="button" onClick={() => onPlayhead(Math.max(0, playhead - 1 / fps))} aria-label="Previous frame" className={iconBtn}><ChevronLeft className="size-4" aria-hidden="true" /></button>
+            <button
+              type="button"
+              onClick={toggle}
+              aria-label={playing ? "Pause (Space)" : "Play (Space)"}
+              aria-pressed={playing}
+              className="mx-1 flex size-8 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10"
+            >
+              {playing ? <Pause className="size-5 fill-current" aria-hidden="true" /> : <Play className="size-5 translate-x-px fill-current" aria-hidden="true" />}
+            </button>
+            <button type="button" onClick={() => onPlayhead(Math.min(duration, playhead + 1 / fps))} aria-label="Next frame" className={iconBtn}><ChevronRight className="size-4" aria-hidden="true" /></button>
+            <button type="button" onClick={() => onPlayhead(duration)} aria-label="Go to end" className={iconBtn}><SkipForward className="size-4" aria-hidden="true" /></button>
+          </div>
+          <div className="flex items-center justify-end gap-0.5">
+            <button type="button" onClick={() => setLoop((l) => !l)} aria-pressed={loop} aria-label="Loop playback" className={cx(iconBtn, loop && "text-cyan-400")}>
+              <Repeat className="size-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMasterMuted((m) => !m);
+                if (!masterMuted) stopAudio();
+              }}
+              aria-label={masterMuted ? "Unmute" : "Mute"}
+              aria-pressed={masterMuted}
+              className={iconBtn}
+            >
+              {masterMuted ? <VolumeX className="size-4" aria-hidden="true" /> : <Volume2 className="size-4" aria-hidden="true" />}
+            </button>
+            <input type="range" min={0} max={1} step={0.05} value={volume} onChange={(e) => setVolume(Number(e.target.value))} aria-label="Preview volume" className="hidden w-16 accent-cyan-400 sm:block" />
+            <button type="button" onClick={() => boxRef.current?.requestFullscreen?.().catch(() => {})} aria-label="Fullscreen" className={iconBtn}>
+              <Maximize className="size-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </div>
     </section>

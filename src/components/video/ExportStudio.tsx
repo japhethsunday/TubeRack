@@ -177,7 +177,7 @@ export function ExportStudio({
             <span className="tabular-nums text-muted-text">{Math.round(progress.ratio * 100)}%{progress.eta !== undefined && ` · ${fmtTime(progress.eta)} left`}</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={Math.round(progress.ratio * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Export progress">
-            <div className="h-full rounded-full bg-gradient-to-r from-fuchsia-500 via-violet-500 to-sky-500 transition-[width] duration-300" style={{ width: `${progress.ratio * 100}%` }} />
+            <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-sky-500 transition-[width] duration-300" style={{ width: `${progress.ratio * 100}%` }} />
           </div>
           <Button size="sm" variant="outline" className="w-full" onClick={() => abort.current?.abort()}><X className="size-3.5" aria-hidden="true" /> Cancel export</Button>
           <p className="text-[11px] text-muted-text">Keep this tab open. You can keep working in other tabs.</p>

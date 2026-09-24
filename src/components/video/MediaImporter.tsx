@@ -169,6 +169,9 @@ export function MediaImporter({
     void next.reduce((p, j) => p.then(() => run(j)), Promise.resolve());
   }
 
+  // Compact (studio bin): finished imports are already tiles in the bin, so
+  // only in-flight, failed, duplicate, or device-only results are listed.
+  const shownJobs = compact ? jobs.filter((j) => j.state !== "done" || j.note) : jobs;
   return (
     <div className="space-y-2">
       <div
@@ -210,9 +213,9 @@ export function MediaImporter({
         />
       </div>
 
-      {jobs.length > 0 && (
+      {shownJobs.length > 0 && (
         <ul className="space-y-1.5" aria-label="Imports">
-          {jobs.map((j) => {
+          {shownJobs.map((j) => {
             const Icon = j.kind ? KIND_ICON[j.kind] : Film;
             return (
               <li key={j.id} className="ui-panel rounded-lg border border-border bg-surface p-2">

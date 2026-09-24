@@ -2,8 +2,9 @@
 
 import { useMedia } from "@/src/components/media/MediaProvider";
 import { isChunked } from "@/src/lib/media/chunked";
-import { useState } from "react";
-import { Film, ImagePlus, Type, Captions, AlertTriangle, CheckCircle2, OctagonX, Download } from "lucide-react";
+import { useEffect, useState } from "react";
+import { filmstripFor } from "@/src/lib/video/media-cache";
+import { Film, ImagePlus, Music2, Plus, Type, Captions, AlertTriangle, CheckCircle2, OctagonX, Download } from "lucide-react";
 import type { SceneSegment } from "@/src/lib/video/build";
 import { durationOf } from "@/src/lib/video/build";
 import type { MediaAsset } from "@/src/lib/media/types";
@@ -66,57 +67,90 @@ export function ScenesPanel({
   );
 }
 
-/** Approved-asset browser: add to playhead (keyboard path) or drag to timeline. */
+/** First frame (video) or the image itself, loaded lazily for bin tiles. */
+function BinThumb({ url, kind }: { url: string | null; kind: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    if (kind === "image") return;
+    let alive = true;
+    void filmstripFor(url).then((f) => alive && f?.frames[0] && setSrc(f.frames[0]));
+    return () => {
+      alive = false;
+    };
+  }, [url, kind]);
+  const shown = kind === "image" ? url : src;
+  if (shown) return <img src={shown} alt="" className="absolute inset-0 size-full object-cover" draggable={false} />;
+  const Icon = kind === "video" ? Film : kind === "image" ? ImagePlus : Music2;
+  return <Icon className="size-6 text-muted-text" aria-hidden="true" />;
+}
+
+const fmtDur = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+/** Media bin: thumbnail tiles — click to add at the playhead, or drag onto the timeline. */
 export function MediaPanel({
   assets,
   onAddAtPlayhead,
+  urlFor,
 }: {
   assets: MediaAsset[];
   onAddAtPlayhead: (asset: MediaAsset) => void;
+  /** Playable/viewable URL for thumbnails (null while unavailable). */
+  urlFor?: (asset: MediaAsset) => string | null;
 }) {
   const usable = assets.filter((a) => a.status === "ready" && a.source !== "provider-request");
   const [dragging, setDragging] = useState<string | null>(null);
   const { blobUrlFor, downloads } = useMedia();
   // Where the bytes are, so a clip never silently shows up blank.
   const availability = (a: MediaAsset): { text: string; warn: boolean } | null => {
-    if (a.id in downloads) return { text: `Downloading from your account… ${Math.round(downloads[a.id] * 100)}%`, warn: false };
+    if (a.id in downloads) return { text: `Downloading ${Math.round(downloads[a.id] * 100)}%`, warn: false };
     if (blobUrlFor(a.id)) return null;
-    if (a.source === "upload-session") return { text: "Only on the device it was imported on", warn: true };
-    if (isChunked(a.payload)) return { text: "Waiting to download…", warn: false };
+    if (a.source === "upload-session") return { text: "On another device", warn: true };
+    if (isChunked(a.payload)) return { text: "Waiting to download", warn: false };
     return null;
   };
   if (usable.length === 0) {
-    return <EmptyState title="No placeable media" body="Generated media, drafts, and uploads appear here once they are ready." />;
+    return <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-text">Your imported clips, photos, and audio appear here.</p>;
   }
   return (
-    <ul className="space-y-1.5" aria-label="Placeable media">
-      {usable.slice(0, 30).map((a) => (
-        <li
-          key={a.id}
-          draggable
-          onDragStart={(e) => {
-            e.dataTransfer.setData("application/x-tuberack-asset", a.id);
-            e.dataTransfer.effectAllowed = "copy";
-            setDragging(a.id);
-          }}
-          onDragEnd={() => setDragging(null)}
-          className={cx("flex items-center justify-between gap-2 rounded-lg border border-border p-2.5", dragging === a.id && "opacity-50")}
-        >
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-medium">{a.title}</span>
-            <span className="block text-[11px] text-muted-text">{a.kind} · {a.source === "local-draft" ? "draft" : "upload"}{a.durationSec ? ` · ${a.durationSec.toFixed(1)}s` : ""}</span>
-            {(() => {
-              const where = availability(a);
-              return where && <span className={cx("block text-[11px]", where.warn ? "text-warning" : "text-primary")}>{where.text}</span>;
-            })()}
-          </span>
-          <Button size="sm" variant="outline" onClick={() => onAddAtPlayhead(a)}>
-            <ImagePlus className="size-3.5" aria-hidden="true" />
-            Add
-          </Button>
-        </li>
-      ))}
-      {usable.length > 30 && <li className="text-xs text-muted-text">Showing 30 of {usable.length} — refine in the Media Studio.</li>}
+    <ul className="grid grid-cols-2 gap-2" aria-label="Media bin">
+      {usable.slice(0, 60).map((a) => {
+        const where = availability(a);
+        const url = urlFor?.(a) ?? null;
+        return (
+          <li
+            key={a.id}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData("application/x-tuberack-asset", a.id);
+              e.dataTransfer.effectAllowed = "copy";
+              setDragging(a.id);
+            }}
+            onDragEnd={() => setDragging(null)}
+            className={cx("group min-w-0", dragging === a.id && "opacity-50")}
+          >
+            <button
+              type="button"
+              onClick={() => onAddAtPlayhead(a)}
+              title={`Add ${a.title} at the playhead`}
+              className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-md bg-muted ring-1 ring-border transition-shadow hover:ring-2 hover:ring-primary"
+            >
+              <BinThumb url={where ? null : url} kind={a.kind === "video" || a.kind === "image" ? a.kind : "audio"} />
+              {a.durationSec ? (
+                <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 font-mono text-[10px] tabular-nums text-white">{fmtDur(a.durationSec)}</span>
+              ) : null}
+              <span className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow transition-opacity group-hover:opacity-100" aria-hidden="true">
+                <Plus className="size-3.5" />
+              </span>
+              {where && (
+                <span className={cx("absolute inset-x-0 bottom-0 bg-black/75 px-1.5 py-0.5 text-left text-[10px]", where.warn ? "text-amber-300" : "text-cyan-300")}>{where.text}</span>
+              )}
+            </button>
+            <p className="mt-1 truncate text-[11px] text-muted-text" title={a.title}>{a.title}</p>
+          </li>
+        );
+      })}
+      {usable.length > 60 && <li className="col-span-2 text-xs text-muted-text">Showing 60 of {usable.length} — manage all media in the Media Studio.</li>}
     </ul>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
+import { BLUR_BACKGROUND } from "@/src/lib/video/compositor";
 import { isChunked } from "@/src/lib/media/chunked";
 import { sanitizeSvg } from "@/src/lib/security/svg";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Undo2, Redo2, Wand2, Camera, UploadCloud, Film, Plus, Clipboard, ClipboardPaste } from "lucide-react";
+import { Undo2, Redo2, Wand2, Plus, Clipboard, ClipboardPaste, ArrowLeft, Download, FolderOpen, Type, Shapes, LayoutList, SlidersHorizontal, X } from "lucide-react";
 import { useProjects, LocalStorageNote } from "@/src/components/projects/ProjectsProvider";
 import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { useScripts } from "@/src/components/script/ScriptProvider";
@@ -28,12 +29,13 @@ import { EmptyState } from "@/src/components/ui/states";
 import { LoadingState } from "@/src/components/ui/feedback";
 import { Tabs } from "@/src/components/ui/Tabs";
 import { Modal } from "@/src/components/ui/overlays";
+import { Portal } from "@/src/components/ui/Portal";
 import { Input } from "@/src/components/ui/fields";
 import { newTrack, sceneSegments, buildFromScenes, captionsFromNarration, durationOf, validateComposition, healthOf } from "@/src/lib/video/build";
 import { moveClip, trimClip, splitClipAt, deleteClip, duplicateClip, addClip, snapTime, snapCandidates, pasteClips, maxDurationFor } from "@/src/lib/video/ops";
 import { presetById, textPresetById, brandedTitleStyle } from "@/src/lib/video/presets";
 import type { MediaAsset } from "@/src/lib/media/types";
-import type { TimelineClip } from "@/src/lib/video/types";
+import type { Composition, TimelineClip } from "@/src/lib/video/types";
 import { cx } from "@/src/components/ui/cx";
 
 export default function VideoStudioPage() {
@@ -86,6 +88,23 @@ function Studio() {
   const [lastExport, setLastExport] = useState<(Prerendered & { exp: FinishedExport }) | null>(null);
   const [publishSignal, setPublishSignal] = useState(0);
   const [rightTab, setRightTab] = useState("inspector");
+  // The studio is a full-screen workspace: stop the page behind it scrolling.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    // Dialogs (publish, export, confirmations) mount outside the studio
+    // tree: theme the document while the studio is open.
+    const root = document.documentElement;
+    const wasDark = root.classList.contains("dark");
+    root.classList.add("dark", "studio-theme");
+    return () => {
+      document.body.style.overflow = prev;
+      root.classList.remove("studio-theme");
+      if (!wasDark) root.classList.remove("dark");
+    };
+  }, []);
+  // Phone layout: which bottom sheet is open.
+  const [sheet, setSheet] = useState<null | "media" | "text" | "elements" | "edit" | "tools">(null);
   const [presetId, setPresetId] = useState("youtube");
   const [quality, setQuality] = useState("Standard");
   const [fps, setFps] = useState("30");
@@ -117,6 +136,8 @@ function Studio() {
   const selectedClip = comp?.clips.find((c) => c.id === selectedClipId) ?? null;
 
   // Clipboard + in/out marks, bound after the project loads (see actionsRef below).
+  // Newest timeline + frame, for callbacks created on earlier renders.
+  const latest = useRef<{ clips: TimelineClip[]; canvas: Composition["canvas"] }>({ clips: [], canvas: {} as Composition["canvas"] });
   const actionsRef = useRef<{ copy: () => void; paste: () => void; markIn: () => void; markOut: () => void; clearMarks: () => void } | null>(null);
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -205,13 +226,25 @@ function Studio() {
     const a = assets.find((x) => x.id === assetId);
     return a ? { kind: a.kind, source: a.source, payload: a.payload, mime: a.mime, title: a.title, blobUrl: mediaApi.blobUrlFor(a.id) } : null;
   };
+  latest.current = { clips, canvas };
+  /** Viewable URL for an asset's bytes (device copy first), or null while unavailable. */
+  const mediaUrl = (a: MediaAsset): string | null => {
+    const local = mediaApi.blobUrlFor(a.id);
+    if (local) return local;
+    return a.source === "provider-output" && !isChunked(a.payload) && /^(https?:|\/)/.test(a.payload) ? a.payload : null;
+  };
   const trackFor = (kind: TimelineClip["kind"]) => tracks.find((t) => t.kind === kind)?.id ?? `track_${kind}`;
-  const endOf = (trackId: string) => clips.filter((c) => c.trackId === trackId).reduce((m, c) => Math.max(m, c.startSec + c.durationSec), 0);
+  const endOf = (trackId: string) => latest.current.clips.filter((c) => c.trackId === trackId).reduce((m, c) => Math.max(m, c.startSec + c.durationSec), 0);
 
   /** Place an asset on the timeline at a time (or appended to its track). */
   function placeAsset(asset: MediaAsset, at?: number, trackId?: string) {
+    // Imports finish one after another from callbacks created earlier:
+    // always build on the newest timeline, never a stale render's copy.
+    const clips = latest.current.clips;
+    const canvas = latest.current.canvas;
     const kind = asset.kind === "image" || asset.kind === "video" ? asset.kind : asset.kind === "voice" || asset.kind === "sfx" ? asset.kind : "music";
-    const tid = trackId ?? trackFor(kind);
+    // Imports go one after another on the main video track (photos too).
+    const tid = trackId ?? (kind === "image" ? trackFor("video") : trackFor(kind));
     const startSec = at ?? endOf(tid);
     const full = asset.durationSec && asset.durationSec > 0 ? asset.durationSec : kind === "image" ? 5 : 5;
     const seg = segments.find((s) => startSec >= s.startSec && startSec < s.startSec + s.durationSec);
@@ -236,7 +269,9 @@ function Studio() {
     if (kind === "video" && clips.length === 0 && asset.width && asset.height) {
       const vertical = asset.height > asset.width;
       const preset = presetById(vertical ? "shorts" : "youtube");
-      video.setCanvas(pid, { ...canvas, preset: preset.id, aspect: preset.aspect, width: preset.width, height: preset.height });
+      const nextCanvas = { ...canvas, preset: preset.id, aspect: preset.aspect, width: preset.width, height: preset.height };
+      video.setCanvas(pid, nextCanvas);
+      latest.current = { ...latest.current, canvas: nextCanvas };
     }
   }
 
@@ -261,7 +296,8 @@ function Studio() {
   }
 
   function commit(next: TimelineClip[]) {
-    video.commitClips(pid, clips, next);
+    video.commitClips(pid, latest.current.clips, next);
+    latest.current = { ...latest.current, clips: next };
   }
 
   function autoBuild() {
@@ -342,20 +378,6 @@ function Studio() {
 
   const leftPanel = (
     <div className="space-y-3">
-      <div className="flex gap-1 rounded-lg border border-border p-1" role="tablist" aria-label="Studio panels">
-        {(["media", "text", "elements", "scenes"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={leftTab === t}
-            onClick={() => setLeftTab(t)}
-            className={cx("h-8 flex-1 rounded-md text-xs font-medium capitalize", leftTab === t ? "bg-muted text-foreground" : "text-muted-text hover:text-foreground")}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
       {leftTab === "scenes" && (
         <ScenesPanel
           segments={segments}
@@ -370,13 +392,13 @@ function Studio() {
       )}
       {leftTab === "media" && (
         <div className="space-y-3">
-          <MediaImporter projectId={pid} onImported={(asset) => placeAsset(asset)} compact={assets.length > 0} />
-          <MediaPanel assets={assets} onAddAtPlayhead={addAssetAtPlayhead} />
+          <MediaImporter projectId={pid} onImported={(asset) => placeAsset(asset)} compact />
+          <MediaPanel assets={assets} onAddAtPlayhead={addAssetAtPlayhead} urlFor={mediaUrl} />
         </div>
       )}
       {leftTab === "elements" && (
         <ElementsPanel
-          background={canvas.background ?? "#000000"}
+          background={canvas.background ?? BLUR_BACKGROUND}
           onBackground={(background) => video.setCanvas(pid, { ...canvas, background })}
           onAddElement={(text, style, name) => {
             const next = addClip(clips, {
@@ -411,7 +433,7 @@ function Studio() {
 
   const rightPanel = (
     <div className="space-y-3">
-      <div className="flex gap-1 rounded-lg border border-border p-1" role="tablist" aria-label="Inspector panels">
+      <div className="-mx-3 -mt-3 mb-1 flex border-b border-border px-1" role="tablist" aria-label="Inspector panels">
         {(["inspector", "export"] as const).map((t) => (
           <button
             key={t}
@@ -419,7 +441,7 @@ function Studio() {
             role="tab"
             aria-selected={rightTab === t}
             onClick={() => setRightTab(t)}
-            className={cx("h-8 flex-1 rounded-md text-xs font-medium capitalize", rightTab === t ? "bg-muted text-foreground" : "text-muted-text hover:text-foreground")}
+            className={cx("-mb-px h-10 flex-1 border-b-2 text-xs font-semibold capitalize transition-colors", rightTab === t ? "border-primary text-foreground" : "border-transparent text-muted-text hover:text-foreground")}
           >
             {t}
           </button>
@@ -466,81 +488,149 @@ function Studio() {
     </div>
   );
 
-  return (
-    <div className="mx-auto w-full max-w-[1500px] space-y-4">
-      <Breadcrumb trail={[{ label: "Projects", href: "/projects" }, { label: project.name, href: `/projects/${project.id}` }, { label: "Video Studio" }]} />
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2">
-        <Camera className="size-4 text-muted-text" aria-hidden="true" />
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold">{project.name}</p>
-        <p className="hidden text-xs text-muted-text sm:block" aria-live="polite">
-          {video.savedAt ? `Saved on device · ${new Date(video.savedAt).toLocaleTimeString()}` : "Saving…"}
+  const publishSource = {
+    projectId: pid,
+    projectName: project.name,
+    topic: project.topic,
+    comp: composition,
+    duration,
+    fps: Number(fps) || 30,
+    health,
+    blockingIssues: issues.filter((i) => i.severity === "block").map((i) => i.message),
+    assetFor: renderAsset,
+    render: { ...sizeFor(composition, 1080), fps: Number(fps) || 30 },
+  };
+  const LEFT_TABS = [
+    { id: "media", label: "Media", icon: FolderOpen },
+    { id: "text", label: "Text", icon: Type },
+    { id: "elements", label: "Elements", icon: Shapes },
+    { id: "scenes", label: "Scenes", icon: LayoutList },
+  ] as const;
+  const saveLabel = video.savedAt ? `Saved ${new Date(video.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Saving…";
+
+  const topBar = (
+    <header className="flex h-12 shrink-0 items-center gap-1.5 border-b border-border bg-surface px-2 sm:px-3">
+      <Link href={`/projects/${project.id}`} aria-label="Back to project" className="flex size-8 items-center justify-center rounded-md text-muted-text hover:bg-muted hover:text-foreground">
+        <ArrowLeft className="size-4" aria-hidden="true" />
+      </Link>
+      <div className="min-w-0 flex-1 sm:flex-none">
+        <p className="truncate text-sm font-semibold sm:max-w-[260px]">{project.name}</p>
+        <p className="flex items-center gap-1 text-[10px] text-muted-text" aria-live="polite">
+          <span className={cx("size-1.5 rounded-full", video.savedAt ? "bg-emerald-400" : "bg-amber-400")} aria-hidden="true" />
+          <span className="sm:hidden">{video.savedAt ? "Saved" : "Saving…"}</span>
+          <span className="hidden sm:inline">{saveLabel}</span>
         </p>
-        <Button size="sm" variant="ghost" disabled={!video.canUndo(pid)} onClick={() => video.undo(pid)} title="Undo (Ctrl+Z)">
+      </div>
+      <div className="ml-1 hidden items-center sm:flex">
+        <button type="button" disabled={!video.canUndo(pid)} onClick={() => video.undo(pid)} title="Undo (Ctrl+Z)" aria-label="Undo" className="flex size-8 items-center justify-center rounded-md text-muted-text hover:bg-muted hover:text-foreground disabled:opacity-30">
           <Undo2 className="size-4" aria-hidden="true" />
-          <span className="sr-only">Undo</span>
-        </Button>
-        <Button size="sm" variant="ghost" disabled={!video.canRedo(pid)} onClick={() => video.redo(pid)} title="Redo (Ctrl+Shift+Z)">
+        </button>
+        <button type="button" disabled={!video.canRedo(pid)} onClick={() => video.redo(pid)} title="Redo (Ctrl+Shift+Z)" aria-label="Redo" className="flex size-8 items-center justify-center rounded-md text-muted-text hover:bg-muted hover:text-foreground disabled:opacity-30">
           <Redo2 className="size-4" aria-hidden="true" />
-          <span className="sr-only">Redo</span>
+        </button>
+      </div>
+      <div className="flex-1" />
+      {scenes.length > 0 && (
+        <Button size="sm" variant="ghost" title="Build the timeline from your storyboard scenes" onClick={() => (clips.length === 0 ? autoBuild() : setConfirmBuild(true))}>
+          <Wand2 className="size-4" aria-hidden="true" />
+          <span className="hidden md:inline">{clips.length === 0 ? "Build from scenes" : "Rebuild…"}</span>
+          <span className="sr-only md:hidden">Build from scenes</span>
         </Button>
-        <Button size="sm" variant="outline" onClick={() => setLeftTab("media")}>
-          <UploadCloud className="size-4" aria-hidden="true" /> Import
-        </Button>
-        {scenes.length > 0 && (
-          <Button size="sm" variant="ghost" onClick={() => (clips.length === 0 ? autoBuild() : setConfirmBuild(true))}>
-            <Wand2 className="size-4" aria-hidden="true" />
-            {clips.length === 0 ? "Build from scenes" : "Rebuild…"}
-          </Button>
-        )}
-        {clips.length > 0 && (
-          <Button size="sm" variant="outline" onClick={() => setRightTab("export")}>
-            <Film className="size-4" aria-hidden="true" /> Export
-          </Button>
-        )}
-        {clips.length > 0 && (
-          <PublishButton
-            source={{
-              projectId: pid,
-              projectName: project.name,
-              topic: project.topic,
-              comp: composition,
-              duration,
-              fps: Number(fps) || 30,
-              health,
-              blockingIssues: issues.filter((i) => i.severity === "block").map((i) => i.message),
-              assetFor: renderAsset,
-              render: { ...sizeFor(composition, 1080), fps: Number(fps) || 30 },
-            }}
-            prerendered={lastExport}
-            openSignal={publishSignal}
-          />
-        )}
-      </div>
-
-      {!isDesktop ? (
-      <div>
-        <Tabs
-          defaultId="preview"
-          tabs={[
-            { id: "preview", label: "Preview", content: PreviewBlock() },
-            { id: "timeline", label: "Timeline", content: TimelineBlock() },
-            { id: "media", label: "Media", content: leftPanel },
-            { id: "tools", label: "Tools", content: rightPanel },
-          ]}
-        />
-      </div>
-      ) : (
-
-      <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)_340px]">
-        <div>{leftPanel}</div>
-        <div className="min-w-0 space-y-4">
-          {PreviewBlock()}
-          {TimelineBlock()}
-        </div>
-        <div>{rightPanel}</div>
-      </div>
       )}
-      <VideoStorageNote />
+      {clips.length > 0 && (
+        <span className="hidden sm:block">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setRightTab("export");
+            setSheet("tools");
+          }}
+        >
+          <Download className="size-4" aria-hidden="true" /> Export
+        </Button>
+        </span>
+      )}
+      {clips.length > 0 && <PublishButton source={publishSource} prerendered={lastExport} openSignal={publishSignal} />}
+    </header>
+  );
+
+  return (
+    // Portal: the page-transition wrapper is transformed, which would trap a
+    // fixed full-screen layer inside it.
+    <Portal>
+    <div className="dark studio-theme fixed inset-0 z-[60] flex flex-col bg-background text-foreground">
+      {topBar}
+      {isDesktop ? (
+        <>
+          <div className="flex min-h-0 flex-1">
+            <nav aria-label="Studio panels" className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-border bg-surface py-2" role="tablist">
+              {LEFT_TABS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={leftTab === t.id}
+                  onClick={() => setLeftTab(t.id)}
+                  className={cx("flex w-14 flex-col items-center gap-1 rounded-md py-2 text-[10px] font-medium transition-colors", leftTab === t.id ? "bg-muted text-primary" : "text-muted-text hover:bg-muted/60 hover:text-foreground")}
+                >
+                  <t.icon className="size-5" aria-hidden="true" />
+                  {t.label}
+                </button>
+              ))}
+            </nav>
+            <aside aria-label={LEFT_TABS.find((t) => t.id === leftTab)?.label} className="w-[300px] shrink-0 overflow-y-auto border-r border-border bg-surface p-3">
+              {leftPanel}
+            </aside>
+            <main className="min-w-0 flex-1">{PreviewBlock("viewer")}</main>
+            <aside aria-label="Inspector" className="w-[320px] shrink-0 overflow-y-auto border-l border-border bg-surface p-3">
+              {rightPanel}
+            </aside>
+          </div>
+          <div className="isolate h-[36vh] min-h-[220px] shrink-0 border-t border-border">{TimelineBlock()}</div>
+        </>
+      ) : (
+        <>
+          <main className="isolate h-[42vh] shrink-0">{PreviewBlock("viewer")}</main>
+          <div className="isolate min-h-0 flex-1 border-t border-border">{TimelineBlock()}</div>
+          <nav aria-label="Studio tools" className="grid shrink-0 grid-cols-5 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]">
+            {([
+              { id: "media", label: "Import", icon: FolderOpen },
+              { id: "text", label: "Text", icon: Type },
+              { id: "elements", label: "Elements", icon: Shapes },
+              { id: "edit", label: "Edit", icon: SlidersHorizontal },
+              { id: "tools", label: "Export", icon: Download },
+            ] as const).map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  if (t.id === "media" || t.id === "text" || t.id === "elements") setLeftTab(t.id);
+                  if (t.id === "edit") setRightTab("inspector");
+                  if (t.id === "tools") setRightTab("export");
+                  setSheet(sheet === t.id ? null : t.id);
+                }}
+                aria-pressed={sheet === t.id}
+                className={cx("flex flex-col items-center gap-1 py-2 text-[10px] font-medium", sheet === t.id ? "text-primary" : "text-muted-text")}
+              >
+                <t.icon className="size-5" aria-hidden="true" />
+                {t.label}
+              </button>
+            ))}
+          </nav>
+          {sheet && (
+            <div className="absolute inset-x-0 bottom-0 z-30 flex max-h-[62vh] flex-col rounded-t-2xl border-t border-border bg-elevated shadow-[0_-12px_40px_rgba(0,0,0,0.5)]" role="dialog" aria-label="Studio panel">
+              <div className="flex shrink-0 items-center justify-between px-4 pb-1 pt-2">
+                <span className="mx-auto h-1 w-10 rounded-full bg-border" aria-hidden="true" />
+                <button type="button" onClick={() => setSheet(null)} aria-label="Close panel" className="absolute right-3 top-2 rounded-md p-1 text-muted-text hover:bg-muted hover:text-foreground">
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="min-h-0 overflow-y-auto p-3 pt-1">{sheet === "edit" || sheet === "tools" ? rightPanel : leftPanel}</div>
+            </div>
+          )}
+        </>
+      )}
 
       {confirmBuild && (
         <Modal title="Rebuild timeline?" description="Replaces every clip on the timeline." onClose={() => setConfirmBuild(false)}>
@@ -565,11 +655,13 @@ function Studio() {
         </Modal>
       )}
     </div>
+    </Portal>
   );
 
-  function PreviewBlock() {
+  function PreviewBlock(variant: "card" | "viewer" = "card") {
     return (
       <Preview
+        variant={variant}
         comp={{ ...composition, canvas }}
         segments={segments}
         duration={duration}
@@ -584,49 +676,51 @@ function Studio() {
   }
 
   function TimelineBlock() {
-    return (
-      <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <label className="flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1">
-          <Plus className="size-3.5 text-muted-text" aria-hidden="true" />
+    const tool = "flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-text transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40";
+    const leading = (
+      <>
+        <label className={tool} title="Add track">
+          <Plus className="size-4" aria-hidden="true" />
           <select
             value=""
             onChange={(e) => {
               if (e.target.value) addTrack(e.target.value as TimelineClip["kind"]);
             }}
             aria-label="Add track"
-            className="bg-transparent text-xs font-medium focus:outline-none"
+            className="w-4 cursor-pointer appearance-none bg-transparent text-transparent focus:outline-none"
           >
             <option value="">Add track</option>
-            <option value="video">Video track</option>
-            <option value="image">Image track</option>
+            <option value="video">Video / overlay track</option>
             <option value="text">Text track</option>
             <option value="music">Audio track</option>
             <option value="voice">Voice track</option>
             <option value="sfx">SFX track</option>
           </select>
         </label>
-        <button type="button" disabled={!selectedClipId} onClick={() => actionsRef.current?.copy()} title="Copy (Ctrl+C)" className="flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">
-          <Clipboard className="size-3.5" aria-hidden="true" /> Copy
+        <button type="button" disabled={!selectedClipId} onClick={() => actionsRef.current?.copy()} title="Copy (Ctrl+C)" aria-label="Copy" className={tool}>
+          <Clipboard className="size-4" aria-hidden="true" />
         </button>
-        <button type="button" disabled={!clipboard.length} onClick={() => actionsRef.current?.paste()} title="Paste at playhead (Ctrl+V)" className="flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">
-          <ClipboardPaste className="size-3.5" aria-hidden="true" /> Paste
+        <button type="button" disabled={!clipboard.length} onClick={() => actionsRef.current?.paste()} title="Paste at playhead (Ctrl+V)" aria-label="Paste" className={tool}>
+          <ClipboardPaste className="size-4" aria-hidden="true" />
         </button>
-        <button type="button" onClick={() => actionsRef.current?.markIn()} title="Mark in (I)" className="rounded-lg border border-border bg-surface px-2 py-1 font-medium transition-colors hover:bg-muted">In</button>
-        <button type="button" onClick={() => actionsRef.current?.markOut()} title="Mark out (O)" className="rounded-lg border border-border bg-surface px-2 py-1 font-medium transition-colors hover:bg-muted">Out</button>
+        <button type="button" onClick={() => actionsRef.current?.markIn()} title="Mark in (I)" className={tool}>In</button>
+        <button type="button" onClick={() => actionsRef.current?.markOut()} title="Mark out (O)" className={tool}>Out</button>
         {inOut && (
-          <span className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 font-medium text-primary">
+          <span className="flex h-7 shrink-0 items-center gap-1 rounded-md bg-primary/15 px-2 text-xs font-medium text-primary">
             {inOut.in.toFixed(2)}s → {inOut.out.toFixed(2)}s
             <button type="button" onClick={() => setInOut(null)} aria-label="Clear in/out" className="ml-1 hover:text-foreground">×</button>
           </span>
         )}
-        <span className="ml-auto text-muted-text">{clips.length} clips · {tracks.length} tracks</span>
-      </div>
-      <div onDrop={(e) => {
+      </>
+    );
+    return (
+      <div className="h-full" onDrop={(e) => {
         // Drop onto empty timeline space appends to a fitting track.
         if (e.dataTransfer.getData("application/x-tuberack-asset")) onDropAsset(e);
       }} onDragOver={(e) => e.preventDefault()}>
         <TimelinePro
+          fill
+          leading={leading}
           clips={clips}
           tracks={tracks}
           segments={segments}
@@ -645,10 +739,7 @@ function Studio() {
           }}
           assetFor={(assetId) => {
             const a = assets.find((x) => x.id === assetId);
-            const r = renderAsset(assetId);
-            if (!a || !r) return null;
-            const url = r.blobUrl ?? (a.source === "provider-output" && !isChunked(a.payload) && /^(https?:|\/)/.test(a.payload) ? a.payload : null);
-            return { url, kind: a.kind, durationSec: a.durationSec, title: a.title };
+            return a ? { url: mediaUrl(a), kind: a.kind, durationSec: a.durationSec, title: a.title } : null;
           }}
           onDropAsset={(assetId, trackId, atSec) => {
             const asset = assets.find((a) => a.id === assetId);
@@ -690,7 +781,6 @@ function Studio() {
             })
           }
         />
-      </div>
       </div>
     );
   }
