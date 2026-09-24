@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Modal } from "@/src/components/ui/overlays";
 import { Button } from "@/src/components/ui/Button";
@@ -8,6 +8,9 @@ import { Input, Textarea, Select } from "@/src/components/ui/fields";
 import { LocalStorageNote, useProjects } from "@/src/components/projects/ProjectsProvider";
 import { CONTENT_TYPES, PLATFORMS } from "@/src/lib/projects/types";
 import { useRouter } from "next/navigation";
+import { growth } from "@/src/lib/growth-client";
+
+const YT = "yt:connected";
 
 /**
  * Real project creation against device-local storage. Leaves explicit room
@@ -26,6 +29,24 @@ export function NewProjectButton({ label = "New project" }: { label?: string }) 
   const [description, setDescription] = useState("");
   const [goal, setGoal] = useState("");
   const [error, setError] = useState<string | undefined>();
+  const [ytChannel, setYtChannel] = useState<string | null>(null);
+
+  // Offer the connected YouTube channel (and pre-select it) every time the dialog opens.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void growth.connection().then((o) => {
+      if (cancelled || !o.ok || !o.data.connection) return;
+      const title = o.data.connection.channelTitle;
+      setYtChannel(title);
+      const existing = channels.find((c) => c.name.trim().toLowerCase() === title.trim().toLowerCase());
+      setChannelId((cur) => cur || (existing ? existing.id : YT));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   function reset() {
     setName("");
@@ -47,6 +68,11 @@ export function NewProjectButton({ label = "New project" }: { label?: string }) 
       return;
     }
     let cid = channelId;
+    if (cid === YT && ytChannel) {
+      // First project on the connected channel: create its app channel once, then reuse it.
+      const existing = channels.find((c) => c.name.trim().toLowerCase() === ytChannel.trim().toLowerCase());
+      cid = existing ? existing.id : addChannel(ytChannel, "YouTube").id;
+    }
     if (!cid) {
       if (newChannel.trim()) {
         cid = addChannel(newChannel.trim(), "").id;
@@ -99,9 +125,13 @@ export function NewProjectButton({ label = "New project" }: { label?: string }) 
             </Select>
             <Select label="Channel" value={channelId} onChange={(e) => setChannelId(e.target.value)} hint="Or create one below.">
               <option value="">Select…</option>
+              {ytChannel && !channels.some((c) => c.name.trim().toLowerCase() === ytChannel.trim().toLowerCase()) && (
+                <option value={YT}>{ytChannel} (connected YouTube)</option>
+              )}
               {channels.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
+                  {ytChannel && c.name.trim().toLowerCase() === ytChannel.trim().toLowerCase() ? " (connected YouTube)" : ""}
                 </option>
               ))}
             </Select>
