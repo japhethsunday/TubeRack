@@ -68,6 +68,12 @@ const serverSchema = z.object({
   NVIDIA_API_KEY: z.string().optional(),
   // Optional comma-separated override of the NVIDIA model order
   NVIDIA_TEXT_MODELS: z.string().optional(),
+
+  // Mistral (console.mistral.ai): text models, Voxtral voice and transcription as backups to Gemini
+  MISTRAL_API_KEY: z.string().optional(),
+  // Optional overrides
+  MISTRAL_TEXT_MODELS: z.string().optional(),
+  MISTRAL_TTS_VOICE: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;

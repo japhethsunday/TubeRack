@@ -3,6 +3,31 @@ import { normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPl
 import { stripMarkdown } from "@/src/lib/text/markdown";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
 import { isNvidiaConfigured, nvidiaGenerateText } from "@/src/server/ai/nvidia";
+import { isMistralConfigured, mistralGenerateText, mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
+
+type TextRequest = { prompt: string; maxTokens?: number; json?: boolean };
+
+/** Backup text providers, in order, that have keys set. */
+function backupTextProviders(env = getServerEnv()): { name: string; run: (r: TextRequest) => Promise<{ text: string; model: string }> }[] {
+  return [
+    ...(isMistralConfigured(env) ? [{ name: "mistral", run: (r: TextRequest) => mistralGenerateText(r) }] : []),
+    ...(isNvidiaConfigured(env) ? [{ name: "nvidia", run: (r: TextRequest) => nvidiaGenerateText(r) }] : []),
+  ];
+}
+
+/** Try each backup provider in turn; throws the last error if none answers. */
+async function backupText(request: TextRequest, env = getServerEnv()): Promise<{ text: string; model: string }> {
+  let last: unknown = new Error("No backup text provider is configured.");
+  for (const p of backupTextProviders(env)) {
+    try {
+      return await p.run(request);
+    } catch (error) {
+      last = error;
+      console.error(`[${p.name}] text fallback failed:`, error instanceof Error ? error.message.slice(0, 300) : error);
+    }
+  }
+  throw last;
+}
 import { getServerEnv } from "@/src/lib/env";
 import { getGateway, type AIGateway } from "@/src/lib/ai-gateway/registry";
 import {
@@ -40,9 +65,9 @@ export function isGeminiConfigured(env = getServerEnv()): boolean {
   return Boolean(env.GEMINI_API_KEY);
 }
 
-/** Text features work with Gemini, NVIDIA, or both. */
+/** Text features work with Gemini, Mistral, NVIDIA, or any mix. */
 export function isTextConfigured(env = getServerEnv()): boolean {
-  return Boolean(env.GEMINI_API_KEY) || isNvidiaConfigured(env);
+  return Boolean(env.GEMINI_API_KEY) || isMistralConfigured(env) || isNvidiaConfigured(env);
 }
 
 /** Resolved model names (env overrides, safe defaults). */
@@ -182,11 +207,11 @@ export class GeminiTextProvider implements TextProvider {
     const prompt = request.prompt.trim();
     if (!prompt) throw new Error("Text generation failed: prompt cannot be empty.");
     const env = getServerEnv();
-    const nvidia = isNvidiaConfigured(env);
-    // Only NVIDIA set up: use it directly.
-    if (!env.GEMINI_API_KEY && nvidia) {
+    const hasBackup = backupTextProviders(env).length > 0;
+    // No Gemini key: use the other providers directly.
+    if (!env.GEMINI_API_KEY && hasBackup) {
       try {
-        return await nvidiaGenerateText({ ...request, prompt });
+        return await backupText({ ...request, prompt }, env);
       } catch (error) {
         throw providerError("text generation", error);
       }
@@ -215,23 +240,23 @@ export class GeminiTextProvider implements TextProvider {
         if (!text) throw new Error("empty response");
         return { text, model: m };
       };
-      // With NVIDIA as backup, give Gemini less time before handing over.
-      const budget = nvidia ? { budgetMs: 100_000, attemptMs: 60_000 } : {};
+      // With backups available, give Gemini less time before handing over.
+      const budget = hasBackup ? { budgetMs: 100_000, attemptMs: 60_000 } : {};
       const first = await withModelFallback(model, FALLBACK_MODELS.text, call, budget);
       if (!request.json || extractJsonObject(first.text)) return first;
       // One automatic retry when the JSON came back unreadable.
       const second = await withModelFallback(first.model, FALLBACK_MODELS.text, call, budget);
       if (extractJsonObject(second.text)) return second;
-      if (nvidia) return await nvidiaGenerateText({ ...request, prompt }).catch(() => first);
+      if (hasBackup) return await backupText({ ...request, prompt }, env).catch(() => first);
       return first;
     } catch (error) {
-      if (error instanceof ProviderNotConfiguredError && !nvidia) throw error;
-      // Gemini busy, slow, out of quota or failing: hand over to NVIDIA's models.
-      if (nvidia) {
+      if (error instanceof ProviderNotConfiguredError && !hasBackup) throw error;
+      // Gemini busy, slow, out of quota or failing: hand over to Mistral, then NVIDIA.
+      if (hasBackup) {
         try {
-          return await nvidiaGenerateText({ ...request, prompt });
-        } catch (nvidiaError) {
-          console.error("[nvidia] fallback failed:", nvidiaError instanceof Error ? nvidiaError.message.slice(0, 300) : nvidiaError);
+          return await backupText({ ...request, prompt }, env);
+        } catch {
+          // logged per provider; report the original Gemini problem
         }
       }
       throw providerError("text generation", error);
@@ -389,13 +414,27 @@ export class GeminiTtsProvider implements TtsProvider {
     const env = getServerEnv();
     const model = env.GEMINI_TTS_MODEL || DEFAULT_TTS_MODEL;
     const voice = request.voice?.trim() || env.GEMINI_TTS_VOICE || DEFAULT_TTS_VOICE;
+    const chunks = splitForSpeech(text);
+    const mistral = isMistralConfigured(env);
+    // One provider per take, so the voice never changes mid-narration.
+    const viaMistral = async () => ({ parts: await mapLimit(chunks, 3, (chunk) => mistralSpeechChunk(chunk)), model: "voxtral-mini-tts" });
     try {
-      const chunks = splitForSpeech(text);
-      const parts = await mapLimit(chunks, 4, (chunk) => this.synthesizeChunk(chunk, voice, model));
+      let result: { parts: { pcm: Buffer; rate: number }[]; model: string };
+      if (!env.GEMINI_API_KEY && mistral) result = await viaMistral();
+      else {
+        try {
+          result = { parts: await mapLimit(chunks, 4, (chunk) => this.synthesizeChunk(chunk, voice, model)), model };
+        } catch (error) {
+          if (!mistral || (error instanceof ProviderNotConfiguredError && !mistral)) throw error;
+          console.error("[gemini] speech failed, using Voxtral:", error instanceof Error ? error.message.slice(0, 200) : error);
+          result = await viaMistral();
+        }
+      }
+      const parts = result.parts;
       const rate = parts[0].rate;
       const pause = Buffer.alloc(Math.round(rate * 0.25) * 2); // 250 ms of silence between chunks
       const pcm = Buffer.concat(parts.flatMap((p, i) => (i < parts.length - 1 ? [p.pcm, pause] : [p.pcm])));
-      return { audioBase64: pcmToWavBase64(pcm.toString("base64"), rate), mimeType: "audio/wav", model, durationSec: pcm.length / 2 / rate };
+      return { audioBase64: pcmToWavBase64(pcm.toString("base64"), rate), mimeType: "audio/wav", model: result.model, durationSec: pcm.length / 2 / rate };
     } catch (error) {
       if (error instanceof ProviderNotConfiguredError) throw error;
       throw providerError("speech synthesis", error);
@@ -607,8 +646,15 @@ export interface TimedSegment {
  * clamped — segments that are not well-formed are dropped, never invented.
  */
 export async function transcribeAudio(bytes: Uint8Array, mimeType: string): Promise<{ text: string; segments: TimedSegment[]; model: string }> {
-  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   if (bytes.byteLength === 0) throw new Error("Transcription failed: audio is empty.");
+  if (!isGeminiConfigured() && isMistralConfigured()) {
+    try {
+      return await mistralTranscribe(bytes, mimeType);
+    } catch (error) {
+      throw providerError("transcription", error);
+    }
+  }
+  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   const env = getServerEnv();
   const model = env.GEMINI_TEXT_MODEL || DEFAULT_TEXT_MODEL;
   const ai = getGeminiClient(env);
@@ -641,6 +687,13 @@ export async function transcribeAudio(bytes: Uint8Array, mimeType: string): Prom
     return { text: segments.map((s) => s.text).join(" "), segments, model };
   } catch (error) {
     if (error instanceof ProviderNotConfiguredError) throw error;
+    if (isMistralConfigured()) {
+      try {
+        return await mistralTranscribe(bytes, mimeType);
+      } catch (mistralError) {
+        console.error("[mistral] transcription fallback failed:", mistralError instanceof Error ? mistralError.message.slice(0, 200) : mistralError);
+      }
+    }
     throw providerError("transcription", error);
   }
 }

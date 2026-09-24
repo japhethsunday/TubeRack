@@ -35,6 +35,16 @@ export function describeProviders(): ProviderDescriptor[] {
       detail: isGeminiConfigured(env) ? "GEMINI_API_KEY is set." : "Set GEMINI_API_KEY to enable.",
     },
     {
+      provider: "mistral",
+      type: "cloud",
+      capabilities: ["text", "intelligence", "tts", "transcription"],
+      models: ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest", "voxtral-mini-tts-2603", "voxtral-mini-latest"],
+      local: false,
+      gpuRequired: false,
+      configured: Boolean(env.MISTRAL_API_KEY),
+      detail: env.MISTRAL_API_KEY ? "MISTRAL_API_KEY is set; backs up text, voice and captions." : "Set MISTRAL_API_KEY to add Mistral text, voice and captions as backup.",
+    },
+    {
       provider: "nvidia",
       type: "cloud",
       capabilities: ["text", "intelligence"],
