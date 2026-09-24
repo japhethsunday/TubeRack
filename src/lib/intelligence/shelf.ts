@@ -69,7 +69,14 @@ export interface ProjectIntel {
   retention: RetentionRecord[];
   brief: string;
   history: HistoryEntry[];
+  /** Generated results (shot lists, thumbnail concepts, repurposing…) kept per tool. */
+  outputs?: Record<string, SavedOutput>;
   updatedAt: string;
+}
+
+export interface SavedOutput {
+  text: string;
+  at: string;
 }
 
 let seq = 0;
@@ -205,6 +212,11 @@ export function addRetentionRecord(
     `Retention review saved (${record.flags.length} note(s)).`,
     opts?.at,
   );
+}
+
+export function saveOutput(intel: ProjectIntel, key: string, text: string, label: string, at?: string): ProjectIntel {
+  const when = at ?? new Date().toISOString();
+  return stampHistory({ ...intel, outputs: { ...(intel.outputs ?? {}), [key]: { text, at: when } } }, "output", `${label} generated.`, when);
 }
 
 export function saveBrief(intel: ProjectIntel, brief: string, at?: string): ProjectIntel {

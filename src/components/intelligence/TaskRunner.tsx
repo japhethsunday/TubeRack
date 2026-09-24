@@ -2,6 +2,8 @@
 
 import { Markdown } from "@/src/components/ui/Markdown";
 import { useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { Play, RotateCcw, Ban, CheckCircle2, OctagonX, Sparkles } from "lucide-react";
 import type { GenerationStatus, IntelligenceTaskType } from "@/src/lib/intelligence/tasks";
 import { INTELLIGENCE_TASK_DEFS } from "@/src/lib/intelligence/tasks";
@@ -51,7 +53,13 @@ export function TaskRunner<T>({
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [ai, setAi] = useState<ProviderOutcome<IntelligenceResult> | null>(null);
+  const [fresh, setAi] = useState<ProviderOutcome<IntelligenceResult> | null>(null);
+  // The detailed analysis is saved to the project, so it's still here after a reload.
+  const intel = useIntel();
+  const saveTo = useSearchParams().get("project") ?? "_workspace";
+  const saved = intel.outputFor(saveTo, `analysis-${task}`);
+  const ai: ProviderOutcome<IntelligenceResult> | null =
+    fresh ?? (saved ? { ok: true, data: { task, text: saved.text, model: "" } } : null);
   const cancelRef = useRef(false);
   const def = INTELLIGENCE_TASK_DEFS[task];
 
@@ -94,6 +102,7 @@ export function TaskRunner<T>({
         return;
       }
       setAi(outcome);
+      if (outcome.ok) intel.saveOutputFor(saveTo, `analysis-${task}`, outcome.data.text, def.label);
       setProgress(100);
       setStatus("completed");
     } catch (e) {
@@ -151,7 +160,7 @@ export function TaskRunner<T>({
                 <h3 className="flex items-center gap-2 text-sm font-semibold">
                   <Sparkles className="size-4 text-primary" aria-hidden="true" />
                   Detailed analysis
-                  <span className="text-xs font-normal text-muted-text">{ai.data.model}</span>
+                  
                 </h3>
                 <DownloadButton
                   size="xs"

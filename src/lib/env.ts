@@ -59,10 +59,10 @@ const serverSchema = z.object({
 
   // Google Gemini (server-only primary AI provider: text, intelligence, image, TTS)
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_TEXT_MODEL: z.string().default("gemini-3.6-flash"),
-  GEMINI_IMAGE_MODEL: z.string().default("gemini-3.1-flash-image"),
-  GEMINI_TTS_MODEL: z.string().default("gemini-2.5-flash-preview-tts"),
-  GEMINI_TTS_VOICE: z.string().default("Kore"),
+  GEMINI_TEXT_MODEL: z.string().optional(),
+  GEMINI_IMAGE_MODEL: z.string().optional(),
+  GEMINI_TTS_MODEL: z.string().optional(),
+  GEMINI_TTS_VOICE: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;

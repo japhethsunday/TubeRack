@@ -76,6 +76,7 @@ export function RepurposeWorkspace({ projectId, context }: { projectId: string; 
     <div className="space-y-4">
     <GeminiAssist
       task="repurpose-plan"
+      saveAs={{ projectId, key: "repurpose-plan" }}
       title="Repurpose"
       blurb="Writes ready-to-post Shorts scripts, a thread, a LinkedIn post, and a community post from this script."
       disabledReason={context.sections.length === 0 ? "Write the script first ; repurposing uses your real sections." : undefined}

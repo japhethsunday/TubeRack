@@ -82,6 +82,7 @@ function WatchCard({ watch, onChange, onRemove, onOpen }: { watch: TrendWatch; o
           </ol>
           <GeminiAssist
             task="topic-discovery"
+            saveAs={{ projectId: "_workspace", key: `trend-ideas-${watch.id}` }}
             title="Video ideas from this week's trends"
             blurb="Turn what's rising right now into specific video ideas you could publish this week."
             actionLabel="Get ideas"

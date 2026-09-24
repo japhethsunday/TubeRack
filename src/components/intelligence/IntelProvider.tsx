@@ -24,6 +24,8 @@ import {
   intelCounts,
   saveAudience,
   saveBrief,
+  saveOutput,
+  type SavedOutput,
   saveOpportunity,
   saveStrategy,
   setIntelItemStatus,
@@ -107,6 +109,9 @@ interface IntelContextValue {
   editItem: (projectId: string, field: "titles" | "hooks", id: string, text: string) => void;
   addRetention: (projectId: string, record: Omit<RetentionRecord, "id" | "createdAt">) => void;
   saveBriefFor: (projectId: string, brief: string) => void;
+  /** Last generated result for a tool in a project (survives reloads, syncs across devices). */
+  outputFor: (projectId: string, key: string) => SavedOutput | null;
+  saveOutputFor: (projectId: string, key: string, text: string, label: string) => void;
   countsFor: (projectId: string) => ReturnType<typeof intelCounts>;
   opportunities: Opportunity[];
   saveOpportunity: (input: OpportunityInput) => void;
@@ -225,6 +230,8 @@ export function IntelProvider({ children }: { children: React.ReactNode }) {
         patchIntel(projectId, (i) => editIntelItem(i, field, id, text)),
       addRetention: (projectId, record) => patchIntel(projectId, (i) => addRetentionRecord(i, record)),
       saveBriefFor: (projectId, brief) => patchIntel(projectId, (i) => saveBrief(i, brief)),
+      outputFor: (projectId, key) => bundle.intel[projectId]?.outputs?.[key] ?? null,
+      saveOutputFor: (projectId, key, text, label) => patchIntel(projectId, (i) => saveOutput(i, key, text, label)),
       countsFor: (projectId) => intelCounts(bundle.intel[projectId] ?? emptyIntel(projectId)),
       opportunities: bundle.opportunities,
       saveOpportunity: (input) => setBundle((b) => ({ ...b, opportunities: saveOpportunity(b.opportunities, input) })),

@@ -123,7 +123,7 @@ export function VoiceStudio({
       payload: "",
       mime: "audio/wav",
       durationSec: estimateSeconds(Math.max(1, words), 150),
-      tags: ["take", "gemini", providerVoiceName],
+      tags: ["take", "generated", providerVoiceName],
       approval: "draft",
     });
     registerRerun(asset.id, () => void generateTake(body, label, sceneIds));

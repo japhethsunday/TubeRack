@@ -492,7 +492,7 @@ export function ChannelCreator() {
               <Section title="Channel keywords (YouTube field)" copy={keywordsField}><p className="font-mono text-xs">{keywordsField}</p></Section>
               <Section title="Launch checklist"><List items={plan.launchChecklist} /></Section>
             </div>
-            <p className="text-xs text-muted-text">Written by {current.model} from the evidence above. Numbers in the plan come only from that evidence.</p>
+            <p className="text-xs text-muted-text">Built from the evidence above. Numbers in the plan come only from that evidence.</p>
           </div>
         ) : (
           <div className="h-40 animate-pulse rounded-xl bg-muted" aria-busy="true" />

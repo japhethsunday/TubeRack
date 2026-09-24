@@ -146,6 +146,7 @@ export function ThumbnailTab({
     <div className="space-y-6">
       <GeminiAssist
         task="thumbnail-concepts"
+        saveAs={{ projectId, key: "thumbnail-concepts" }}
         title="Thumbnail concepts"
         blurb="Four distinct, honest thumbnail concepts built from this project's title, audience, and angle."
         context={{ ...context, title: primaryTitle || context.title }}

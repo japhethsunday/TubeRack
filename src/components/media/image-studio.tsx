@@ -119,7 +119,7 @@ export function ImageStudio({
         mime: "image/png",
         width: POSTER_DIMS[aspect].width,
         height: POSTER_DIMS[aspect].height,
-        tags: ["gemini", aspect],
+        tags: ["generated", aspect],
         approval: "draft",
       });
       const variant = i === 0 ? prompt : `${prompt}\nVariation ${i + 1}: a distinctly different composition.`;

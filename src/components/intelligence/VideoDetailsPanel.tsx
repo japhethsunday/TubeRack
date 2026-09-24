@@ -1,5 +1,6 @@
 "use client";
 
+import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { Markdown } from "@/src/components/ui/Markdown";
 import { useEffect, useRef, useState } from "react";
 import { X, Eye, ThumbsUp, MessageSquare, Clock, CalendarDays, Sparkles, Link2, Plus, Users, Film } from "lucide-react";
@@ -108,7 +109,9 @@ export function VideoDetailsPanel({
 }) {
   const [details, setDetails] = useState<VideoDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<string | null>(null);
+  const intel = useIntel();
+  const [freshAnalysis, setAnalysis] = useState<string | null>(null);
+  const analysis = freshAnalysis ?? intel.outputFor("_workspace", `video-analysis-${videoId}`)?.text ?? null;
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -154,7 +157,10 @@ export function VideoDetailsPanel({
       },
     });
     setAnalyzing(false);
-    if (outcome.ok) setAnalysis(outcome.data.text);
+    if (outcome.ok) {
+      setAnalysis(outcome.data.text);
+      intel.saveOutputFor("_workspace", `video-analysis-${videoId}`, outcome.data.text, "Video analysis");
+    }
     else setAnalysisError(outcome.message);
   }
 

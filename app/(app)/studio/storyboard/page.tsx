@@ -184,6 +184,7 @@ function Board() {
         <>
           <GeminiAssist
             task="storyboard-plan"
+            saveAs={{ projectId: projectId ?? "_workspace", key: "storyboard-plan" }}
             title="Generate shot list"
             blurb="Turns every scene into filmable shots: framing, b-roll, on-screen text, sound cues, and transitions."
             context={{

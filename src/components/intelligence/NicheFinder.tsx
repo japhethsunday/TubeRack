@@ -1,5 +1,6 @@
 "use client";
 
+import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -25,6 +26,15 @@ const REGIONS = [
 ] as const;
 
 const VERDICT_TONE = { "Strong opportunity": "ok", Promising: "info", Crowded: "warn", "Low demand": "bad" } as const;
+
+function parseJsonOr<T>(text: string | undefined, fallback: T): T {
+  if (!text) return fallback;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return fallback;
+  }
+}
 
 function loadShortlist(): NicheResult[] {
   try {
@@ -120,7 +130,10 @@ function NicheCard({
   onOpenVideo: (id: string) => void;
 }) {
   const [open, setOpen] = useState(rank === 1);
-  const [report, setReport] = useState<NicheReport | null>(null);
+  const intel = useIntel();
+  const reportKey = `niche-report-${niche.query.toLowerCase()}`;
+  const [freshReport, setReport] = useState<NicheReport | null>(null);
+  const report = freshReport ?? parseJsonOr<NicheReport | null>(intel.outputFor("_workspace", reportKey)?.text, null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const m = niche.metrics;
@@ -130,7 +143,10 @@ function NicheCard({
     setError("");
     const outcome = await nicheReport(niche);
     setBusy(false);
-    if (outcome.ok) setReport(outcome.data.report);
+    if (outcome.ok) {
+      setReport(outcome.data.report);
+      intel.saveOutputFor("_workspace", reportKey, JSON.stringify(outcome.data.report), `Niche plan: ${niche.query}`);
+    }
     else setError(outcome.message);
   }
 
@@ -268,8 +284,12 @@ export function NicheFinder() {
   const [mode, setMode] = useState<"expand" | "exact">("expand");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [scan, setScan] = useState<NicheScan | null>(null);
-  const [shortlist, setShortlist] = useState<NicheResult[]>([]);
+  const intel = useIntel();
+  const [freshScan, setScan] = useState<NicheScan | null>(null);
+  const scan = freshScan ?? parseJsonOr<NicheScan | null>(intel.outputFor("_workspace", "niche-last-scan")?.text, null);
+  const savedShortlist = intel.outputFor("_workspace", "niche-shortlist");
+  const [localShortlist, setShortlist] = useState<NicheResult[]>([]);
+  const shortlist = savedShortlist ? parseJsonOr<NicheResult[]>(savedShortlist.text, []) : localShortlist;
   const [videoId, setVideoId] = useState<string | null>(null);
   const [view, setView] = useState<"results" | "shortlist">("results");
 
@@ -283,6 +303,7 @@ export function NicheFinder() {
     const next = exists ? shortlist.filter((s) => s.query !== n.query) : [n, ...shortlist];
     setShortlist(next);
     saveShortlist(next);
+    intel.saveOutputFor("_workspace", "niche-shortlist", JSON.stringify(next), "Niche shortlist");
   }
 
   async function run(e?: React.FormEvent) {
@@ -297,6 +318,7 @@ export function NicheFinder() {
     setBusy(false);
     if (outcome.ok) {
       setScan(outcome.data);
+      intel.saveOutputFor("_workspace", "niche-last-scan", JSON.stringify(outcome.data), `Niche scan: ${seed.trim()}`);
       setView("results");
     } else setError(outcome.message);
   }

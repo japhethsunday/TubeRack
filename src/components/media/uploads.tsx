@@ -183,10 +183,15 @@ export function UploadZone({ projectId }: { projectId: string }) {
             }}
           />
         </div>
-        <Alert tone="info" title="Session bytes, validated content">
-          Files are sniffed by magic bytes and capped by size. Bytes live for this session only — metadata
-          persists; re-upload after reload. Sign in to store uploads with your account.
-        </Alert>
+        {session.status === "signed-in" ? (
+          <Alert tone="info" title="Saved to your account">
+            Uploaded files are stored with this project and are still here after you close the app or open it on another device.
+          </Alert>
+        ) : (
+          <Alert tone="warn" title="Not saved yet">
+            You&apos;re not signed in, so uploads last only until you close this tab. Sign in to keep them with your project.
+          </Alert>
+        )}
       </div>
       <div className="space-y-2">
         <h3 className="text-sm font-semibold">Intake ({sessions.length})</h3>

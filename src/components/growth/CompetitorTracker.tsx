@@ -151,6 +151,7 @@ export function CompetitorTracker() {
       {breakouts.length > 0 && (
         <GeminiAssist
           task="competitive-analysis"
+          saveAs={{ projectId: "_workspace", key: "competitor-readout" }}
           title="What's working for your competitors"
           blurb="Break down the real breakout videos above: the patterns you can borrow, plus the gaps they leave open."
           context={{ breakouts, channels: (reports ?? []).map((r) => ({ title: r.competitor.title, medianViews: r.stats.medianViews, uploadsPerWeek: r.stats.uploadsPerWeek, shortsShare: r.stats.shortsShare, keywords: r.keywords.map((k) => k.word) })) }}

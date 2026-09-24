@@ -75,7 +75,10 @@ export function parseMediaBundle(data: unknown): MediaBundle {
       `Import is not a TubeRack media file: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "root"} — ${i.message}`).join("; ")}`,
     );
   }
-  return parsed.data as MediaBundle;
+  const bundle = parsed.data as MediaBundle;
+  // Older takes and images were titled after the model provider.
+  for (const a of bundle.assets) a.title = a.title.replace(/^Gemini take\b/, "Voice take").replace(/^Gemini art\b/, "Art").replace(/\bGemini\b/g, "Generated");
+  return bundle;
 }
 
 export type { GenerationJob, MediaStatus };

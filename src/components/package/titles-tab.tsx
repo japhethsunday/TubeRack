@@ -1,5 +1,6 @@
 "use client";
 
+import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { useState } from "react";
 import { Plus, Trash2, Star, Sparkles } from "lucide-react";
 import { suggestTitlesWithProvider } from "@/src/lib/ai-client";
@@ -33,7 +34,10 @@ export function TitlesTab({
   const [text, setText] = useState("");
   const [category, setCategory] = useState("Curiosity");
   const [showDirections, setShowDirections] = useState(false);
-  const [aiTitles, setAiTitles] = useState<{ text: string; category: string }[] | null>(null);
+  const intel = useIntel();
+  const [freshTitles, setAiTitles] = useState<{ text: string; category: string }[] | null>(null);
+  const savedTitles = intel.outputFor(projectId, "title-suggestions");
+  const aiTitles = freshTitles ?? parseSavedTitles(savedTitles?.text);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -51,7 +55,10 @@ export function TitlesTab({
       chapters: "",
     });
     setAiBusy(false);
-    if (outcome.ok) setAiTitles(outcome.data.titles);
+    if (outcome.ok) {
+      setAiTitles(outcome.data.titles);
+      intel.saveOutputFor(projectId, "title-suggestions", JSON.stringify(outcome.data.titles), "Title suggestions");
+    }
     else setAiError(outcome.message);
   }
 
@@ -214,4 +221,14 @@ function TitleRow({ projectId, title }: { projectId: string; title: PackTitle })
       </div>
     </li>
   );
+}
+
+function parseSavedTitles(text: string | undefined): { text: string; category: string }[] | null {
+  if (!text) return null;
+  try {
+    const v: unknown = JSON.parse(text);
+    return Array.isArray(v) ? v.filter((t): t is { text: string; category: string } => typeof t?.text === "string" && typeof t?.category === "string") : null;
+  } catch {
+    return null;
+  }
 }

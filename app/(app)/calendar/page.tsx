@@ -9,7 +9,7 @@ export default function Page() {
       <Breadcrumb trail={[{ label: "Dashboard", href: "/dashboard" }, { label: "Content Calendar" }]} />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Content Calendar</h1>
-        <p className="mt-1 max-w-prose text-sm text-muted-text">Plan every video from script to publish. Let Gemini build a schedule, get reminder emails, and export to Google Calendar or Apple Calendar.</p>
+        <p className="mt-1 max-w-prose text-sm text-muted-text">Plan every video from script to publish. Auto-plan a schedule, get reminder emails, and export to Google Calendar or Apple Calendar.</p>
       </div>
       <ContentCalendar />
     </div>
