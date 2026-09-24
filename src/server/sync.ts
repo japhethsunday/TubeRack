@@ -156,14 +156,22 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
         results.push("skipped");
         continue;
       }
-      if (doc.channelId) {
-        const ch = await db`SELECT id FROM channels WHERE id = ${String(doc.channelId)} AND workspace_id = ${workspaceId} LIMIT 1`;
-        if (ch.length === 0) {
-          results.push("skipped");
-          continue;
+      let channelId = doc.channelId ? String(doc.channelId) : "";
+      if (channelId) {
+        const ch = await db`SELECT id FROM channels WHERE id = ${channelId} AND workspace_id = ${workspaceId} LIMIT 1`;
+        if (ch.length === 0) channelId = "";
+      }
+      if (!channelId) {
+        // Never drop a project because its channel didn't sync: attach it to
+        // one of this workspace's channels (creating one if there are none).
+        const first = await db`SELECT id FROM channels WHERE workspace_id = ${workspaceId} ORDER BY created_at LIMIT 1`;
+        if (first[0]) channelId = String(first[0].id);
+        else {
+          const created = await db`INSERT INTO channels (workspace_id, name, niche) VALUES (${workspaceId}, ${"My channel"}, ${""}) RETURNING id`;
+          channelId = String(created[0].id);
         }
       }
-      results.push(await upsertById("projects", toProjectRow(doc as never, workspaceId), workspaceId));
+      results.push(await upsertById("projects", toProjectRow({ ...(doc as object), channelId } as never, workspaceId), workspaceId));
     }
     for (const e of body.events) {
       const doc = (e ?? {}) as { id?: string };
