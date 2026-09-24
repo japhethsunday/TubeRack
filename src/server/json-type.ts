@@ -48,3 +48,15 @@ export const bigintType = {
     return Number.isSafeInteger(n) ? n : x;
   },
 };
+
+/**
+ * Date-only columns (analytics entry dates, calendar days) stay the plain
+ * "YYYY-MM-DD" strings the app uses. The driver default turns them into
+ * midnight-UTC timestamps, which client schemas reject.
+ */
+export const dateOnlyType = {
+  to: 1082,
+  from: [1082],
+  serialize: (x: unknown) => (x instanceof Date ? x.toISOString().slice(0, 10) : String(x)),
+  parse: (x: string) => x,
+};

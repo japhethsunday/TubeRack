@@ -70,6 +70,11 @@ function toParam(v: unknown): unknown {
   return v === undefined ? null : v;
 }
 
+/** Run `fn` over items with at most `size` in flight (DB pool is small). */
+async function inBatches<T>(items: T[], size: number, fn: (item: T) => Promise<void>): Promise<void> {
+  for (let i = 0; i < items.length; i += size) await Promise.all(items.slice(i, i + size).map(fn));
+}
+
 async function upsertById(
   table: string,
   row: Record<string, unknown>,
@@ -253,23 +258,24 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
   if (kind === "media") {
     const body = parsed.data as { assets: unknown[]; voices: unknown[]; consistency: unknown[]; deletedAssetIds: string[] };
     const result = { ...empty };
-    for (const a of body.assets) {
+    // A few writes at a time: large libraries finish well inside the limit.
+    await inBatches(body.assets, 4, async (a) => {
       const row = toAssetRow((a ?? {}) as never, workspaceId);
       if (!row) {
         result.skipped += 1;
-        continue;
+        return;
       }
       if (row.project_id) {
         const owner = await projectWorkspace(String(row.project_id));
         if (owner !== workspaceId) {
           result.skipped += 1;
-          continue;
+          return;
         }
       }
       // Bytes never sync up — uploads use the upload endpoint.
       delete (row as Record<string, unknown>).inline_bytes;
       result[await upsertById("media_assets", row, workspaceId)] += 1;
-    }
+    });
     const voices = Array.isArray(body.voices) ? body.voices.slice(0, 100) : [];
     const consistency = Array.isArray(body.consistency) ? body.consistency.slice(0, 100) : [];
     const byProject = new Map<string, { voices: unknown[]; consistency: unknown }>();

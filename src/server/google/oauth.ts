@@ -94,7 +94,20 @@ export async function googleApi<T = Record<string, unknown>>(url: string, token:
   if (!response.ok) {
     const err = json.error;
     const message = typeof err === "string" ? err : err?.message;
-    throw new Error(`YouTube (your channel) request failed: ${message ?? response.status}`);
+    const detail = message ?? `status ${response.status}`;
+    // Map Google's failures to accurate app errors (never a generic 500).
+    if (response.status === 401) {
+      throw new BackendError("VALIDATION_ERROR", "YouTube access expired. Reconnect your channel on My Channel.");
+    }
+    if (response.status === 403 && /quota|rate/i.test(detail)) {
+      throw new BackendError("RATE_LIMITED", "YouTube's daily limit for this app is used up. Try again later.");
+    }
+    if (response.status === 403) {
+      throw new BackendError("FORBIDDEN", `YouTube refused the request: ${detail}`);
+    }
+    if (response.status === 404) throw new BackendError("NOT_FOUND", `YouTube could not find that: ${detail}`);
+    if (response.status >= 500) throw new BackendError("BACKEND_UNAVAILABLE", "YouTube is having trouble right now. Try again in a minute.");
+    throw new BackendError("VALIDATION_ERROR", `YouTube rejected the request: ${detail}`);
   }
   return json;
 }

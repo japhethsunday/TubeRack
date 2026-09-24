@@ -6,6 +6,9 @@ import { limiterFor, clientKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { SYNC_SCHEMAS, type SyncKind } from "@/src/lib/sync-map";
 
+// Fail fast instead of holding a save open for the platform maximum.
+export const maxDuration = 60;
+
 const KINDS = Object.keys(SYNC_SCHEMAS) as SyncKind[];
 
 function kindFrom(request: Request): SyncKind {
