@@ -4,7 +4,7 @@ import {
   Lightbulb, Wand2, Rocket, Music, Captions, Layers,
 } from "lucide-react";
 import { HeroMockup } from "@/src/components/home/HeroMockup";
-import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
+import { SiteHeader } from "@/src/components/home/SiteHeader";
 import { SiteFooter } from "@/src/components/home/SiteFooter";
 import { Reveal, CountUp } from "@/src/components/home/motion";
 
@@ -56,25 +56,7 @@ export default function HomePage() {
       <div className="auth-blob pointer-events-none absolute left-1/3 top-[70rem] size-[36rem] rounded-full bg-violet-400/20 blur-3xl dark:bg-violet-600/20" style={{ animationDelay: "-11s" }} />
       <div className="app-grid pointer-events-none absolute inset-x-0 top-0 h-[60rem]" />
 
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-foreground text-background">
-            <Clapperboard className="size-4" aria-hidden="true" />
-          </span>
-          <span className="font-semibold tracking-tight">TubeRack</span>
-        </Link>
-        <nav className="flex items-center gap-2 text-sm">
-          <a href="#how" className="hidden rounded-lg px-3 py-2 text-foreground/70 hover:text-foreground sm:inline">How it works</a>
-          <a href="#features" className="hidden rounded-lg px-3 py-2 text-foreground/70 hover:text-foreground sm:inline">Features</a>
-          <ThemeToggle />
-          <Link href="/login" className="rounded-lg px-3 py-2 font-medium text-foreground/80 hover:bg-foreground/10 hover:text-foreground">
-            Sign in
-          </Link>
-          <Link href="/signup" className="rounded-lg bg-foreground px-3.5 py-2 font-medium text-background hover:bg-foreground/90">
-            Get started
-          </Link>
-        </nav>
-      </header>
+      <SiteHeader />
 
       {/* Hero */}
       <section className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:pt-20">
