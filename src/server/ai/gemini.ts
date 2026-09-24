@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { extractJsonObject } from "@/src/lib/ai-gateway/json";
 import { getServerEnv } from "@/src/lib/env";
 import { getGateway, type AIGateway } from "@/src/lib/ai-gateway/registry";
 import {
@@ -161,13 +162,14 @@ export class GeminiTextProvider implements TextProvider {
     const model = env.GEMINI_TEXT_MODEL || DEFAULT_TEXT_MODEL;
     // Floor of 256: reasoning models spend output budget on thought tokens,
     // so tiny caps would return empty text.
-    const maxOutputTokens =
-      typeof request.maxTokens === "number" && Number.isFinite(request.maxTokens)
-        ? Math.min(8192, Math.max(256, Math.floor(request.maxTokens)))
-        : 2048;
+    // JSON replies get a generous budget: thinking tokens count against it, and
+    // a cut-off reply is unusable.
+    const requested =
+      typeof request.maxTokens === "number" && Number.isFinite(request.maxTokens) ? Math.floor(request.maxTokens) : 2048;
+    const maxOutputTokens = request.json ? Math.min(32768, Math.max(8192, requested * 3)) : Math.min(8192, Math.max(256, requested));
     try {
       const ai = getGeminiClient(env);
-      return await withModelFallback(model, FALLBACK_MODELS.text, async (m) => {
+      const call = async (m: string) => {
         const response = await ai.models.generateContent({
           model: m,
           contents: prompt,
@@ -180,7 +182,12 @@ export class GeminiTextProvider implements TextProvider {
         const text = response.text?.trim();
         if (!text) throw new Error("empty response");
         return { text, model: m };
-      });
+      };
+      const first = await withModelFallback(model, FALLBACK_MODELS.text, call);
+      if (!request.json || extractJsonObject(first.text)) return first;
+      // One automatic retry when the JSON came back unreadable.
+      const second = await withModelFallback(first.model, FALLBACK_MODELS.text, call);
+      return extractJsonObject(second.text) ? second : first;
     } catch (error) {
       if (error instanceof ProviderNotConfiguredError) throw error;
       throw providerError("text generation", error);
@@ -400,12 +407,7 @@ export async function writeScriptSections(req: ScriptWriteRequest): Promise<{ te
     maxTokens: Math.min(8192, Math.round(req.targetWords * 2.5) + 1024),
     json: true,
   });
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ""));
-  } catch {
-    throw new Error("Gemini script generation failed: response was not valid JSON. Try again.");
-  }
+  const parsed: unknown = parseJsonObject(text, "script generation");
   const list = (parsed as { sections?: unknown }).sections;
   if (!Array.isArray(list) || list.length !== req.sections.length || !list.every((t) => typeof t === "string")) {
     throw new Error("Gemini script generation failed: section count did not match. Try again.");
@@ -414,13 +416,9 @@ export async function writeScriptSections(req: ScriptWriteRequest): Promise<{ te
 }
 
 function parseJsonObject(text: string, what: string): Record<string, unknown> {
-  try {
-    const value: unknown = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ""));
-    if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
-  } catch {
-    // fall through
-  }
-  throw new Error(`Gemini ${what} failed: response was not valid JSON. Try again.`);
+  const obj = extractJsonObject(text);
+  if (obj) return obj;
+  throw new Error(`Gemini ${what} failed: the reply couldn't be read. Please try again.`);
 }
 
 const strings = (v: unknown, max: number) =>
@@ -647,7 +645,7 @@ export async function scoreThumbnails(title: string, images: { mime: string; bas
             ],
           },
         ],
-        config: { responseMimeType: "application/json", maxOutputTokens: 2000, temperature: 0.2 },
+        config: { responseMimeType: "application/json", maxOutputTokens: 8192, temperature: 0.2 },
       }),
     );
     const o = parseJsonObject(response.text?.trim() ?? "", "thumbnail review");

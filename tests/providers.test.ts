@@ -63,3 +63,28 @@ describe("youtube referer", () => {
     assert.equal(apiReferer(getServerEnv({ APP_URL: "https://example.com" } as unknown as NodeJS.ProcessEnv)), "https://example.com/");
   });
 });
+
+import { extractJsonObject, repairTruncated } from "@/src/lib/ai-gateway/json";
+
+describe("tolerant JSON extraction", () => {
+  it("handles fences, surrounding prose, and trailing commas", () => {
+    assert.deepEqual(extractJsonObject('```json\n{"a":1}\n```'), { a: 1 });
+    assert.deepEqual(extractJsonObject('Sure! Here it is:\n{"a":[1,2,],}\nHope that helps.'), { a: [1, 2] });
+    assert.equal(extractJsonObject("no json here"), null);
+    assert.equal(extractJsonObject("[1,2]"), null);
+  });
+
+  it("repairs a reply cut off mid-array, keeping only complete values", () => {
+    const cut = '{"niches":[{"name":"A","query":"a"},{"name":"B","query":"b"},{"name":"C","que';
+    const obj = extractJsonObject(cut) as { niches: { name: string; query?: string }[] };
+    assert.deepEqual(obj.niches, [{ name: "A", query: "a" }, { name: "B", query: "b" }, { name: "C" }]);
+  });
+
+  it("repairs a cut inside a string and leaves complete JSON untouched", () => {
+    const obj = extractJsonObject('{"summary":"ok","ideas":["one","tw') as { summary: string; ideas: string[] };
+    assert.equal(obj.summary, "ok");
+    assert.deepEqual(obj.ideas, ["one"]);
+    assert.equal(repairTruncated('{"a":1}'), '{"a":1}');
+    assert.equal(repairTruncated('{"a'), null);
+  });
+});
