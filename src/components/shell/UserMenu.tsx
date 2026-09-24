@@ -59,11 +59,11 @@ export function UserMenu({ user, onClose }: { user: SessionInfo | null; onClose:
               <li>
                 <span
                   aria-disabled="true"
-                  title="Workspaces arrive in Phase 4"
+                  title="Multiple workspaces are not available yet"
                   className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-text opacity-60"
                 >
                   <Plus className="size-4" aria-hidden="true" />
-                  New workspace — Phase 4
+                  New workspace — coming soon
                 </span>
               </li>
             </ul>

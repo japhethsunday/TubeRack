@@ -21,23 +21,28 @@ import { Input, Textarea } from "@/src/components/ui/fields";
 import { EmptyState, ErrorState } from "@/src/components/ui/states";
 import { LoadingState, Progress } from "@/src/components/ui/feedback";
 
-const STAGE_TAB: Record<ProjectStage, string> = {
-  idea: "overview",
-  research: "research",
-  strategy: "strategy",
-  script: "script",
-  storyboard: "storyboard",
-  visuals: "assets",
-  voice: "audio",
-  music: "audio",
-  video: "video",
-  thumbnail: "thumbnail",
-  seo: "seo",
-  repurposing: "publishing",
-  publishing: "publishing",
-  analytics: "overview",
-  improvement: "overview",
-};
+/** Every pipeline stage opens the real tool for this project. */
+function stageHref(stage: ProjectStage, projectId: string): string {
+  const q = `project=${encodeURIComponent(projectId)}`;
+  const map: Record<ProjectStage, string> = {
+    idea: `/intelligence/lab?${q}`,
+    research: `/intelligence/research?${q}`,
+    strategy: `/intelligence/strategy?${q}`,
+    script: `/studio/script?${q}`,
+    storyboard: `/studio/storyboard?${q}`,
+    visuals: `/studio/media?${q}&tab=image`,
+    voice: `/studio/media?${q}&tab=voice`,
+    music: `/studio/media?${q}&tab=audio`,
+    video: `/studio/video?${q}`,
+    thumbnail: `/studio/package?${q}&tab=thumbnail`,
+    seo: `/studio/package?${q}&tab=seo`,
+    repurposing: `/studio/package?${q}&tab=repurpose`,
+    publishing: `/studio/package?${q}&tab=platforms`,
+    analytics: `/analytics?${q}`,
+    improvement: `/analytics?${q}`,
+  };
+  return map[stage];
+}
 
 /** Project command center: header, pipeline, modules, summary, continue. */
 export default function ProjectOverviewPage() {
@@ -78,7 +83,7 @@ export default function ProjectOverviewPage() {
         <Breadcrumb trail={[{ label: "Projects", href: "/projects" }, { label: "Not found" }]} />
         <ErrorState
           title="Project not found"
-          body="It may have been deleted on this device, or the link came from another browser. Projects live in local storage until cloud sync ships in Phase 11."
+          body="It may have been deleted, or it belongs to another account. Sign in to see projects synced to your account."
           recoveryHref="/projects"
           recoveryLabel="Back to projects"
         />
@@ -126,36 +131,14 @@ export default function ProjectOverviewPage() {
             <Pencil className="size-4" aria-hidden="true" />
             Edit details
           </Button>
-          {(() => {
-            const inScriptWork = ["idea", "research", "strategy", "script", "storyboard"].includes(project.currentStage);
-            const studioHref = `/studio/script?project=${project.id}`;
-            const previewHref = `/projects/preview?stage=${STAGE_TAB[project.currentStage]}`;
-            const primary = inScriptWork
-              ? { href: studioHref, label: continueLabelFor(project) }
-              : { href: previewHref, label: `${continueLabelFor(project)} (preview)` };
-            const secondary = inScriptWork
-              ? { href: previewHref, label: "Module preview" }
-              : { href: studioHref, label: "Script Studio" };
-            return (
-              <>
-                <Link
-                  href={secondary.href}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted"
-                  onClick={() => touch(project.id)}
-                >
-                  {secondary.label}
-                </Link>
-                <Link
-                  href={primary.href}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
-                  onClick={() => touch(project.id)}
-                >
-                  {primary.label}
-                  <ArrowRight className="size-4" aria-hidden="true" />
-                </Link>
-              </>
-            );
-          })()}
+          <Link
+            href={stageHref(project.currentStage, project.id)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+            onClick={() => touch(project.id)}
+          >
+            {continueLabelFor(project)}
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
         </div>
       </div>
       <LocalStorageNote compact />
@@ -181,7 +164,7 @@ export default function ProjectOverviewPage() {
             </Button>
           ) : allDone ? (
             <p role="status" className="mt-4 rounded-lg border border-success/30 bg-success/10 p-3 text-sm">
-              All 15 stages complete. Analytics and improvement loops attach in Phase 10.
+              All 15 stages complete. Track performance in Analytics and feed learnings into your next idea.
             </p>
           ) : null}
         </section>
@@ -189,7 +172,7 @@ export default function ProjectOverviewPage() {
         <section aria-label="Production modules" className="lg:col-span-2">
           <h2 className="text-sm font-semibold">Production modules</h2>
           <p className="mt-0.5 text-xs text-muted-text">
-            Module layouts are static previews — tools connect in Phases 5–9 + 11.
+            Open any stage to work on it. Mark a stage complete to move the pipeline forward.
           </p>
           <ul className="mt-3 grid gap-2 sm:grid-cols-2">
             {PROJECT_STAGES.map((stage) => {
@@ -197,13 +180,21 @@ export default function ProjectOverviewPage() {
               return (
                 <li key={stage}>
                   <Link
-                    href={`/projects/preview?stage=${STAGE_TAB[stage]}`}
+                    href={stageHref(stage, project.id)}
+                    onClick={() => touch(project.id)}
                     className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2.5 transition-colors duration-150 hover:border-muted-text/50 hover:bg-muted/40"
                   >
                     <span className="text-sm font-medium">{stageLabel(stage)}</span>
-                    <Badge tone={state === "complete" ? "ok" : state === "in-progress" ? "info" : "preview"}>
-                      {state === "complete" ? "Complete" : state === "in-progress" ? "In progress" : "Preview"}
-                    </Badge>
+                    <span className="flex items-center gap-2">
+                      {state === "complete" ? (
+                        <Badge tone="ok">Complete</Badge>
+                      ) : state === "in-progress" ? (
+                        <Badge tone="info">In progress</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-text">Open</span>
+                      )}
+                      <ArrowRight className="size-3.5 text-muted-text" aria-hidden="true" />
+                    </span>
                   </Link>
                 </li>
               );
@@ -237,7 +228,7 @@ export default function ProjectOverviewPage() {
           return parts.length === 0 ? (
             <p className="mt-2 text-sm text-muted-text">
               No intelligence saved yet. Analyze the idea, define the audience,
-              and approve titles and hooks — they collect here for Phase 6.
+              and approve titles and hooks — they collect here and feed the Script Studio.
             </p>
           ) : (
             <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Saved intelligence">

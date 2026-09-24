@@ -13,6 +13,7 @@ import { emptyMediaBundle, parseMediaBundle, MEDIA_STORAGE_KEY, type MediaBundle
 import { useBackend } from "@/src/components/shell/BackendStatus";
 import { pullBundle, pushBundle, mergeById } from "@/src/lib/sync";
 import { InfoLine } from "@/src/components/ui/Toast";
+import { SyncNote } from "@/src/components/auth/SyncNote";
 
 let seq = 0;
 function nextId(prefix: string): string {
@@ -277,13 +278,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function MediaStorageNote({ compact }: { compact?: boolean }) {
-  return (
-    <InfoLine>
-      {compact
-        ? "Drafts + metadata on this device; upload bytes last for this session only. Providers connect in Phase 11."
-        : "Generated drafts, voice profiles, and asset metadata persist in this browser. Uploaded file bytes are session-only — re-upload after reload. Provider media and cloud storage arrive in Phase 11."}
-    </InfoLine>
-  );
+  void compact;
+  return <SyncNote what="Media, voice profiles, and asset details" extra="Uploaded files are stored with your account when you are signed in." />;
 }
 
 export type { MediaKind };

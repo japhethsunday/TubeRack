@@ -17,7 +17,7 @@ export default function GlobalError({
             <p className="mt-2 max-w-prose text-sm text-muted-text">
               A critical error escaped the route boundary. Retry to reload the
               app shell — report includes only a local console entry until
-              observability ships in Phase 12.
+              reload the page to try again.
             </p>
             <button
               type="button"

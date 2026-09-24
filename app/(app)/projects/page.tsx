@@ -123,7 +123,7 @@ export default function ProjectsPage() {
         <EmptyState
           icon={FolderKanban}
           title="No projects yet"
-          body="Create your first project — name, channel, topic, and goal. It appears here instantly and syncs to the cloud in Phase 11."
+          body="Create your first project — name, channel, topic, and goal. It appears here instantly and syncs to your account when you are signed in."
           action={<NewProjectButton label="Create your first project" />}
         />
       ) : (

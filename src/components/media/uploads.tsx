@@ -9,6 +9,8 @@ import { Progress } from "@/src/components/ui/feedback";
 import { Alert } from "@/src/components/ui/Alert";
 import { EmptyState } from "@/src/components/ui/states";
 import type { UploadSession } from "@/src/lib/media/types";
+import { useSession } from "@/src/components/auth/useSession";
+import { api } from "@/src/lib/api";
 
 function kindLabel(kind: UploadKind): string {
   return kind === "image" ? "Image" : kind === "video" ? "Video" : "Audio";
@@ -17,6 +19,24 @@ function kindLabel(kind: UploadKind): string {
 /** Real upload intake: magic-byte validation, metadata extraction, session bytes. */
 export function UploadZone({ projectId }: { projectId: string }) {
   const { addAsset, putBlob } = useMedia();
+  const session = useSession();
+
+  /** PUT bytes to the signed storage URL with real progress. */
+  function putWithProgress(url: string, file: File, mime: string, onProgress: (pct: number) => void, cancelled: () => boolean): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", url);
+      xhr.setRequestHeader("Content-Type", mime);
+      xhr.upload.onprogress = (e) => {
+        if (cancelled()) xhr.abort();
+        if (e.lengthComputable) onProgress(e.loaded / e.total);
+      };
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status}).`)));
+      xhr.onerror = () => reject(new Error("Upload failed: network error."));
+      xhr.onabort = () => reject(new Error("Upload cancelled."));
+      xhr.send(file);
+    });
+  }
   const [sessions, setSessions] = useState<UploadSession[]>([]);
   const [dragging, setDragging] = useState(false);
   const cancelFlags = useRef(new Map<string, boolean>());
@@ -73,14 +93,34 @@ export function UploadZone({ projectId }: { projectId: string }) {
         patch(id, { status: "cancelled" });
         return;
       }
+      // Signed in: store the file with the account so it survives reloads.
+      let storedUrl: string | null = null;
+      if (session.status === "signed-in") {
+        const signed = await api.post<{ uploadUrl: string; fileUrl: string }>("/api/v1/uploads/sign", {
+          mime: found.mime,
+          size: file.size,
+        });
+        await putWithProgress(
+          signed.uploadUrl,
+          file,
+          found.mime,
+          (f) => patch(id, { progress: 70 + Math.round(f * 29) }),
+          () => Boolean(cancelFlags.current.get(id)),
+        );
+        storedUrl = signed.fileUrl;
+      }
+      if (cancelFlags.current.get(id)) {
+        patch(id, { status: "cancelled" });
+        return;
+      }
       addAsset({
         projectId,
         sceneIds: [],
         kind: found.kind === "audio" ? "music" : found.kind,
-        source: "upload-session",
+        source: storedUrl ? "provider-output" : "upload-session",
         status: "ready",
         title: file.name,
-        payload: "",
+        payload: storedUrl ?? "",
         mime: found.mime,
         durationSec: meta.durationSec,
         width: meta.width,
@@ -143,7 +183,7 @@ export function UploadZone({ projectId }: { projectId: string }) {
         </div>
         <Alert tone="info" title="Session bytes, validated content">
           Files are sniffed by magic bytes and capped by size. Bytes live for this session only — metadata
-          persists; re-upload after reload. Server-side validation still applies in Phase 11.
+          persists; re-upload after reload. Sign in to store uploads with your account.
         </Alert>
       </div>
       <div className="space-y-2">

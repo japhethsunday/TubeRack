@@ -1,6 +1,5 @@
 import { Tabs } from "@/src/components/ui/Tabs";
-import { Alert } from "@/src/components/ui/Alert";
-import { AccountStateBanner } from "@/src/components/auth/AccountStateBanner";
+import { VerifyBanner } from "@/src/components/auth/VerifyBanner";
 import { ProfilePanel, SecurityPanel, SessionsPanel } from "@/src/components/settings/account-panels";
 import { PreferencesPanel, NotificationsPanel } from "@/src/components/settings/preference-panels";
 import { WorkspacePanel, BillingPanel, DataPanel } from "@/src/components/settings/workspace-panels";
@@ -16,7 +15,7 @@ const VALID = [
   "data",
 ] as const;
 
-/** Account settings: account vs workspace, honest preview states throughout. */
+/** Account settings: profile, security, sessions, workspace, billing, data. */
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -34,17 +33,7 @@ export default async function SettingsPage({
         </p>
       </div>
 
-      <Alert tone="info" title="Preview settings">
-        Controls are interactive so the UX can be reviewed, but nothing syncs
-        to an account until sessions and storage connect in Phase 11. The theme
-        toggle is the exception — it applies to this device immediately.
-      </Alert>
-
-      <AccountStateBanner
-        state="unverified"
-        actionHref="/verify-email"
-        actionLabel="Verify email"
-      />
+      <VerifyBanner />
 
       <Tabs
         defaultId={initial}

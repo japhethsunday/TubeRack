@@ -20,7 +20,7 @@ import { Modal } from "@/src/components/ui/overlays";
 import { Button } from "@/src/components/ui/Button";
 import { Input, Textarea } from "@/src/components/ui/fields";
 import { Badge } from "@/src/components/ui/Badge";
-import { ProviderBoundaryNote } from "@/src/components/script/BoundaryNote";
+import { rewriteSectionWithProvider } from "@/src/lib/ai-client";
 import { cx } from "@/src/components/ui/cx";
 
 /**
@@ -44,6 +44,7 @@ export function SectionCard({
   onShorten,
   onAddRef,
   onRemoveRef,
+  topic = "",
 }: {
   section: ScriptSection;
   index: number;
@@ -61,11 +62,25 @@ export function SectionCard({
   onShorten: (text: string) => void;
   onAddRef: (fact: string, source: string) => void;
   onRemoveRef: (refId: string) => void;
+  topic?: string;
 }) {
   const [showNotes, setShowNotes] = useState(false);
   const [showRefs, setShowRefs] = useState(false);
   const [shortenPreview, setShortenPreview] = useState<string | null>(null);
   const [rewriteOpen, setRewriteOpen] = useState(false);
+  const [rewriteNote, setRewriteNote] = useState("");
+  const [rewriteDraft, setRewriteDraft] = useState<string | null>(null);
+  const [rewriteBusy, setRewriteBusy] = useState(false);
+  const [rewriteError, setRewriteError] = useState<string | null>(null);
+
+  async function runRewrite() {
+    setRewriteBusy(true);
+    setRewriteError(null);
+    const outcome = await rewriteSectionWithProvider({ heading: section.heading, text: section.text, instruction: rewriteNote, topic });
+    setRewriteBusy(false);
+    if (outcome.ok) setRewriteDraft(outcome.data.text);
+    else setRewriteError(outcome.message);
+  }
   const [refFact, setRefFact] = useState("");
   const [refSource, setRefSource] = useState("");
   const words = countWords(section.text);
@@ -123,7 +138,7 @@ export function SectionCard({
           onClick={() => setShortenPreview(extractShorten(section.text))}
           icon={<ShortenIcon className="size-3.5" />}
         />
-        <ToolButton label="Rewrite with provider (Phase 11)" onClick={() => setRewriteOpen(true)} icon={<Wand2 className="size-3.5" />} />
+        <ToolButton label="Rewrite with Gemini" disabled={!section.text.trim()} onClick={() => { setRewriteDraft(null); setRewriteError(null); setRewriteOpen(true); }} icon={<Wand2 className="size-3.5" />} />
         <ToolButton label="Delete section" danger onClick={onDelete} icon={<Trash2 className="size-3.5" />} />
         <ToolButton
           label={showNotes ? "Hide creator notes" : "Creator notes"}
@@ -166,7 +181,7 @@ export function SectionCard({
 
       {showRefs && (
         <div className="mt-2 space-y-2 rounded-lg border border-dashed border-border p-3">
-          <p className="text-xs font-medium">Research references (all unverified until Phase 11)</p>
+          <p className="text-xs font-medium">Research references (verify before publishing)</p>
           {section.researchRefs.length === 0 && (
             <p className="text-xs text-muted-text">None attached. Add facts with their source — never invent citations.</p>
           )}
@@ -226,20 +241,40 @@ export function SectionCard({
       )}
 
       {rewriteOpen && (
-        <Modal title="Rewrite with provider" onClose={() => setRewriteOpen(false)}>
-          <ProviderBoundaryNote
-            operation="Section rewrite"
-            contextLines={[
-              `Section “${section.heading}” (${words} words, shown in full)`,
-              "Project tone, format, and creator instruction",
-              "Audience profile + relevant strategy fields",
-              "Channel DNA positioning and avoid-words",
-            ]}
-          />
-          <div className="mt-4 flex justify-end">
-            <Button variant="outline" onClick={() => setRewriteOpen(false)}>
-              Close
-            </Button>
+        <Modal title={`Rewrite “${section.heading}”`} description="Gemini rewrites this section. Review it before replacing — save a version first if you want to keep the original." onClose={() => setRewriteOpen(false)}>
+          <div className="space-y-3">
+            <Textarea
+              label="How should it change? (optional)"
+              rows={2}
+              value={rewriteNote}
+              onChange={(e) => setRewriteNote(e.target.value)}
+              placeholder="e.g. punchier, add a concrete example, cut to 60 words…"
+            />
+            {rewriteError && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{rewriteError}</p>}
+            {rewriteDraft !== null && (
+              <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-3 text-sm leading-relaxed" aria-label="Rewritten section">
+                {rewriteDraft}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRewriteOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant={rewriteDraft !== null ? "outline" : "primary"} loading={rewriteBusy} onClick={() => void runRewrite()}>
+                <Wand2 className="size-4" aria-hidden="true" />
+                {rewriteDraft !== null ? "Try again" : "Rewrite"}
+              </Button>
+              {rewriteDraft !== null && (
+                <Button
+                  onClick={() => {
+                    onText(rewriteDraft);
+                    setRewriteOpen(false);
+                  }}
+                >
+                  Replace section
+                </Button>
+              )}
+            </div>
           </div>
         </Modal>
       )}

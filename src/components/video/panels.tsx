@@ -335,7 +335,7 @@ export function ExportPanel({
           </Select>
         </div>
         <p className="mt-2 text-xs text-muted-text">
-          {formatDuration(duration)} timeline · {clipCount} clip(s). Workers render server-side in Phase 11 — this panel saves the exact request.
+          {formatDuration(duration)} timeline · {clipCount} clip(s). This panel saves the exact render request with its settings.
         </p>
       </section>
 
@@ -360,7 +360,7 @@ export function ExportPanel({
             ))}
           </ul>
         )}
-        <Button className="mt-3" onClick={onSaveRequest} disabled={health === "blocked"} title={health === "blocked" ? "Resolve blocking issues first" : "Save a render request for Phase 11 workers"}>
+        <Button className="mt-3" onClick={onSaveRequest} disabled={health === "blocked"} title={health === "blocked" ? "Resolve blocking issues first" : "Save the exact render request"}>
           <Download className="size-4" aria-hidden="true" />
           Save render request
         </Button>
@@ -380,7 +380,7 @@ export function ExportPanel({
                   <Badge tone={r.health === "ready" ? "ok" : r.health === "review" ? "warn" : "bad"}>{r.health}</Badge>
                 </p>
                 <p className="text-xs text-muted-text">
-                  {r.settings.width}×{r.settings.height} {r.settings.format} · {r.issues.length} noted issue(s) · saved {new Date(r.createdAt).toLocaleString()} · submits to workers in Phase 11.
+                  {r.settings.width}×{r.settings.height} {r.settings.format} · {r.issues.length} noted issue(s) · saved {new Date(r.createdAt).toLocaleString()} · saved request.
                 </p>
                 <button type="button" onClick={() => onRemoveRequest(r.id)} className="mt-1 text-xs text-muted-text underline">
                   Discard request

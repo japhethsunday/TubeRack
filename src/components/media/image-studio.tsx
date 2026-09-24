@@ -232,7 +232,7 @@ export function ImageStudio({
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)} hint="Capability-gated: unsupported options explain themselves.">
           {PROVIDERS.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.label}{p.available ? "" : " — Phase 11"}
+              {p.label}
             </option>
           ))}
         </Select>
@@ -289,7 +289,7 @@ export function ImageStudio({
                 />
               </div>
             ))}
-            <MethodologyNote text="Local assembly from scene, script, DNA, and consistency. Edit freely — this direction travels with provider requests in Phase 11." />
+            <MethodologyNote text="Local assembly from scene, script, DNA, and consistency. Edit freely — Gemini receives exactly this direction." />
           </div>
         </details>
 

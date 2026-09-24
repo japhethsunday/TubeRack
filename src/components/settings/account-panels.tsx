@@ -1,44 +1,66 @@
 "use client";
 
-import { useState } from "react";
-import { ShieldCheck, KeyRound, Smartphone } from "lucide-react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { KeyRound, Monitor, LogOut } from "lucide-react";
 import { Input } from "@/src/components/ui/fields";
 import { PasswordField } from "@/src/components/auth/PasswordField";
 import { PasswordStrength } from "@/src/components/auth/PasswordStrength";
-import { AuthBoundaryNotice } from "@/src/components/auth/AuthBoundaryNotice";
 import { fieldErrors } from "@/src/components/auth/form";
-import { profileSchema, changePasswordSchema } from "@/src/lib/auth/validation";
+import { changePasswordSchema } from "@/src/lib/auth/validation";
+import { useSession, signOut } from "@/src/components/auth/useSession";
+import { api, ApiError } from "@/src/lib/api";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Button } from "@/src/components/ui/Button";
 import { Badge } from "@/src/components/ui/Badge";
-import { Alert } from "@/src/components/ui/Alert";
-import { EmptyState } from "@/src/components/ui/states";
-import { PREVIEW_IDENTITY } from "@/src/config/identity";
 
-function Saved({ feature, detail }: { feature: string; detail: string }) {
+function Result({ ok, message }: { ok: boolean; message: string }) {
   return (
-    <div className="mt-4">
-      <AuthBoundaryNotice feature={feature} validated={detail} />
-    </div>
+    <p role={ok ? "status" : "alert"} className={`rounded-lg p-3 text-sm ${ok ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
+      {message}
+    </p>
   );
 }
 
-export function ProfilePanel() {
-  const [name, setName] = useState(PREVIEW_IDENTITY.name);
-  const [username, setUsername] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saved, setSaved] = useState(false);
+function SignedOutNote() {
+  return (
+    <p className="text-sm text-muted-text">
+      <Link href="/login" className="font-medium text-foreground underline">Sign in</Link> to manage your account.
+    </p>
+  );
+}
 
-  function save(e: React.FormEvent) {
+const errorText = (e: unknown) => (e instanceof ApiError ? e.details?.[0] ?? e.message : "Something went wrong. Nothing was changed.");
+
+export function ProfilePanel() {
+  const session = useSession();
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- seed the editable field once the session loads.
+    if (session.user) setName(session.user.name);
+  }, [session.user]);
+
+  if (session.status === "loading") return <p className="text-sm text-muted-text">Loading profile…</p>;
+  if (session.status === "signed-out") return <SignedOutNote />;
+
+  async function save(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = profileSchema.safeParse({ name, username: username || undefined });
-    if (!parsed.success) {
-      setErrors(fieldErrors(parsed.error));
-      setSaved(false);
+    if (!name.trim()) {
+      setResult({ ok: false, message: "Name is required." });
       return;
     }
-    setErrors({});
-    setSaved(true);
+    setBusy(true);
+    try {
+      await api.patch("/api/v1/users/me", { name: name.trim() });
+      setResult({ ok: true, message: "Profile saved." });
+    } catch (error) {
+      setResult({ ok: false, message: errorText(error) });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -46,109 +68,117 @@ export function ProfilePanel() {
       <div className="flex items-center gap-4">
         <Avatar name={name || "?"} size="lg" />
         <div>
-          <p className="text-sm font-medium">Avatar</p>
-          <p className="text-xs text-muted-text">Uploads activate with storage in Phase 11.</p>
+          <p className="text-sm font-medium">{name || "Your name"}</p>
+          <p className="flex items-center gap-2 text-xs text-muted-text">
+            {session.user.email}
+            {session.user.email_verified_at ? <Badge tone="ok">Verified</Badge> : (
+              <Link href="/verify-email" className="underline">Verify email</Link>
+            )}
+          </p>
         </div>
       </div>
-      <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} error={errors.name} autoComplete="name" />
-      <Input label="Email" type="email" defaultValue={PREVIEW_IDENTITY.email} disabled hint="Changing email re-verifies the address — available in Phase 11." />
-      <Input label="Username (optional)" value={username} onChange={(e) => setUsername(e.target.value)} error={errors.username} placeholder="studio-ada" hint="Lowercase letters, numbers, dashes." />
-      <Button type="submit">Save profile</Button>
-      {saved && <Saved feature="Profile update" detail={`Profile for “${name}” passed local validation.`} />}
+      <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+      <Input label="Email" type="email" value={session.user.email} disabled hint="Your sign-in address." />
+      <Button type="submit" loading={busy}>Save profile</Button>
+      {result && <Result {...result} />}
     </form>
   );
 }
 
 export function SecurityPanel() {
+  const session = useSession();
   const [current, setCurrent] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
 
-  function save(e: React.FormEvent) {
+  if (session.status === "signed-out") return <SignedOutNote />;
+
+  async function save(e: React.FormEvent) {
     e.preventDefault();
     const parsed = changePasswordSchema.safeParse({ current, password, confirm });
     if (!parsed.success) {
       setErrors(fieldErrors(parsed.error));
-      setSaved(false);
       return;
     }
     setErrors({});
-    setSaved(true);
+    setBusy(true);
+    try {
+      await api.post("/api/v1/auth/password/change", { current, password, confirm });
+      setResult({ ok: true, message: "Password updated. Other devices were signed out." });
+      setCurrent("");
+      setPassword("");
+      setConfirm("");
+    } catch (error) {
+      setResult({ ok: false, message: errorText(error) });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <div className="grid max-w-3xl gap-6">
-      <form onSubmit={save} noValidate className="max-w-lg space-y-4" aria-label="Change password">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <KeyRound className="size-4 text-muted-text" aria-hidden="true" />
-          Change password
-        </h3>
-        <PasswordField label="Current password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} error={errors.current} />
-        <div className="space-y-2">
-          <PasswordField label="New password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
-          <PasswordStrength value={password} />
-        </div>
-        <PasswordField label="Confirm new password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} error={errors.confirm} />
-        <Button type="submit">Update password</Button>
-        {saved && <Saved feature="Password change" detail="New password passed local validation." />}
-      </form>
-
-      <section aria-label="Two-factor authentication" className="rounded-xl border border-border p-5">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <Smartphone className="size-4 text-muted-text" aria-hidden="true" />
-          Two-factor authentication
-          <Badge tone="preview">Phase 11</Badge>
-        </h3>
-        <p className="mt-1 text-sm text-muted-text">
-          TOTP + recovery codes land with the auth service. No partial or fake
-          2FA is offered.
-        </p>
-        <Button disabled title="Two-factor setup arrives in Phase 11" className="mt-3">
-          Set up 2FA
-        </Button>
-      </section>
-
-      <section aria-label="Recovery" className="rounded-xl border border-border p-5">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <ShieldCheck className="size-4 text-muted-text" aria-hidden="true" />
-          Recovery
-        </h3>
-        <p className="mt-1 text-sm text-muted-text">
-          Recovery codes are issued alongside 2FA in Phase 11. Until then, email
-          reset is the only recovery path.
-        </p>
-      </section>
-    </div>
+    <form onSubmit={save} noValidate className="max-w-lg space-y-4" aria-label="Change password">
+      <h3 className="flex items-center gap-2 text-sm font-semibold">
+        <KeyRound className="size-4 text-muted-text" aria-hidden="true" />
+        Change password
+      </h3>
+      <PasswordField label="Current password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} error={errors.current} />
+      <div className="space-y-2">
+        <PasswordField label="New password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
+        <PasswordStrength value={password} />
+      </div>
+      <PasswordField label="Confirm new password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} error={errors.confirm} />
+      <Button type="submit" loading={busy}>Update password</Button>
+      {result && <Result {...result} />}
+      <p className="text-xs text-muted-text">
+        Forgot it? <Link href="/forgot-password" className="underline">Reset by email</Link>.
+      </p>
+    </form>
   );
 }
 
 export function SessionsPanel() {
+  const session = useSession();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  if (session.status === "signed-out") return <SignedOutNote />;
+
+  async function revokeOthers() {
+    setBusy(true);
+    try {
+      await api.post("/api/v1/auth/sessions/revoke-others");
+      setResult({ ok: true, message: "Every other device was signed out." });
+    } catch (error) {
+      setResult({ ok: false, message: errorText(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="grid max-w-3xl gap-4">
       <section aria-label="This session" className="rounded-xl border border-border p-5">
-        <h3 className="text-sm font-semibold">This browser</h3>
-        <p className="mt-1 text-sm text-muted-text">
-          Preview context — no session token exists yet. Device, IP, and
-          last-active tracking start with server sessions (Phase 11).
-        </p>
-        <div className="mt-3">
-          <Alert tone="info" title="Nothing to sign out">
-            There is no session to end. Sign-out becomes real alongside sessions
-            in Phase 11 — and will return you to the login screen.
-          </Alert>
-        </div>
-      </section>
-      <EmptyState
-        title="No other sessions"
-        body="Every signed-in device lists here with revoke controls once session storage ships."
-      />
-      <div>
-        <Button disabled title="Session revocation arrives in Phase 11">
-          Sign out other sessions
+        <h3 className="flex items-center gap-2 text-sm font-semibold">
+          <Monitor className="size-4 text-muted-text" aria-hidden="true" />
+          This browser <Badge tone="ok">Active</Badge>
+        </h3>
+        <p className="mt-1 text-sm text-muted-text">Signed in as {session.user?.email ?? "…"}.</p>
+        <Button variant="outline" className="mt-3" onClick={() => void signOut()}>
+          <LogOut className="size-4" aria-hidden="true" />
+          Sign out
         </Button>
-      </div>
+      </section>
+      <section aria-label="Other sessions" className="rounded-xl border border-border p-5">
+        <h3 className="text-sm font-semibold">Other devices</h3>
+        <p className="mt-1 text-sm text-muted-text">Lost a device or signed in somewhere public? End every other session at once.</p>
+        <Button className="mt-3" loading={busy} onClick={() => void revokeOthers()}>
+          Sign out other devices
+        </Button>
+        {result && <div className="mt-3"><Result {...result} /></div>}
+      </section>
     </div>
   );
 }

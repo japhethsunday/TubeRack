@@ -224,7 +224,7 @@ function Studio() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Visual &amp; Audio Studio — {project.name}</h1>
           <p className="mt-0.5 text-xs text-muted-text">
-            {channelName(project.channelId)} · {scenes.length} scene(s) · on-device drafts are free; providers connect in Phase 11.
+            {channelName(project.channelId)} · {scenes.length} scene(s) · on-device drafts are free; Gemini images and voice need sign-in.
           </p>
         </div>
         <button

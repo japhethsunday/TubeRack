@@ -119,3 +119,43 @@ export async function storagePing(): Promise<boolean> {
 export async function inlineLimit(): Promise<number> {
   return getServerEnv().MEDIA_INLINE_LIMIT;
 }
+
+/**
+ * Signed direct upload: the browser PUTs bytes straight to Supabase, so
+ * large video never passes through a serverless function (4.5 MB cap).
+ * The server chooses the key; the token is single-use and short-lived.
+ */
+export async function storageSignedUpload(key: string): Promise<string> {
+  const env = getServerEnv();
+  if (!isStorageConfigured(env)) throw new Error("Object storage is not configured.");
+  const base = env.SUPABASE_URL!.replace(/\/$/, "");
+  const path = key.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(`${base}/storage/v1/object/upload/sign/${encodeURIComponent(env.SUPABASE_BUCKET)}/${path}`, {
+    method: "POST",
+    headers: { ...authHeaders(env), "Content-Type": "application/json" },
+    body: "{}",
+  });
+  if (!response.ok) throw new Error(`Object storage refused the upload link (${response.status}).`);
+  const body = (await response.json()) as { url?: string };
+  if (!body.url) throw new Error("Object storage returned no upload link.");
+  return `${base}/storage/v1${body.url}`;
+}
+
+/** Short-lived signed download link (served after an ownership check). */
+export async function storageSignedUrl(key: string, expiresIn = 3600): Promise<string> {
+  const env = getServerEnv();
+  if (!isStorageConfigured(env)) throw new Error("Object storage is not configured.");
+  const base = env.SUPABASE_URL!.replace(/\/$/, "");
+  const path = key.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(`${base}/storage/v1/object/sign/${encodeURIComponent(env.SUPABASE_BUCKET)}/${path}`, {
+    method: "POST",
+    headers: { ...authHeaders(env), "Content-Type": "application/json" },
+    body: JSON.stringify({ expiresIn }),
+  });
+  if (response.status === 404 || response.status === 400) throw new Error("Object not found.");
+  if (!response.ok) throw internalError();
+  const body = (await response.json()) as { signedURL?: string; signedUrl?: string };
+  const signed = body.signedURL ?? body.signedUrl;
+  if (!signed) throw internalError();
+  return `${base}/storage/v1${signed}`;
+}

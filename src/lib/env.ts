@@ -18,6 +18,10 @@ const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_BUCKET: z.string().default("media"),
 
+  // Transactional email (Resend; server-only)
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default("TubeRack <no-reply@info.lekderis.com>"),
+
   // Security (required for auth routes; validated lazily at startup of those routes)
   JWT_SECRET: z.string().optional(),
   ENCRYPTION_KEY: z.string().optional(),
@@ -92,7 +96,7 @@ export function backendStatus(env: ServerEnv): {
     database: Boolean(env.DATABASE_URL),
     storage: Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY),
     auth: Boolean(env.DATABASE_URL && env.JWT_SECRET),
-    email: false, // No email provider yet — requests store tokens, nothing is sent.
+    email: Boolean(env.RESEND_API_KEY),
   };
 }
 

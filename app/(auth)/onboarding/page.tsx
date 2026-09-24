@@ -141,7 +141,7 @@ export default function OnboardingPage() {
                 <option>Bold and contrarian</option>
               </Select>
               <p className="text-xs text-muted-text">
-                Tone, voice, and visual defaults become Brand DNA in Phase 4 — this step only previews the questions.
+                You can refine tone, voice, and visual defaults anytime in Channel DNA.
               </p>
             </div>
           )}

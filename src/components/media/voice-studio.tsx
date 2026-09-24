@@ -176,7 +176,7 @@ export function VoiceStudio({
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
           {PROVIDERS.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.label}{p.available ? "" : " — Phase 11"}
+              {p.label}
             </option>
           ))}
         </Select>

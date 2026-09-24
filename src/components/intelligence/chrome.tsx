@@ -97,7 +97,7 @@ export function UsageNote({ kind, taskLabel }: { kind: UsageKind; taskLabel: str
   return (
     <p className="flex items-center gap-1.5 text-xs text-muted-text">
       <Coins className="size-3.5" aria-hidden="true" />
-      Usage: {taskLabel} · {kind} · metered with real providers in Phase 11.
+      Usage: {taskLabel} · {kind} · Gemini calls are metered per account.
       <Badge tone="preview">Unmetered preview</Badge>
     </p>
   );

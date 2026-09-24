@@ -4,7 +4,7 @@ import "@/app/globals.css";
 export const metadata: Metadata = {
   title: "TubeRack — AI Video Production Platform",
   description:
-    "Phase 2 design foundation for an AI-native content production operating system: idea to analytics.",
+    "AI video production and YouTube intelligence: research, scripts, voice, visuals, packaging, and analytics in one workspace.",
 };
 
 const THEME_INIT = `(function(){try{var t=localStorage.getItem("tuberack-theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}})();`;

@@ -130,3 +130,7 @@ export function writeSeoWithProvider(context: PackagingContext) {
     api.post<{ description: string; tags: string[]; hashtags: string[]; model: string }>("/api/v1/ai/package", { kind: "seo", context }),
   );
 }
+
+export function rewriteSectionWithProvider(input: { heading: string; text: string; instruction: string; topic: string }) {
+  return attempt(() => api.post<{ text: string; model: string }>("/api/v1/ai/rewrite", input));
+}

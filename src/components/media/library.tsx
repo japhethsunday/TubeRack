@@ -201,7 +201,7 @@ export function AssetCard({
           <AssignScenes asset={asset} sceneOptions={sceneOptions} />
         )}
         {asset.source === "provider-request" && (
-          <p className="text-xs text-muted-text">Scene assignment unlocks once provider media exists (Phase 11).</p>
+          <p className="text-xs text-muted-text">Request drafts have no media yet — generate or upload media to assign it.</p>
         )}
 
         <div className="flex gap-1.5">

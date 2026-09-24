@@ -108,7 +108,7 @@ export function MusicStudio({
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
           {PROVIDERS.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.label}{p.available ? "" : " — Phase 11"}
+              {p.label}
             </option>
           ))}
         </Select>
@@ -251,7 +251,7 @@ export function SfxStudio({
         <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
           {PROVIDERS.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.label}{p.available ? "" : " — Phase 11"}
+              {p.label}
             </option>
           ))}
         </Select>
@@ -276,7 +276,7 @@ export function SfxStudio({
           ))}
         </ul>
         <BufferPreview buffer={render?.buffer ?? null} context={render?.context ?? null} label={renderLabel} />
-        <p className="text-xs text-muted-text">Placement happens on the Phase 8 timeline — here effects are previewed, saved, and assigned to scenes.</p>
+        <p className="text-xs text-muted-text">Placement happens on the Video Studio timeline — here effects are previewed, saved, and assigned to scenes.</p>
       </div>
       <div className="space-y-3">
         <h3 className="text-sm font-semibold">Saved effects ({effects.length})</h3>

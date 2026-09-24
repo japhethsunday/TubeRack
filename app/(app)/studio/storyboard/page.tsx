@@ -245,7 +245,7 @@ function Board() {
           <p className="text-sm text-muted-text">
             Visual direction, narration edits, shot choices, and notes on the current{" "}
             {scenes.length} scene(s) will be destroyed. The script itself is untouched.
-            There are no board versions in Phase 6 — export first if the work matters.
+            Boards have no version history — export first if the work matters.
           </p>
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="outline" onClick={() => setConfirmRebuild(false)}>

@@ -43,7 +43,7 @@ export function NewProjectButton({ label = "New project" }: { label?: string }) 
       return;
     }
     if (!topic.trim()) {
-      setError("Describe the topic or idea — strategy builds on it in Phase 5.");
+      setError("Describe the topic or idea — research and strategy build on it.");
       return;
     }
     let cid = channelId;
@@ -79,7 +79,7 @@ export function NewProjectButton({ label = "New project" }: { label?: string }) 
       {open && (
         <Modal
           title="New project"
-          description="An idea with a pipeline attached. Research, strategy, and AI build on the topic in Phase 5."
+          description="An idea with a pipeline attached. Research, strategy, and AI build on the topic."
           onClose={() => setOpen(false)}
           wide
         >

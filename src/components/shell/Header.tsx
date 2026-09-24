@@ -110,7 +110,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         <Drawer title="Notifications" description="Activity, renders, and mentions land here." onClose={() => setDrawer("none")}>
           <EmptyState
             title="No notifications yet"
-            body="Render completions, comments, and performance alerts will appear here once background workers ship in Phase 11."
+            body="Render completions, comments, and performance alerts will appear here."
           />
         </Drawer>
       )}
@@ -125,7 +125,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
             </li>
             <li>
               <span className="block rounded-lg border border-border p-3 opacity-60" aria-disabled="true">
-                <span className="font-medium">Support inbox — Phase 11</span>
+                <span className="font-medium">Support</span>
                 <span className="block text-muted-text">Account-linked help arrives with the backend.</span>
               </span>
             </li>

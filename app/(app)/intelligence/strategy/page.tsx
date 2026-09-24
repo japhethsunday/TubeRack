@@ -64,7 +64,7 @@ function StrategyBody() {
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Content strategy engine</h1>
         <p className="mt-1 max-w-prose text-sm text-muted-text">
           Strategy as structured data — angle, promise, narrative, format — not
-          a paragraph. Assembles into a production brief for Phase 6.
+          a paragraph. Assembles into a production brief the Script Studio uses.
         </p>
       </div>
 

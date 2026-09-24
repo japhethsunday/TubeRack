@@ -387,3 +387,25 @@ export async function writePackaging(
     model,
   };
 }
+
+/** Rewrite one script section following a creator instruction. */
+export async function rewriteSection(input: {
+  heading: string;
+  text: string;
+  instruction: string;
+  topic: string;
+}): Promise<{ text: string; model: string }> {
+  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Set GEMINI_API_KEY to enable Gemini.");
+  const { text, model } = await new GeminiTextProvider().generateText({
+    prompt: [
+      "You are an expert YouTube scriptwriter. Rewrite the script section below as spoken narration.",
+      `Video topic: ${input.topic || "(not given)"}`,
+      `Section: ${input.heading}`,
+      `Creator instruction: ${input.instruction || "Make it tighter, clearer, and more engaging while keeping the meaning."}`,
+      "Keep facts as given; never invent statistics or quotes. Return ONLY the rewritten section text, no headings or notes.",
+      `Original:\n${input.text}`,
+    ].join("\n\n"),
+    maxTokens: Math.min(4096, Math.round(input.text.split(/\s+/).length * 3) + 512),
+  });
+  return { text: text.replace(/^["“]|["”]$/g, "").trim(), model };
+}

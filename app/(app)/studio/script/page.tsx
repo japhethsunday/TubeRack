@@ -527,6 +527,7 @@ function Editor({
             index={i}
             total={sections.length}
             wpm={wpm}
+            topic={project?.topic ?? ""}
             claims={detectClaims(s.text)}
             match={matches.includes(s.id)}
             onText={(text) => commitQuiet(editSectionText(sections, s.id, text))}

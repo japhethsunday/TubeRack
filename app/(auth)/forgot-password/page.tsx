@@ -9,15 +9,16 @@ import { forgotSchema } from "@/src/lib/auth/validation";
 import { FORGOT_SUBMITTED_MESSAGE } from "@/src/lib/auth/errors";
 import { Input } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
-import { Badge } from "@/src/components/ui/Badge";
+import { api, ApiError } from "@/src/lib/api";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const parsed = forgotSchema.safeParse({ email });
     if (!parsed.success) {
@@ -25,11 +26,16 @@ export default function ForgotPasswordPage() {
       return;
     }
     setErrors({});
+    setFormError(null);
     setLoading(true);
-    window.setTimeout(() => {
-      setLoading(false);
+    try {
+      await api.post("/api/v1/auth/password/forgot", { email });
       setSubmitted(true);
-    }, 400);
+    } catch (error) {
+      setFormError(error instanceof ApiError ? error.message : "Something went wrong. Try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -51,10 +57,7 @@ export default function ForgotPasswordPage() {
           <p role="status" className="text-sm text-muted-text">
             {FORGOT_SUBMITTED_MESSAGE}
           </p>
-          <p className="flex items-center gap-2 text-xs text-muted-text">
-            Email delivery connects in Phase 11 — no message was actually sent.
-            <Badge tone="preview">Phase 11</Badge>
-          </p>
+          <p className="text-xs text-muted-text">Check your spam folder if it does not arrive within a few minutes.</p>
         </div>
       ) : (
         <form onSubmit={submit} noValidate className="space-y-4">
@@ -67,7 +70,12 @@ export default function ForgotPasswordPage() {
             error={errors.email}
             placeholder="you@studio.com"
           />
-          <Button type="submit" loading={loading} className="w-full">
+          {formError && (
+            <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              {formError}
+            </p>
+          )}
+          <Button type="submit" loading={loading} className="auth-sheen w-full">
             Send reset link
           </Button>
         </form>
