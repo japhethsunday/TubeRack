@@ -108,8 +108,10 @@ export async function DELETE(request: Request) {
     // Storage objects are removed best-effort after the row delete below.
     const assets = await db`SELECT storage_key FROM media_assets WHERE project_id = ${id} AND storage_key IS NOT NULL`;
     const keys = assets as unknown as { storage_key: string }[];
-    const result = await db`DELETE FROM projects WHERE id = ${id} RETURNING id`;
-    if (result.length === 0) throw notFound("Project");
+    const found = await db`SELECT id FROM projects WHERE id = ${id} AND deleted_at IS NULL LIMIT 1`;
+    if (found.length === 0) throw notFound("Project");
+    const { deleteProjectData } = await import("@/src/server/sync");
+    await deleteProjectData(id);
     const { storageDelete } = await import("@/src/server/storage");
     for (const a of keys) {
       await storageDelete(a.storage_key);

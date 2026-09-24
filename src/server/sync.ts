@@ -82,8 +82,14 @@ async function upsertById(
 ): Promise<"inserted" | "updated" | "skipped"> {
   const db = getDb();
   if (!db) throw backendUnavailable("Database");
-  const existing = await db.unsafe(`SELECT workspace_id FROM ${table} WHERE id = $1 LIMIT 1`, [String(row.id)] as never[]);
-  const found = existing[0] as { workspace_id?: string; project_id?: string; user_id?: string } | undefined;
+  const softDeletes = table === "projects" || table === "channels";
+  const existing = await db.unsafe(
+    `SELECT workspace_id${softDeletes ? ", deleted_at" : ""} FROM ${table} WHERE id = $1 LIMIT 1`,
+    [String(row.id)] as never[],
+  );
+  const found = existing[0] as { workspace_id?: string; project_id?: string; user_id?: string; deleted_at?: unknown } | undefined;
+  // A deleted project/channel stays deleted: a stale copy on another device must not bring it back.
+  if (found && softDeletes && found.deleted_at) return "skipped";
   if (found) {
     // Ownership check per table shape (user-scoped rows never merge here).
     let owner: string | null | undefined = found.workspace_id;
@@ -117,6 +123,38 @@ async function upsertById(
     vals as never[],
   );
   return "inserted";
+}
+
+/** Tables holding a project's content; cleared when the project is deleted. */
+const PROJECT_CHILD_TABLES = [
+  "project_events",
+  "project_scripts",
+  "project_boards",
+  "project_compositions",
+  "render_requests",
+  "media_assets",
+  "project_extras",
+  "jobs",
+  "project_intel",
+  "project_packaging",
+  "perf_entries",
+  "retention_notes",
+] as const;
+
+/**
+ * Delete a project: its content is removed, and the project row is kept as
+ * a tombstone (deleted_at) so no device can re-create it on its next sync.
+ */
+export async function deleteProjectData(projectId: string): Promise<void> {
+  const db = getDb();
+  if (!db) throw backendUnavailable("Database");
+  await db.begin(async (tx) => {
+    for (const table of PROJECT_CHILD_TABLES) {
+      await tx.unsafe(`DELETE FROM ${table} WHERE project_id = $1`, [projectId]);
+    }
+    await tx`UPDATE opportunities SET project_id = NULL WHERE project_id = ${projectId}`;
+    await tx`UPDATE projects SET deleted_at = now(), updated_at = now() WHERE id = ${projectId}`;
+  });
 }
 
 export interface SyncResult {
@@ -202,14 +240,14 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
     for (const id of body.deletedProjectIds) {
       const owner = await projectWorkspace(id);
       if (owner !== workspaceId) continue;
-      await db`DELETE FROM projects WHERE id = ${id}`;
+      await deleteProjectData(id);
       deleted += 1;
     }
     for (const id of body.deletedChannelIds) {
-      const ch = await db`SELECT workspace_id FROM channels WHERE id = ${id} LIMIT 1`;
+      const ch = await db`SELECT workspace_id FROM channels WHERE id = ${id} AND deleted_at IS NULL LIMIT 1`;
       const owner = (ch[0] as { workspace_id?: string } | undefined)?.workspace_id;
       if (owner !== workspaceId) continue;
-      await db`DELETE FROM channels WHERE id = ${id}`;
+      await db`UPDATE channels SET deleted_at = now() WHERE id = ${id}`;
       deleted += 1;
     }
     const result = tally(results);
@@ -684,8 +722,13 @@ export async function syncGet(kind: Parameters<typeof syncPut>[0], user: Session
     const projects = await db`SELECT id, workspace_id, channel_id, name, content_type, platform, topic, description, goal, stages, current_stage, status, created_at, updated_at FROM projects WHERE workspace_id = ${workspaceId} AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 500`;
     const channels = await db`SELECT id, name, niche, created_at FROM channels WHERE workspace_id = ${workspaceId} AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 100`;
     const events = await db`SELECT id, project_id, kind, detail, created_at FROM project_events WHERE workspace_id = ${workspaceId} ORDER BY created_at DESC LIMIT 1000`;
+    // Recently deleted ids, so every device drops its local copy too.
+    const gone = await db`SELECT id FROM projects WHERE workspace_id = ${workspaceId} AND deleted_at > now() - interval '180 days' ORDER BY deleted_at DESC LIMIT 1000`;
+    const goneChannels = await db`SELECT id FROM channels WHERE workspace_id = ${workspaceId} AND deleted_at > now() - interval '180 days' ORDER BY deleted_at DESC LIMIT 200`;
     return {
       version: 1,
+      deletedProjectIds: (gone as unknown as { id: string }[]).map((r) => String(r.id)),
+      deletedChannelIds: (goneChannels as unknown as { id: string }[]).map((r) => String(r.id)),
       projects: (projects as unknown as Record<string, unknown>[]).map(fromProjectRow),
       channels: (channels as unknown as Record<string, unknown>[]).map(fromChannelRow),
       events: (events as unknown as Record<string, unknown>[]).map(fromEventRow),
