@@ -43,3 +43,21 @@ describe("gemini retry", () => {
     assert.equal(calls, 1);
   });
 });
+
+describe("gemini retired models", () => {
+  it("skips a retired model and reports busy over a later 404", async () => {
+    const retired = new Error('{"error":{"code":404,"message":"This model models/gemini-2.5-flash-lite is no longer available to new users."}}');
+    const out = await withModelFallback("a", ["old", "b"], async (m) => {
+      if (m === "old") throw retired;
+      if (m === "a") throw busy();
+      return m;
+    }, opts);
+    assert.equal(out, "b");
+    await assert.rejects(
+      withModelFallback("a", ["old"], async (m) => {
+        throw m === "a" ? busy() : retired;
+      }, opts),
+      /high demand/,
+    );
+  });
+});

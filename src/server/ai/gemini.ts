@@ -54,12 +54,15 @@ export function getGeminiClient(env = getServerEnv()): GoogleGenAI {
   return new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 }
 
-/** Stable fallbacks used when a configured/default model is unavailable (404). */
-/** Backup models, tried in order when the primary is missing or overloaded. */
+/**
+ * Backup models, tried in order when the primary is missing, retired, or
+ * overloaded. "-latest" aliases track Google's current generation so the
+ * chain keeps working as older models are retired for new keys.
+ */
 const FALLBACK_MODELS = {
-  text: ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
-  image: ["gemini-2.5-flash-image"],
-  tts: ["gemini-2.5-flash-preview-tts"],
+  text: ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"],
+  image: ["gemini-3.1-flash-image", "gemini-3-pro-image-preview", "gemini-2.5-flash-image"],
+  tts: ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"],
 } as const;
 
 function errorText(error: unknown): string {
@@ -67,7 +70,7 @@ function errorText(error: unknown): string {
 }
 
 function isModelMissing(error: unknown): boolean {
-  return /not[ _]found|\b404\b|is not supported|unsupported model/i.test(errorText(error));
+  return /not[ _]found|\b404\b|is not supported|unsupported model|no longer available|deprecated|retired/i.test(errorText(error));
 }
 
 /** Temporary capacity/rate problems worth retrying (503 overloaded, 429, transient 500s). */
@@ -96,6 +99,7 @@ export async function withModelFallback<T>(
   const deadline = Date.now() + (opts.budgetMs ?? 40_000);
   const base = opts.baseDelayMs ?? 700;
   let last: unknown;
+  let busy: unknown;
   for (const m of chain) {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
@@ -104,6 +108,7 @@ export async function withModelFallback<T>(
         last = error;
         if (isModelMissing(error)) break;
         if (!isTransient(error)) throw error;
+        busy = error;
         const wait = base * 2 ** attempt + Math.floor(Math.random() * 300);
         if (attempt === retries || Date.now() + wait > deadline) break;
         await sleep(wait);
@@ -111,7 +116,8 @@ export async function withModelFallback<T>(
     }
     if (Date.now() > deadline) break;
   }
-  throw last;
+  // Prefer reporting "busy" over a retired backup's 404 so the user knows retrying helps.
+  throw busy ?? last;
 }
 
 /** Strip SDK failures to a safe message (never surfaces keys or payloads). */
