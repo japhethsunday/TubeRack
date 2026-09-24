@@ -740,3 +740,31 @@ export async function writeChannelPlan(input: ChannelInputs, evidence: ChannelEv
   if (plan.names.length === 0 || plan.ideas.length < 10) throw new Error("Gemini returned an incomplete channel plan. Try again.");
   return { plan, model };
 }
+
+export interface SceneVisual {
+  visual: string;
+  onScreenText: string;
+}
+
+/** Shot list for auto-video: one concrete image prompt + short on-screen text per scene. */
+export async function planSceneVisuals(input: { topic: string; aspect: "16:9" | "9:16"; style: string; scenes: { title: string; text: string }[] }): Promise<{ visuals: SceneVisual[]; model: string }> {
+  const provider = new GeminiTextProvider();
+  const list = input.scenes.map((s, i) => `${i + 1}. [${s.title}] ${s.text.slice(0, 600)}`).join("\n");
+  const { text, model } = await provider.generateText({
+    prompt:
+      `You are the art director for a YouTube video about "${input.topic.slice(0, 200)}". Frame: ${input.aspect}.` +
+      (input.style ? ` Visual style: ${input.style.slice(0, 200)}.` : "") +
+      `\nFor each scene below write: visual — one concrete, photographic image prompt (subject, setting, composition, lighting) that illustrates what the narration says; ` +
+      `keep a consistent look across scenes; NO text, letters, logos or watermarks in the image. onScreenText — at most 6 words to overlay, or "" if none is needed.\n` +
+      `Scenes:\n${list}\n\nRespond ONLY with JSON: {"scenes":[{"visual":"","onScreenText":""}]} with exactly ${input.scenes.length} items in order.`,
+    maxTokens: 3000,
+    json: true,
+  });
+  const obj = parseJsonObject(text, "scene visuals");
+  const arr = Array.isArray(obj.scenes) ? (obj.scenes as Record<string, unknown>[]) : [];
+  const visuals = input.scenes.map((s, i) => ({
+    visual: String(arr[i]?.visual ?? "").trim().slice(0, 800) || `${s.title} — ${input.topic}`,
+    onScreenText: String(arr[i]?.onScreenText ?? "").trim().slice(0, 60),
+  }));
+  return { visuals, model };
+}

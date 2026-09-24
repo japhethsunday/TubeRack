@@ -2,8 +2,9 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { GenerateVideoDialog } from "@/src/components/video/AutoVideo";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, Undo2, Redo2, Sparkles, Plus, FileText } from "lucide-react";
+import { Search, Undo2, Redo2, Sparkles, Plus, FileText, Clapperboard } from "lucide-react";
 import { useProjects, LocalStorageNote } from "@/src/components/projects/ProjectsProvider";
 import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { useScripts, SaveStatus, ScriptStorageNote } from "@/src/components/script/ScriptProvider";
@@ -63,6 +64,8 @@ function Studio() {
   const autoWrite = useSearchParams().get("autowrite") === "1";
   const router = useRouter();
   const [showGenerate, setShowGenerate] = useState(autoWrite);
+  // After an automatic draft, offer the next step straight away.
+  const [offerVideo, setOfferVideo] = useState(false);
   const [rev, setRev] = useState(0);
 
   const ready = projectsReady && intelReady && scripts.ready;
@@ -220,7 +223,10 @@ function Studio() {
               setShowGenerate(false);
               setRev((r) => r + 1);
               touch(project.id);
-              if (autoWrite) router.replace(`/studio/script?project=${project.id}`, { scroll: false });
+              if (autoWrite) {
+                setOfferVideo(true);
+                router.replace(`/studio/script?project=${project.id}`, { scroll: false });
+              }
             }}
             onClose={() => {
               setShowGenerate(false);
@@ -239,6 +245,7 @@ function Studio() {
       rev={rev}
       onRev={() => setRev((r) => r + 1)}
       onGenerate={() => setShowGenerate(true)}
+      initialShowVideo={offerVideo}
       // An existing script is never auto-overwritten by ?autowrite.
       showGenerate={showGenerate && !autoWrite}
       onCloseGenerate={() => setShowGenerate(false)}
@@ -254,14 +261,16 @@ function Editor({
   onGenerate,
   showGenerate,
   onCloseGenerate,
+  initialShowVideo = false,
 }: {
-  project: { id: string; name: string; topic: string; goal: string; channelId: string };
+  project: { id: string; name: string; topic: string; goal: string; channelId: string; platform: string; contentType: string };
   script: Script;
   rev: number;
   onRev: () => void;
   onGenerate: () => void;
   showGenerate: boolean;
   onCloseGenerate: () => void;
+  initialShowVideo?: boolean;
 }) {
   const { channelName, touch } = useProjects();
   const { intelFor, dnaFor, addRetention } = useIntel();
@@ -273,6 +282,7 @@ function Editor({
   const [wpm, setWpm] = useState(initial.wpm);
   const [query, setQuery] = useState("");
   const [scriptNotes, setScriptNotes] = useState(initial.notes);
+  const [showVideo, setShowVideo] = useState(initialShowVideo);
   const persistTimer = useRef<number | null>(null);
 
   // Resync from the store when versions restore or assembly applies.
@@ -509,6 +519,10 @@ function Editor({
             <Sparkles className="size-4" aria-hidden="true" />
             Assemble…
           </Button>
+          <Button size="sm" onClick={() => setShowVideo(true)} disabled={sections.every((s) => !s.text.trim())} title="Voice-over, visuals and captions from this script">
+            <Clapperboard className="size-4" aria-hidden="true" />
+            Generate video
+          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -596,6 +610,7 @@ function Editor({
 
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-4">
+      {showVideo && <GenerateVideoDialog project={project} sections={sections} wpm={wpm} onClose={() => setShowVideo(false)} />}
       <Breadcrumb trail={[{ label: "Projects", href: "/projects" }, { label: project.name, href: `/projects/${project.id}` }, { label: "Script Studio" }]} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>

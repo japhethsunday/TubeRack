@@ -18,31 +18,9 @@ import { Button } from "@/src/components/ui/Button";
 import { Modal, Drawer } from "@/src/components/ui/overlays";
 import { ConfirmDialog } from "@/src/components/ui/Section";
 import { Input, Textarea } from "@/src/components/ui/fields";
+import { stageHref } from "@/src/lib/projects/stages";
 import { EmptyState, ErrorState } from "@/src/components/ui/states";
 import { LoadingState, Progress } from "@/src/components/ui/feedback";
-
-/** Every pipeline stage opens the real tool for this project. */
-function stageHref(stage: ProjectStage, projectId: string): string {
-  const q = `project=${encodeURIComponent(projectId)}`;
-  const map: Record<ProjectStage, string> = {
-    idea: `/intelligence/lab?${q}`,
-    research: `/intelligence/research?${q}`,
-    strategy: `/intelligence/strategy?${q}`,
-    script: `/studio/script?${q}`,
-    storyboard: `/studio/storyboard?${q}`,
-    visuals: `/studio/media?${q}&tab=image`,
-    voice: `/studio/media?${q}&tab=voice`,
-    music: `/studio/media?${q}&tab=audio`,
-    video: `/studio/video?${q}`,
-    thumbnail: `/studio/package?${q}&tab=thumbnail`,
-    seo: `/studio/package?${q}&tab=seo`,
-    repurposing: `/studio/package?${q}&tab=repurpose`,
-    publishing: `/studio/package?${q}&tab=platforms`,
-    analytics: `/analytics?${q}`,
-    improvement: `/analytics?${q}`,
-  };
-  return map[stage];
-}
 
 /** Project command center: header, pipeline, modules, summary, continue. */
 export default function ProjectOverviewPage() {

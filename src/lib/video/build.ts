@@ -134,13 +134,13 @@ export function sceneSegments(scenes: Scene[]): SceneSegment[] {
 
 function approvedImageFor(sceneId: string, assets: MediaAsset[]): MediaAsset | undefined {
   return assets.find(
-    (a) => a.kind === "image" && a.source === "local-draft" && a.status === "ready" && (a.approval === "approved" || a.approval === "used") && a.sceneIds.includes(sceneId),
+    (a) => a.kind === "image" && a.source !== "provider-request" && a.status === "ready" && (a.approval === "approved" || a.approval === "used") && a.sceneIds.includes(sceneId),
   );
 }
 
 function voiceFor(sceneId: string, assets: MediaAsset[]): MediaAsset | undefined {
   return assets.find(
-    (a) => a.kind === "voice" && a.source === "local-draft" && a.status === "ready" && a.sceneIds.includes(sceneId),
+    (a) => a.kind === "voice" && a.source !== "provider-request" && a.status === "ready" && a.sceneIds.includes(sceneId),
   );
 }
 
@@ -170,21 +170,26 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
         assetId: voice.id,
       });
     }
-    clips.push({
-      ...clipBase("track_text", "text", scene?.title ?? `Scene ${seg.number}`, seg.startSec, Math.min(4, seg.durationSec)),
-      sceneId: seg.sceneId,
-      text: scene?.title ?? `Scene ${seg.number}`,
-      style: {
-        font: "system-ui, sans-serif",
-        size: 40,
-        weight: 700,
-        align: "left",
-        position: "top",
-        color: "#ffffff",
-        background: "rgba(0,0,0,0.55)",
-        opacity: 1,
-      },
-    });
+    // On-screen text is the scene's overlay copy — never the script heading.
+    const overlay = scene?.onScreenText?.trim();
+    if (overlay) {
+      clips.push({
+        ...clipBase("track_text", "text", overlay, seg.startSec, Math.min(4, seg.durationSec)),
+        sceneId: seg.sceneId,
+        text: overlay,
+        textAnim: "pop",
+        style: {
+          font: "system-ui, sans-serif",
+          size: 52,
+          weight: 800,
+          align: "center",
+          position: "top",
+          color: "#ffffff",
+          background: "transparent",
+          opacity: 1,
+        },
+      });
+    }
     const narration = scene?.narration?.trim() || scene?.scriptText?.trim() || "";
     for (const cap of captionsFromNarration(narration, seg.startSec, seg.durationSec)) {
       clips.push({ ...cap, sceneId: seg.sceneId });

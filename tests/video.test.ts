@@ -112,7 +112,7 @@ describe("video build", () => {
 
   it("auto-builds image, voice, title, captions, and music bed", () => {
     __resetVideoIds();
-    const scenes = [scene({ id: "sc1" }), scene({ id: "sc2", number: 2, title: "Payoff", narration: "" })];
+    const scenes = [scene({ id: "sc1", onScreenText: "3 rules that work" }), scene({ id: "sc2", number: 2, title: "Payoff", narration: "" })];
     const assets = [
       asset({ id: "img1", sceneIds: ["sc1"] }),
       asset({ id: "vox1", kind: "voice", title: "Take", sceneIds: ["sc1"], durationSec: 6, payload: JSON.stringify({ text: "hi" }), mime: "application/x-tuberack-voice" }),
@@ -121,7 +121,9 @@ describe("video build", () => {
     const clips = buildFromScenes(scenes, assets);
     assert.ok(clips.some((c) => c.kind === "image" && c.assetId === "img1"));
     assert.ok(clips.some((c) => c.kind === "voice" && c.assetId === "vox1"));
-    assert.ok(clips.some((c) => c.kind === "text"));
+    // Overlay copy only — script headings never appear on screen.
+    assert.ok(clips.some((c) => c.kind === "text" && c.text === "3 rules that work"));
+    assert.ok(!clips.some((c) => c.kind === "text" && c.text === "Payoff"));
     assert.ok(clips.some((c) => c.kind === "captions"));
     assert.ok(clips.some((c) => c.kind === "music" && c.startSec === 0));
     const voice = clips.find((c) => c.kind === "voice");

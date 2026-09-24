@@ -5,7 +5,7 @@ import { isChunked } from "@/src/lib/media/chunked";
 import { sanitizeSvg } from "@/src/lib/security/svg";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Undo2, Redo2, Wand2, Plus, Clipboard, ClipboardPaste, ArrowLeft, Download, FolderOpen, Type, Shapes, LayoutList, SlidersHorizontal, X } from "lucide-react";
+import { Undo2, Redo2, Wand2, Plus, Clipboard, ClipboardPaste, ArrowLeft, ArrowRight, Download, Clapperboard, FolderOpen, Type, Shapes, LayoutList, SlidersHorizontal, X } from "lucide-react";
 import { useProjects, LocalStorageNote } from "@/src/components/projects/ProjectsProvider";
 import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { useScripts } from "@/src/components/script/ScriptProvider";
@@ -29,6 +29,9 @@ import { EmptyState } from "@/src/components/ui/states";
 import { LoadingState } from "@/src/components/ui/feedback";
 import { Tabs } from "@/src/components/ui/Tabs";
 import { Modal } from "@/src/components/ui/overlays";
+import { useNextStep } from "@/src/components/projects/NextStep";
+import { stageLabel } from "@/src/lib/projects/storage";
+import { GenerateVideoDialog } from "@/src/components/video/AutoVideo";
 import { Portal } from "@/src/components/ui/Portal";
 import { Input } from "@/src/components/ui/fields";
 import { newTrack, sceneSegments, buildFromScenes, captionsFromNarration, durationOf, validateComposition, healthOf } from "@/src/lib/video/build";
@@ -75,6 +78,7 @@ function Studio() {
     setSyncedProject(projectId);
     setSelectedId(projectId);
   }
+  const step = useNextStep(selectedId ?? projectId, "video");
   const [playhead, setPlayhead] = useState(0);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
@@ -103,6 +107,7 @@ function Studio() {
       if (!wasDark) root.classList.remove("dark");
     };
   }, []);
+  const [showAutoVideo, setShowAutoVideo] = useState(false);
   // Phone layout: which bottom sheet is open.
   const [sheet, setSheet] = useState<null | "media" | "text" | "elements" | "edit" | "tools">(null);
   const [presetId, setPresetId] = useState("youtube");
@@ -115,6 +120,7 @@ function Studio() {
   const project = projects.find((p) => p.id === selectedId);
   const comp = project ? video.compFor(project.id) : null;
   const scenes = useMemo(() => (project ? scriptsApi.scenesFor(project.id) : []), [project, scriptsApi]);
+  const scriptSections = project ? scriptsApi.scriptFor(project.id)?.sections ?? [] : [];
   const assets = useMemo(() => (project ? mediaApi.assetsFor(project.id) : []), [project, mediaApi]);
   const dna = project ? dnaFor(project.channelId) : null;
 
@@ -557,6 +563,13 @@ function Studio() {
         </button>
       </div>
       <div className="flex-1" />
+      {scriptSections.some((x) => x.text.trim()) && (
+        <Button size="sm" variant="ghost" title="Voice-over, visuals and captions from this project's script" onClick={() => setShowAutoVideo(true)}>
+          <Clapperboard className="size-4" aria-hidden="true" />
+          <span className="hidden md:inline">From script</span>
+          <span className="sr-only md:hidden">Generate video from script</span>
+        </Button>
+      )}
       {scenes.length > 0 && (
         <Button size="sm" variant="ghost" title="Build the timeline from your storyboard scenes" onClick={() => (clips.length === 0 ? autoBuild() : setConfirmBuild(true))}>
           <Wand2 className="size-4" aria-hidden="true" />
@@ -579,6 +592,18 @@ function Studio() {
         </span>
       )}
       {clips.length > 0 && <PublishButton source={publishSource} prerendered={lastExport} openSignal={publishSignal} />}
+      {step?.next && (
+        <button
+          type="button"
+          onClick={step.advance}
+          title={`Mark the video stage done and continue to ${stageLabel(step.next)}`}
+          className="flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-text hover:bg-muted hover:text-foreground"
+        >
+          <span className="hidden lg:inline">Next: {stageLabel(step.next)}</span>
+          <ArrowRight className="size-4" aria-hidden="true" />
+          <span className="sr-only lg:hidden">Next step: {stageLabel(step.next)}</span>
+        </button>
+      )}
     </header>
   );
 
@@ -659,6 +684,7 @@ function Studio() {
         </>
       )}
 
+      {showAutoVideo && <GenerateVideoDialog project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} onClose={() => setShowAutoVideo(false)} />}
       {confirmBuild && (
         <Modal title="Rebuild timeline?" description="Replaces every clip on the timeline." onClose={() => setConfirmBuild(false)}>
           <p className="text-sm text-muted-text">
