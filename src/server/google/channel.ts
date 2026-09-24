@@ -127,12 +127,36 @@ export async function myVideos(workspaceId: string, max = 25): Promise<MyVideo[]
 export async function createUploadSession(
   workspaceId: string,
   origin: string,
-  input: { title: string; description: string; tags: string[]; categoryId: string; privacy: "private" | "unlisted" | "public"; publishAt: string | null; madeForKids: boolean; size: number; mime: string },
+  input: {
+    title: string;
+    description: string;
+    tags: string[];
+    categoryId: string;
+    privacy: "private" | "unlisted" | "public";
+    publishAt: string | null;
+    madeForKids: boolean;
+    size: number;
+    mime: string;
+    defaultLanguage?: string;
+    containsSyntheticMedia?: boolean;
+    notifySubscribers?: boolean;
+    embeddable?: boolean;
+    license?: "youtube" | "creativeCommon";
+  },
 ): Promise<string> {
   const token = await accessToken(workspaceId);
   const status: Record<string, unknown> = { privacyStatus: input.publishAt ? "private" : input.privacy, selfDeclaredMadeForKids: input.madeForKids };
   if (input.publishAt) status.publishAt = input.publishAt;
-  const response = await fetch(`https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status`, {
+  if (input.containsSyntheticMedia !== undefined) status.containsSyntheticMedia = input.containsSyntheticMedia;
+  if (input.embeddable !== undefined) status.embeddable = input.embeddable;
+  if (input.license) status.license = input.license;
+  const snippet: Record<string, unknown> = { title: input.title, description: input.description, tags: input.tags, categoryId: input.categoryId };
+  if (input.defaultLanguage) {
+    snippet.defaultLanguage = input.defaultLanguage;
+    snippet.defaultAudioLanguage = input.defaultLanguage;
+  }
+  const notify = input.notifySubscribers === false ? "&notifySubscribers=false" : "";
+  const response = await fetch(`https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status${notify}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -141,10 +165,7 @@ export async function createUploadSession(
       "X-Upload-Content-Type": input.mime,
       Origin: origin,
     },
-    body: JSON.stringify({
-      snippet: { title: input.title, description: input.description, tags: input.tags, categoryId: input.categoryId },
-      status,
-    }),
+    body: JSON.stringify({ snippet, status }),
     signal: AbortSignal.timeout(20000),
   });
   const location = response.headers.get("location");
@@ -190,4 +211,92 @@ export async function videoWindowStats(
     // impressions/CTR not exposed for this channel — fall back to views
   }
   return { metric: "views", impressions: null, ctr: null, views: Number(v.views ?? 0), watchMinutes: Number(v.estimatedMinutesWatched ?? 0) };
+}
+
+export interface Playlist {
+  id: string;
+  title: string;
+  itemCount: number;
+  privacy: string;
+}
+
+export async function myPlaylists(workspaceId: string): Promise<Playlist[]> {
+  const token = await accessToken(workspaceId);
+  const out: Playlist[] = [];
+  let page = "";
+  for (let i = 0; i < 4; i++) {
+    const r = await googleApi<{ nextPageToken?: string; items?: { id: string; snippet?: { title?: string }; contentDetails?: { itemCount?: number }; status?: { privacyStatus?: string } }[] }>(
+      `${DATA}/playlists?part=snippet,contentDetails,status&mine=true&maxResults=50${page ? `&pageToken=${page}` : ""}`,
+      token,
+    );
+    for (const p of r.items ?? []) out.push({ id: p.id, title: p.snippet?.title ?? "", itemCount: p.contentDetails?.itemCount ?? 0, privacy: p.status?.privacyStatus ?? "" });
+    if (!r.nextPageToken) break;
+    page = r.nextPageToken;
+  }
+  return out;
+}
+
+export async function addToPlaylist(workspaceId: string, playlistId: string, videoId: string): Promise<void> {
+  const token = await accessToken(workspaceId);
+  await googleApi(`${DATA}/playlistItems?part=snippet`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ snippet: { playlistId, resourceId: { kind: "youtube#video", videoId } } }),
+  });
+}
+
+/** Upload a caption track (WebVTT) as a published, non-draft track. */
+export async function uploadCaptions(workspaceId: string, videoId: string, input: { language: string; name: string; vtt: string }): Promise<void> {
+  const token = await accessToken(workspaceId);
+  const boundary = `tuberack${Date.now().toString(36)}`;
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
+    JSON.stringify({ snippet: { videoId, language: input.language, name: input.name, isDraft: false } }) +
+    `\r\n--${boundary}\r\nContent-Type: text/vtt\r\n\r\n${input.vtt}\r\n--${boundary}--`;
+  const response = await fetch(`https://www.googleapis.com/upload/youtube/v3/captions?uploadType=multipart&part=snippet`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+    body,
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!response.ok) {
+    const b = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(`YouTube captions upload failed: ${b.error?.message ?? response.status}`);
+  }
+}
+
+export interface VideoStatus {
+  id: string;
+  title: string;
+  uploadStatus: string; // uploaded | processed | failed | rejected | deleted
+  privacy: string;
+  publishAt: string | null;
+  processingStatus: string | null; // processing | succeeded | failed | terminated
+  processingProgress: { partsTotal?: number; partsProcessed?: number; timeLeftMs?: number } | null;
+  failureReason: string | null;
+  rejectionReason: string | null;
+  thumbnail: string;
+}
+
+export async function videoStatus(workspaceId: string, videoId: string): Promise<VideoStatus> {
+  const token = await accessToken(workspaceId);
+  const r = await googleApi<{ items?: Record<string, unknown>[] }>(`${DATA}/videos?part=snippet,status,processingDetails&id=${encodeURIComponent(videoId)}`, token);
+  const it = r.items?.[0];
+  if (!it) throw new Error("YouTube hasn't registered this video yet — try again in a moment.");
+  const sn = (it.snippet ?? {}) as { title?: string; thumbnails?: Record<string, { url?: string }> };
+  const st = (it.status ?? {}) as Record<string, string>;
+  const pd = (it.processingDetails ?? {}) as { processingStatus?: string; processingProgress?: Record<string, string>; processingFailureReason?: string };
+  const prog = pd.processingProgress;
+  return {
+    id: videoId,
+    title: sn.title ?? "",
+    uploadStatus: st.uploadStatus ?? "",
+    privacy: st.privacyStatus ?? "",
+    publishAt: st.publishAt ?? null,
+    processingStatus: pd.processingStatus ?? null,
+    processingProgress: prog ? { partsTotal: Number(prog.partsTotal), partsProcessed: Number(prog.partsProcessed), timeLeftMs: Number(prog.timeLeftMs) } : null,
+    failureReason: st.failureReason ?? pd.processingFailureReason ?? null,
+    rejectionReason: st.rejectionReason ?? null,
+    thumbnail: sn.thumbnails?.medium?.url ?? "",
+  };
 }

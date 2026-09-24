@@ -12,7 +12,16 @@ export const YOUTUBE_SCOPES = [
   "https://www.googleapis.com/auth/youtube.readonly",
   "https://www.googleapis.com/auth/yt-analytics.readonly",
   "https://www.googleapis.com/auth/youtube.upload",
+  // Playlists + captions (publishing). Existing connections without it keep
+  // working; publishing skips those steps and offers a one-click upgrade.
+  "https://www.googleapis.com/auth/youtube.force-ssl",
 ];
+
+export const FORCE_SSL_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl";
+
+export function hasScope(connection: { scopes: string } | null, scope: string): boolean {
+  return Boolean(connection?.scopes.split(/\s+/).includes(scope));
+}
 
 export function isOAuthConfigured(env = getServerEnv()): boolean {
   return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);

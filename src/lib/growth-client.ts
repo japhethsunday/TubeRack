@@ -36,7 +36,12 @@ export interface MyVideo {
 }
 
 export const growth = {
-  connection: () => attempt(() => api.get<{ configured: boolean; connection: Connection | null }>("/api/v1/youtube/connection")),
+  connection: () => attempt(() => api.get<{ configured: boolean; connection: Connection | null; canManage: boolean }>("/api/v1/youtube/connection")),
+  playlists: () => attempt(() => api.get<{ id: string; title: string; itemCount: number; privacy: string }[]>("/api/v1/youtube/playlists")),
+  videoStatus: (id: string) => attempt(() => api.get<VideoStatus>(`/api/v1/youtube/video-status?id=${encodeURIComponent(id)}`)),
+  publishStep: (body: Record<string, unknown>) => attempt(() => api.post<{ step: string; ok: boolean }>("/api/v1/youtube/publish/step", body)),
+  publishes: (projectId: string) => attempt(() => api.get<PublishRecord[]>(`/api/v1/youtube/publishes?projectId=${encodeURIComponent(projectId)}`)),
+  savePublish: (body: Record<string, unknown>) => attempt(() => api.post<PublishRecord | null>("/api/v1/youtube/publishes", body)),
   disconnect: () => attempt(() => api.remove<{ disconnected: boolean }>("/api/v1/youtube/connection")),
   analytics: (days: number) => attempt(() => api.get<ChannelAnalytics>(`/api/v1/youtube/analytics?days=${days}`)),
   myVideos: () => attempt(() => api.get<MyVideo[]>("/api/v1/youtube/my-videos")),
@@ -134,4 +139,31 @@ export interface AbTest {
   ai_scores: { scores?: { variantId?: string; score: number; strengths: string[]; weaknesses: string[] }[]; pickVariantId?: string | null; reasoning?: string };
   error: string | null;
   created_at: string;
+}
+
+export interface VideoStatus {
+  id: string;
+  title: string;
+  uploadStatus: string;
+  privacy: string;
+  publishAt: string | null;
+  processingStatus: string | null;
+  processingProgress: { partsTotal?: number; partsProcessed?: number; timeLeftMs?: number } | null;
+  failureReason: string | null;
+  rejectionReason: string | null;
+  thumbnail: string;
+}
+
+export interface PublishRecord {
+  id: string;
+  project_id: string;
+  video_id: string | null;
+  title: string;
+  privacy: string;
+  publish_at: string | null;
+  status: "uploading" | "processing" | "published" | "scheduled" | "failed";
+  steps: Record<string, string>;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
 }

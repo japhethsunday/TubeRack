@@ -18,6 +18,11 @@ const body = z.object({
   madeForKids: z.boolean().default(false),
   size: z.number().int().positive().max(256 * 1024 ** 3),
   mime: z.string().regex(/^video\//, "Choose a video file."),
+  defaultLanguage: z.string().regex(/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/).optional(),
+  containsSyntheticMedia: z.boolean().optional(),
+  notifySubscribers: z.boolean().optional(),
+  embeddable: z.boolean().optional(),
+  license: z.enum(["youtube", "creativeCommon"]).optional(),
 });
 
 /**

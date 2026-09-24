@@ -106,3 +106,48 @@ describe("secret box", () => {
     assert.throws(() => open(parts.join(".")));
   });
 });
+
+import { buildDescription, buildVtt, categoryId, clampTitle, languageCode, normalizeTags, scheduleError } from "@/src/lib/video/publish";
+
+describe("youtube publish metadata", () => {
+  it("appends valid chapters and missing hashtags", () => {
+    const d = buildDescription({
+      description: "Learn it fast. #budget",
+      chapters: [{ timeSec: 0, title: "Intro" }, { timeSec: 30, title: "Setup" }, { timeSec: 95, title: "Results" }],
+      hashtags: ["budget", "meal prep"],
+    });
+    assert.ok(d.includes("Chapters\n0:00 Intro\n0:30 Setup\n1:35 Results"));
+    assert.ok(d.endsWith("#mealprep"));
+    assert.equal(d.match(/#budget/g)?.length, 1);
+  });
+
+  it("omits chapters YouTube would reject", () => {
+    const d = buildDescription({ description: "x", chapters: [{ timeSec: 5, title: "A" }, { timeSec: 30, title: "B" }, { timeSec: 60, title: "C" }], hashtags: [] });
+    assert.ok(!d.includes("Chapters"));
+  });
+
+  it("fits tags into 500 characters and dedupes", () => {
+    const tags = normalizeTags(["Budget", "budget", "meal prep", "<bad>", ...Array.from({ length: 80 }, (_, i) => `tag number ${i}`)]);
+    assert.equal(tags[0], "Budget");
+    assert.equal(tags[1], "meal prep");
+    assert.equal(tags[2], "bad");
+    const cost = tags.reduce((n, t, i) => n + t.length + (t.includes(" ") ? 2 : 0) + (i ? 1 : 0), 0);
+    assert.ok(cost <= 500);
+  });
+
+  it("maps categories, languages, titles, and schedules", () => {
+    assert.equal(categoryId("Education"), "27");
+    assert.equal(categoryId(""), "22");
+    assert.equal(languageCode("Yoruba"), "yo");
+    assert.equal(clampTitle("<Hi> " + "x".repeat(200)).length, 100);
+    assert.equal(scheduleError("", 0), null);
+    assert.ok(scheduleError(new Date(Date.now() + 60_000).toISOString()));
+  });
+
+  it("builds WebVTT from caption clips", () => {
+    const clip = (start: number, dur: number, text: string) => ({ id: text, trackId: "t", kind: "captions" as const, name: text, text, startSec: start, durationSec: dur, volume: 1, fadeInSec: 0, fadeOutSec: 0, muted: false });
+    const vtt = buildVtt([clip(2.5, 1.25, "second"), clip(0, 2, "first")]);
+    assert.equal(vtt, "WEBVTT\n\n1\n00:00:00.000 --> 00:00:02.000\nfirst\n\n2\n00:00:02.500 --> 00:00:03.750\nsecond\n");
+    assert.equal(buildVtt([]), null);
+  });
+});

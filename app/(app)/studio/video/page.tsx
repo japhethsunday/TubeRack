@@ -13,6 +13,7 @@ import { Timeline } from "@/src/components/video/Timeline";
 import { Preview } from "@/src/components/video/Preview";
 import { ScenesPanel, MediaPanel, TextPanel, Inspector, ExportPanel } from "@/src/components/video/panels";
 import { GeminiCaptions } from "@/src/components/video/GeminiCaptions";
+import { PublishButton } from "@/src/components/video/PublishToYouTube";
 import { Breadcrumb } from "@/src/components/ui/data";
 import { Button } from "@/src/components/ui/Button";
 import { Select } from "@/src/components/ui/fields";
@@ -384,6 +385,23 @@ function Studio() {
           <Wand2 className="size-4" aria-hidden="true" />
           {clips.length === 0 ? "Auto-build from scenes" : "Rebuild…"}
         </Button>
+        {clips.length > 0 && (
+          <PublishButton
+            source={{
+              projectId: pid,
+              projectName: project.name,
+              comp: composition,
+              duration,
+              fps: Number(fps) || 30,
+              health,
+              blockingIssues: issues.filter((i) => i.severity === "block").map((i) => i.message),
+              assetFor: (assetId) => {
+                const a = assets.find((x) => x.id === assetId);
+                return a ? { kind: a.kind, source: a.source, payload: a.payload, mime: a.mime, title: a.title, blobUrl: mediaApi.blobUrlFor(a.id) } : null;
+              },
+            }}
+          />
+        )}
       </div>
 
       <div className="lg:hidden">
