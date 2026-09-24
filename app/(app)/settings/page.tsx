@@ -37,6 +37,7 @@ export default async function SettingsPage({
 
       <Tabs
         defaultId={initial}
+        urlParam="tab"
         tabs={[
           { id: "profile", label: "Profile", content: <ProfilePanel /> },
           { id: "preferences", label: "Preferences", content: <PreferencesPanel /> },

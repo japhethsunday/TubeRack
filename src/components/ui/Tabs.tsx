@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cx } from "@/src/components/ui/cx";
 
 export interface TabDef {
@@ -11,8 +12,38 @@ export interface TabDef {
 }
 
 /** Accessible tabs: arrow-key navigation, aria-selected, real tabpanels. */
-export function Tabs({ tabs, defaultId }: { tabs: TabDef[]; defaultId?: string }) {
-  const [active, setActive] = useState(defaultId ?? tabs[0]?.id);
+export function Tabs({
+  tabs,
+  defaultId,
+  onChange,
+  urlParam,
+}: {
+  tabs: TabDef[];
+  /** Selected tab; when it changes (e.g. the URL's ?tab= changed) the tabs follow. */
+  defaultId?: string;
+  onChange?: (id: string) => void;
+  /** Keep the selected tab in this query param (e.g. "tab"), both ways. */
+  urlParam?: string;
+}) {
+  const router = useRouter();
+  const search = useSearchParams();
+  const fromUrl = urlParam ? search.get(urlParam) : null;
+  const wanted = fromUrl && tabs.some((t) => t.id === fromUrl) ? fromUrl : defaultId;
+  const [active, setActiveState] = useState(wanted ?? tabs[0]?.id);
+  const [synced, setSynced] = useState(wanted);
+  if (wanted !== synced) {
+    setSynced(wanted);
+    if (wanted) setActiveState(wanted);
+  }
+  function setActive(id: string) {
+    setActiveState(id);
+    onChange?.(id);
+    if (urlParam && !onChange) {
+      const q = new URLSearchParams(search.toString());
+      q.set(urlParam, id);
+      router.replace(`?${q.toString()}`, { scroll: false });
+    }
+  }
   const listRef = useRef<HTMLDivElement>(null);
   const baseId = useId();
 

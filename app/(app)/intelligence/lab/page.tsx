@@ -36,6 +36,12 @@ function Lab() {
   const { dnaFor, saveOpportunity } = useIntel();
   const { activeSignals } = useAnalytics();
   const [projectId, setProjectId] = useState<string | null>(params.get("project"));
+  const urlProject = params.get("project");
+  const [syncedProject, setSyncedProject] = useState(urlProject);
+  if (urlProject !== syncedProject) {
+    setSyncedProject(urlProject);
+    setProjectId(urlProject);
+  }
   const [idea, setIdea] = useState(params.get("idea") ?? "");
   const [audience, setAudience] = useState("");
   const [problem, setProblem] = useState("");

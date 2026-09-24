@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useProjects, LocalStorageNote } from "@/src/components/projects/ProjectsProvider";
 import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { useScripts } from "@/src/components/script/ScriptProvider";
@@ -46,7 +46,27 @@ function Studio() {
   const { ready: videoReady, compFor } = useVideo();
   const packaging = usePackaging();
   const [selectedId, setSelectedId] = useState<string | null>(params.get("project"));
-  const [tab, setTab] = useState<TabId>(isTabId(params.get("tab")) ? (params.get("tab") as TabId) : "overview");
+  const urlProject = params.get("project");
+  const [syncedProject, setSyncedProject] = useState(urlProject);
+  if (urlProject !== syncedProject) {
+    setSyncedProject(urlProject);
+    setSelectedId(urlProject);
+  }
+  const router = useRouter();
+  const urlTab: TabId = isTabId(params.get("tab")) ? (params.get("tab") as TabId) : "overview";
+  const [tab, setTabState] = useState<TabId>(urlTab);
+  // Follow the URL: sidebar links like ?tab=voice → ?tab=audio stay on this page.
+  const [syncedUrlTab, setSyncedUrlTab] = useState(urlTab);
+  if (urlTab !== syncedUrlTab) {
+    setSyncedUrlTab(urlTab);
+    setTabState(urlTab);
+  }
+  function setTab(next: TabId) {
+    setTabState(next);
+    const q = new URLSearchParams(params.toString());
+    q.set("tab", next);
+    router.replace(`?${q.toString()}`, { scroll: false });
+  }
 
   const ready = projectsReady && intelReady && scriptsReady && mediaReady && videoReady && packaging.ready;
   const project = projects.find((p) => p.id === selectedId);
@@ -235,7 +255,7 @@ function Studio() {
           </Link>
         </div>
       </div>
-      <Tabs defaultId={tab} tabs={tabs} />
+      <Tabs defaultId={tab} urlParam="tab" tabs={tabs} onChange={(id) => isTabId(id) && setTab(id as TabId)} />
       <div className="flex flex-col gap-2">
         <LocalStorageNote />
         <PackageStorageNote />

@@ -45,6 +45,12 @@ function Studio() {
   const video = useVideo();
 
   const [selectedId, setSelectedId] = useState<string | null>(projectId);
+  // Follow ?project= when a link changes it while this page is already open.
+  const [syncedProject, setSyncedProject] = useState(projectId);
+  if (projectId !== syncedProject) {
+    setSyncedProject(projectId);
+    setSelectedId(projectId);
+  }
   const [playhead, setPlayhead] = useState(0);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);

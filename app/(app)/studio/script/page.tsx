@@ -51,6 +51,12 @@ function Studio() {
   const scripts = useScripts();
 
   const [selectedId, setSelectedId] = useState<string | null>(projectId);
+  // Follow ?project= when a link changes it while this page is already open.
+  const [syncedProject, setSyncedProject] = useState(projectId);
+  if (projectId !== syncedProject) {
+    setSyncedProject(projectId);
+    setSelectedId(projectId);
+  }
   const [showGenerate, setShowGenerate] = useState(false);
   const [rev, setRev] = useState(0);
 
