@@ -9,6 +9,8 @@ import { Clapperboard, X } from "lucide-react";
 import { Sidebar } from "@/src/components/shell/Sidebar";
 import { Header } from "@/src/components/shell/Header";
 import { AccountNotice } from "@/src/components/shell/AccountNotice";
+import { BackButton } from "@/src/components/shell/BackButton";
+import { Suspense } from "react";
 import { NextStepBar } from "@/src/components/projects/NextStep";
 import { ToastProvider } from "@/src/components/ui/Toast";
 
@@ -81,6 +83,9 @@ export function AppShell({
           </header>
           <div className="flex flex-1 items-start gap-6 px-4 py-6 sm:px-6 lg:px-8">
             <main id="main" className="min-w-0 flex-1" tabIndex={-1}>
+              <Suspense fallback={null}>
+                <BackButton />
+              </Suspense>
               <AccountNotice />
               <NextStepBar />
               <div key={pathname} className="ui-page">

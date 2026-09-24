@@ -153,8 +153,23 @@ export function ChannelCreator() {
    * Idea → real project with a complete brief (audience, strategy, approved
    * hook), then straight into the Script Studio, which writes the draft.
    */
+  /** The project already made from this idea (same channel, same title), if any. */
+  function existingFor(idea: ChannelPlan["ideas"][number]) {
+    if (!current) return undefined;
+    const channelName = current.plan.names[0]?.name ?? current.niche;
+    const channel = projects.channels.find((c) => c.name === channelName);
+    if (!channel) return undefined;
+    const title = idea.title.trim().toLowerCase();
+    return projects.projects.find((x) => x.channelId === channel.id && x.name.trim().toLowerCase() === title);
+  }
+
   function startVideo(idea: ChannelPlan["ideas"][number]) {
     if (!current) return;
+    const existing = existingFor(idea);
+    if (existing) {
+      router.push(`/studio/script?project=${existing.id}`);
+      return;
+    }
     const p = current.plan;
     const channelName = p.names[0]?.name ?? current.niche;
     const channel = projects.channels.find((c) => c.name === channelName) ?? projects.addChannel(channelName, current.niche);
@@ -212,12 +227,22 @@ export function ChannelCreator() {
       d.setDate(d.getDate() + 1);
     }
     try {
+      // Skip ideas already on the calendar so scheduling twice doesn't duplicate them.
+      const from = new Date().toISOString().slice(0, 10);
+      const until = new Date(Date.now() + 400 * 86_400_000).toISOString().slice(0, 10);
+      const existing = await api.get<{ title: string }[]>(`/api/v1/calendar?from=${from}&to=${until}`);
+      const taken = new Set(existing.map((x) => x.title.trim().toLowerCase()));
+      const todo = current.plan.ideas.filter((idea) => !taken.has(idea.title.trim().toLowerCase()));
+      if (todo.length === 0) {
+        setNotice("All of these ideas are already on your content calendar.");
+        return;
+      }
       let n = 0;
-      for (const [i, idea] of current.plan.ideas.entries()) {
+      for (const [i, idea] of todo.entries()) {
         await api.post("/api/v1/calendar", { title: idea.title, kind: "publish", date: slots[i], notes: [idea.format, idea.hook].filter(Boolean).join(" — "), remind: true });
         n++;
       }
-      setNotice(`${n} ideas added to your content calendar.`);
+      setNotice(`${n} idea${n === 1 ? "" : "s"} added to your content calendar${n < current.plan.ideas.length ? " (the rest were already there)" : ""}.`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not add ideas to the calendar.");
     }
@@ -324,7 +349,7 @@ export function ChannelCreator() {
                 </Button>
                 {plan.ideas[0] && (
                   <Button size="sm" onClick={() => startVideo(plan.ideas[0])}>
-                    <Clapperboard className="size-4" aria-hidden="true" /> Start first video
+                    <Clapperboard className="size-4" aria-hidden="true" /> {existingFor(plan.ideas[0]) ? "Open first video" : "Start first video"}
                   </Button>
                 )}
               </div>
@@ -438,7 +463,7 @@ export function ChannelCreator() {
                         <p className="text-xs text-muted-text">{[idea.pillar, idea.format].filter(Boolean).join(" · ")}{idea.hook ? ` — ${idea.hook}` : ""}</p>
                       </div>
                       <Button size="sm" variant="ghost" onClick={() => startVideo(idea)}>
-                        <Clapperboard className="size-3.5" aria-hidden="true" /> Create
+                        <Clapperboard className="size-3.5" aria-hidden="true" /> {existingFor(idea) ? "Open" : "Create"}
                       </Button>
                     </li>
                   ))}
