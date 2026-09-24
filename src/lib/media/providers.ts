@@ -71,50 +71,7 @@ export const PROVIDERS: ProviderDef[] = [
       reference: "Reference-image conditioning is not wired yet.",
     },
   },
-  {
-    id: "comfyui",
-    label: "ComfyUI (self-hosted)",
-    blurb: "Your own ComfyUI workflow on GPU infrastructure. Runs as a background job.",
-    available: false,
-    unavailableReason: "ComfyUI is not configured or not reachable (COMFYUI_URL + COMFYUI_WORKFLOW).",
-    capabilities: { image: true, video: false, tts: false, music: false, sfx: false, reference: false, variations: true },
-    capabilityNotes: { tts: "ComfyUI generates images only here.", music: "ComfyUI generates images only here.", sfx: "ComfyUI generates images only here.", video: "Video workflows are not wired." },
-  },
-  {
-    id: "piper",
-    label: "Piper (self-hosted TTS)",
-    blurb: "Fast local text-to-speech on CPU. Runs as a background job.",
-    available: false,
-    unavailableReason: "Piper is not configured or not reachable (PIPER_URL).",
-    capabilities: { image: false, video: false, tts: true, music: false, sfx: false, reference: false, variations: false },
-    capabilityNotes: { image: "Piper is text-to-speech only.", music: "Piper is text-to-speech only.", sfx: "Piper is text-to-speech only.", video: "Piper is text-to-speech only." },
-  },
-  {
-    id: "ace-step",
-    label: "ACE-Step (self-hosted music)",
-    blurb: "AI music generation on GPU infrastructure. Runs as a background job.",
-    available: false,
-    unavailableReason: "ACE-Step is not configured or not reachable (ACE_STEP_URL).",
-    capabilities: { image: false, video: false, tts: false, music: true, sfx: false, reference: false, variations: false },
-    capabilityNotes: { image: "ACE-Step generates music only.", tts: "ACE-Step generates music only.", sfx: "Use on-device effects or uploads.", video: "ACE-Step generates music only." },
-  },
 ];
-
-/** Providers executed by the job worker (vs. instant cloud/on-device). */
-export const JOB_PROVIDERS = new Set(["comfyui", "piper", "ace-step"]);
-
-/** Merge live registry availability into the static matrix. */
-export function withAvailability(usable: (name: string) => boolean): ProviderDef[] {
-  return PROVIDERS.map((p) => (JOB_PROVIDERS.has(p.id) ? { ...p, available: usable(p.id) } : p));
-}
-
-/** Gate against a specific (availability-merged) list. */
-export function blockIn(list: ProviderDef[], providerId: string, capability: Capability): string | null {
-  const provider = list.find((p) => p.id === providerId) ?? list[0];
-  if (!provider.available) return provider.unavailableReason;
-  if (!provider.capabilities[capability]) return provider.capabilityNotes[capability] ?? "Not supported by this provider.";
-  return null;
-}
 
 export function providerById(id: string): ProviderDef {
   return PROVIDERS.find((p) => p.id === id) ?? PROVIDERS[0];

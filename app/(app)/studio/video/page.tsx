@@ -12,7 +12,7 @@ import { useIntelQuery } from "@/src/components/intelligence/chrome";
 import { Timeline } from "@/src/components/video/Timeline";
 import { Preview } from "@/src/components/video/Preview";
 import { ScenesPanel, MediaPanel, TextPanel, Inspector, ExportPanel } from "@/src/components/video/panels";
-import { ProviderActions } from "@/src/components/video/ProviderActions";
+import { GeminiCaptions } from "@/src/components/video/GeminiCaptions";
 import { Breadcrumb } from "@/src/components/ui/data";
 import { Button } from "@/src/components/ui/Button";
 import { Select } from "@/src/components/ui/fields";
@@ -352,7 +352,7 @@ function Studio() {
           onRemoveRequest={video.removeRequest}
         />
       )}
-      <ProviderActions projectId={pid} composition={composition} clips={clips} assets={assets} onCaptions={commit} />
+      <GeminiCaptions clips={clips} assets={assets} onCaptions={commit} />
       <SnapshotsPanel projectId={pid} />
     </div>
   );

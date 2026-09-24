@@ -122,3 +122,14 @@ without replacing any module:
   by the application layer.
 - Render assumes a Rendiv-compatible worker API; Rendiv itself is not
   vendored.
+
+## Phase 14 — self-hosted integrations removed (product decision)
+
+The owner chose hosted APIs over self-hosted infrastructure. Removed from
+the codebase and deployments: ComfyUI, Piper, ACE-Step, WhisperX and Rendiv
+adapters, the FFmpeg service, the job runner/worker, `/api/v1/generate`,
+the Piper sidecar, and the Railway services that ran them. All five move to
+**REFERENCE ONLY**. Replacements: Gemini images, Gemini TTS, and Gemini
+audio transcription for captions. Music uses on-device beds or uploads;
+MP4 rendering is not offered. The `jobs` table and `/api/v1/jobs` remain for
+future hosted long-running work.

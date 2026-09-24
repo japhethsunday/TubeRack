@@ -59,3 +59,9 @@ integrations talk to separate processes over HTTP (ComfyUI, Piper,
 WhisperX, ACE-Step, the render worker) or shell out to the FFmpeg binary,
 so the GPL/AGPL positions above are unchanged. npm dependencies added in
 this pass: none.
+
+## Phase 14 status
+
+All self-hosted integrations (ComfyUI, Piper, ACE-Step, WhisperX, Rendiv,
+FFmpeg) were removed from the codebase and deployments. No GPL/AGPL/BSD
+components are used in any form; the audit above is kept for reference.

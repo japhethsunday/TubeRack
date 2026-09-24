@@ -409,3 +409,53 @@ export async function rewriteSection(input: {
   });
   return { text: text.replace(/^["“]|["”]$/g, "").trim(), model };
 }
+
+export interface TimedSegment {
+  startSec: number;
+  endSec: number;
+  text: string;
+}
+
+/**
+ * Transcribe speech with Gemini (audio understanding) into timed caption
+ * segments. Timings come from the model; they are validated, sorted, and
+ * clamped — segments that are not well-formed are dropped, never invented.
+ */
+export async function transcribeAudio(bytes: Uint8Array, mimeType: string): Promise<{ text: string; segments: TimedSegment[]; model: string }> {
+  if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Set GEMINI_API_KEY to enable Gemini.");
+  if (bytes.byteLength === 0) throw new Error("Gemini transcription failed: audio is empty.");
+  const env = getServerEnv();
+  const model = env.GEMINI_TEXT_MODEL || DEFAULT_TEXT_MODEL;
+  const ai = getGeminiClient(env);
+  const prompt =
+    "Transcribe this narration exactly. Split it into caption lines of at most about 8 words, each with its start and end time in seconds from the start of the audio. " +
+    'Respond ONLY with JSON: {"segments":[{"start":0.0,"end":2.4,"text":"..."}]}';
+  try {
+    const response = await withModelFallback(model, FALLBACK_MODELS.text, (m) =>
+      ai.models.generateContent({
+        model: m,
+        contents: [
+          {
+            role: "user",
+            parts: [{ inlineData: { mimeType, data: Buffer.from(bytes).toString("base64") } }, { text: prompt }],
+          },
+        ],
+        config: { responseMimeType: "application/json", maxOutputTokens: 8192, temperature: 0 },
+      }),
+    );
+    const raw = response.text?.trim() ?? "";
+    const obj = parseJsonObject(raw, "transcription");
+    const list = Array.isArray(obj.segments) ? obj.segments : [];
+    const segments: TimedSegment[] = list
+      .map((s) => s as { start?: unknown; end?: unknown; text?: unknown })
+      .map((s) => ({ startSec: Number(s.start), endSec: Number(s.end), text: typeof s.text === "string" ? s.text.trim() : "" }))
+      .filter((s) => Number.isFinite(s.startSec) && Number.isFinite(s.endSec) && s.endSec > s.startSec && s.startSec >= 0 && s.text)
+      .sort((a, b) => a.startSec - b.startSec)
+      .slice(0, 2000);
+    if (segments.length === 0) throw new Error("no timed segments returned");
+    return { text: segments.map((s) => s.text).join(" "), segments, model };
+  } catch (error) {
+    if (error instanceof ProviderNotConfiguredError) throw error;
+    throw providerError("transcription", error);
+  }
+}

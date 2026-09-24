@@ -14,8 +14,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts tests/*.test.tsx",
-    "db:migrate": "node db/migrate.mjs",
-    "worker": "tsx src/worker/index.ts"
+    "db:migrate": "node db/migrate.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

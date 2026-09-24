@@ -134,3 +134,9 @@ export function writeSeoWithProvider(context: PackagingContext) {
 export function rewriteSectionWithProvider(input: { heading: string; text: string; instruction: string; topic: string }) {
   return attempt(() => api.post<{ text: string; model: string }>("/api/v1/ai/rewrite", input));
 }
+
+export function transcribeWithProvider(file: string) {
+  return attempt(() =>
+    api.post<{ text: string; segments: { startSec: number; endSec: number; text: string }[]; model: string }>("/api/v1/ai/transcribe", { file }),
+  );
+}

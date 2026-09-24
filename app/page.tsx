@@ -30,13 +30,13 @@ const ORBIT = [
   { label: "Gemini", className: "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2" },
   { label: "YouTube API", className: "right-0 top-1/2 translate-x-1/2 -translate-y-1/2" },
   { label: "Supabase", className: "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2" },
-  { label: "FFmpeg", className: "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2" },
+  { label: "Resend", className: "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2" },
 ];
 const ORBIT_INNER = [
-  { label: "WhisperX", className: "left-[15%] top-[15%]" },
-  { label: "Piper", className: "right-[15%] top-[15%]" },
-  { label: "ComfyUI", className: "bottom-[15%] right-[15%]" },
-  { label: "ACE-Step", className: "bottom-[15%] left-[15%]" },
+  { label: "Scripts", className: "left-[15%] top-[15%]" },
+  { label: "Voice", className: "right-[15%] top-[15%]" },
+  { label: "Images", className: "bottom-[15%] right-[15%]" },
+  { label: "Captions", className: "bottom-[15%] left-[15%]" },
 ];
 
 const MARQUEE = [
@@ -126,7 +126,7 @@ export default function HomePage() {
           { n: 15, label: "pipeline stages, one project" },
           { n: 8, label: "intelligence studios" },
           { n: 5, label: "production studios" },
-          { n: 8, label: "AI and media providers supported" },
+          { n: 10, label: "AI intelligence tasks" },
         ].map((f, i) => (
           <Reveal key={f.label} delay={i * 90}>
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center">

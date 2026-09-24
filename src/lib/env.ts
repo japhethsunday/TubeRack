@@ -48,20 +48,6 @@ const serverSchema = z.object({
   YOUTUBE_API_KEY: z.string().optional(),
   YOUTUBE_FALLBACK_BASE: z.string().optional(),
 
-  // Self-hosted media/AI services (all optional; app works fully without them)
-  WHISPERX_URL: z.string().optional(),
-  PIPER_URL: z.string().optional(),
-  PIPER_VOICE: z.string().default("en_US-lessac-medium"),
-  // Optional bearer token shared with the Piper sidecar (services/piper).
-  PIPER_TOKEN: z.string().optional(),
-  COMFYUI_URL: z.string().optional(),
-  COMFYUI_WORKFLOW: z.string().optional(),
-  // Optional bearer token for an authenticating proxy in front of ComfyUI.
-  COMFYUI_API_KEY: z.string().optional(),
-  ACE_STEP_URL: z.string().optional(),
-  FFMPEG_PATH: z.string().optional(),
-  RENDIV_URL: z.string().optional(),
-
   // Google Gemini (server-only primary AI provider: text, intelligence, image, TTS)
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_TEXT_MODEL: z.string().default("gemini-3.6-flash"),
