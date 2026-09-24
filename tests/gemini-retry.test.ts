@@ -90,3 +90,16 @@ describe("overload failover", () => {
     assert.deepEqual(calls, ["a", "b"]);
   });
 });
+
+describe("slow model failover", () => {
+  it("gives up on a model that doesn't answer in time and uses the next one", async () => {
+    const calls: string[] = [];
+    const out = await withModelFallback("slow", ["fast"], async (m) => {
+      calls.push(m);
+      if (m === "slow") await new Promise((r) => setTimeout(r, 500));
+      return m;
+    }, { attemptMs: 50, baseDelayMs: 1 });
+    assert.equal(out, "fast");
+    assert.deepEqual(calls, ["slow", "fast"]);
+  });
+});

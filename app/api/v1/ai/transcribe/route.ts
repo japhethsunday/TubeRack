@@ -6,7 +6,7 @@ import { storageGet } from "@/src/server/storage";
 import { notFound, toErrorResponse, validationError } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Only app file references; the storage key is rebuilt inside the caller's workspace.
 const FILE = /^\/api\/v1\/(generated|uploads)\/([0-9a-f-]{36}(?:-output)?\.(?:wav|mp3|ogg|webm|mp4))$/;

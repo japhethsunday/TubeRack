@@ -12,7 +12,7 @@ import type { ChannelEvidence, ChannelInputs } from "@/src/lib/channel/plan";
 import { backendUnavailable, toErrorResponse, validationError } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const body = z.object({
   niche: z.string().trim().min(2).max(80),

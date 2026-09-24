@@ -22,7 +22,7 @@ import { IntelligenceNotConfiguredError } from "@/src/lib/ai-gateway/intelligenc
  * components, workers, or tests — never from client components.
  */
 
-const DEFAULT_TEXT_MODEL = "gemini-3.6-flash";
+const DEFAULT_TEXT_MODEL = "gemini-3.5-pro";
 const DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image";
 const DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 const DEFAULT_TTS_VOICE = "Kore";
@@ -63,9 +63,9 @@ export function getGeminiClient(env = getServerEnv()): GoogleGenAI {
  * chain keeps working as older models are retired for new keys.
  */
 const FALLBACK_MODELS = {
-  // Different families have separate capacity: when Flash is overloaded,
-  // Flash-Lite or Pro usually still answer. Missing models are skipped fast.
-  text: ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.5-pro", "gemini-pro-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
+  // Pro first for quality; Flash families have separate capacity and answer
+  // fast when Pro is overloaded or slow. Missing models are skipped fast.
+  text: ["gemini-pro-latest", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-pro", "gemini-2.5-flash"],
   image: ["gemini-3.1-flash-image", "gemini-3-pro-image-preview", "gemini-2.5-flash-image"],
   tts: ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"],
 } as const;
@@ -97,6 +97,14 @@ export function isTransient(error: unknown): boolean {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Model timed out after ${Math.round(ms / 1000)}s (deadline)`)), ms);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+}
+
 /**
  * Resilient call: retry transient failures on the same model with
  * jittered backoff, then move down the fallback chain. Missing models skip
@@ -107,11 +115,13 @@ export async function withModelFallback<T>(
   model: string,
   fallbacks: readonly string[],
   call: (m: string) => Promise<T>,
-  opts: { retries?: number; budgetMs?: number; baseDelayMs?: number } = {},
+  opts: { retries?: number; budgetMs?: number; baseDelayMs?: number; attemptMs?: number } = {},
 ): Promise<T> {
   const chain = [model, ...fallbacks.filter((m) => m !== model)];
   const retries = opts.retries ?? 2;
-  const deadline = Date.now() + (opts.budgetMs ?? 45_000);
+  const deadline = Date.now() + (opts.budgetMs ?? 130_000);
+  // One slow model must not eat the whole budget: give up on it and fall back.
+  const attemptMs = opts.attemptMs ?? 75_000;
   const base = opts.baseDelayMs ?? 700;
   let last: unknown;
   let busy: unknown;
@@ -119,7 +129,7 @@ export async function withModelFallback<T>(
   for (const m of chain) {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        return await call(m);
+        return await withTimeout(call(m), Math.min(attemptMs, Math.max(1_000, deadline - Date.now())));
       } catch (error) {
         last = error;
         if (isQuotaBlocked(error)) quota ??= error;
@@ -128,7 +138,7 @@ export async function withModelFallback<T>(
         busy = error;
         // Overloaded (503/high demand): another model is likelier to answer than
         // this one a second later, so move on immediately.
-        if (/\b503\b|UNAVAILABLE|overloaded|high demand/i.test(errorText(error))) break;
+        if (/\b503\b|UNAVAILABLE|overloaded|high demand|timed out/i.test(errorText(error))) break;
         const wait = base * 2 ** attempt + Math.floor(Math.random() * 300);
         if (attempt === retries || Date.now() + wait > deadline) break;
         await sleep(wait);
@@ -146,12 +156,12 @@ function providerError(what: string, error: unknown): Error {
   console.error(`[gemini] ${what} failed:`, errorText(error).slice(0, 500));
   if (isQuotaBlocked(error)) {
     return new Error(
-      `Your Gemini API key has no quota left for ${what}. Free-tier keys usually can't generate ${what === "image generation" ? "images" : "this"} — enable billing for the key in Google AI Studio (aistudio.google.com → API keys → set up billing), or try again tomorrow if you hit the daily limit.`,
+      `The generation service has no quota left for ${what}. Free-tier keys usually can't generate ${what === "image generation" ? "images" : "this"} Please try again later.`,
     );
   }
   if (isTransient(error)) {
     return new Error(
-      `Gemini is very busy right now, so ${what} could not finish. We retried automatically on backup models — please try again in a minute.`,
+      `The generation service is very busy right now, so ${what} could not finish. We retried automatically on backup models — please try again in a minute.`,
     );
   }
   const message = error instanceof Error ? error.message : String(error);

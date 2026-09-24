@@ -9,7 +9,7 @@ import { providerFailure } from "@/src/server/ai/guard";
 import { toErrorResponse, validationError } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type Ctx = { params: Promise<{ id: string }> };
 

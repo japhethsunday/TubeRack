@@ -6,7 +6,7 @@ import { providerFailure } from "@/src/server/ai/guard";
 import { toErrorResponse, validationError } from "@/src/server/errors";
 import { sharedLimit } from "@/src/server/shared-limit";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 // Vercel caps request bodies at 4.5 MB; the client compresses banners below this.
 const MAX_BYTES = 4 * 1024 * 1024;
 

@@ -5,7 +5,7 @@ import { providerFailure } from "@/src/server/ai/guard";
 import { rateLimited, toErrorResponse } from "@/src/server/errors";
 import { limiterFor } from "@/src/server/rate-limit";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /** GET /api/v1/competitors/report — refresh uploads, outliers, cadence (~2 units/channel). */
 export async function GET() {

@@ -7,7 +7,7 @@ import { notFound, rateLimited, toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 import { limiterFor } from "@/src/server/rate-limit";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /** POST /api/v1/trends/scan { id } — scan one watched topic now (~102 units). */
 export async function POST(request: Request) {

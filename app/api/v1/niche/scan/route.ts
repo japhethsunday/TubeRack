@@ -7,7 +7,7 @@ import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } 
 import { toErrorResponse, validationError } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const body = z.object({
   seed: z.string().trim().min(2).max(200),

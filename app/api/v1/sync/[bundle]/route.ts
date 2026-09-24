@@ -7,7 +7,7 @@ import { rateLimited } from "@/src/server/errors";
 import { SYNC_SCHEMAS, type SyncKind } from "@/src/lib/sync-map";
 
 // Fail fast instead of holding a save open for the platform maximum.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const KINDS = Object.keys(SYNC_SCHEMAS) as SyncKind[];
 

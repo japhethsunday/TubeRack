@@ -5,7 +5,7 @@ import { guardProviderCall, providerFailure, recordUsage, storeGenerated, type P
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const body = z.object({
   text: z.string().trim().min(1, "Text is required.").max(5000),

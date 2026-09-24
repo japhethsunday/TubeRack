@@ -7,7 +7,7 @@ import { addDays } from "@/src/lib/growth/calendar";
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const body = z.object({
   topic: z.string().trim().min(2).max(200),

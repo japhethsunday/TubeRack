@@ -6,7 +6,7 @@ import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } 
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const body = z.object({
   items: z
