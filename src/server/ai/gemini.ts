@@ -858,7 +858,9 @@ export function splitWav(bytes: Uint8Array, pieceSec = 180): { bytes: Uint8Array
   if (!w || w.byteRate <= 0 || w.blockAlign <= 0) return [{ bytes, offsetSec: 0 }];
   const b = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const total = w.dataLen;
-  const target = Math.floor((pieceSec * w.byteRate) / w.blockAlign) * w.blockAlign;
+  // Each piece stays under ~14 MB whatever the quality of the take (a single request's limit).
+  const seconds = Math.min(pieceSec, (14 * 1024 * 1024) / w.byteRate);
+  const target = Math.floor((seconds * w.byteRate) / w.blockAlign) * w.blockAlign;
   if (total <= target * 1.15) return [{ bytes, offsetSec: 0 }];
   const window = Math.floor((2 * w.byteRate) / w.blockAlign) * w.blockAlign; // look ±2 s for a pause
   const step = Math.max(w.blockAlign, Math.floor(w.byteRate / 50 / w.blockAlign) * w.blockAlign); // 20 ms frames

@@ -28,3 +28,12 @@ test("long voice-overs split into valid pieces that add up to the whole take", (
   }
   assert.equal(splitWav(wav(60), 180).length, 1);
 });
+
+test("high-quality takes are cut into pieces small enough for one request", () => {
+  const rate = 48000;
+  const pcm = Buffer.alloc(200 * rate * 2);
+  const take = new Uint8Array(Buffer.from(pcmToWavBase64(pcm.toString("base64"), rate), "base64"));
+  const pieces = splitWav(take, 180);
+  assert.ok(pieces.length >= 2);
+  for (const p of pieces) assert.ok(p.bytes.byteLength <= 14.2 * 1024 * 1024, `${p.bytes.byteLength}`);
+});
