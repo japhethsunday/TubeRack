@@ -126,10 +126,12 @@ function escapeXml(s: string): string {
 export function composeThumbnail(baseSvg: string, overlays: TextOverlay[]): string {
   const W = 1280;
   const H = 720;
-  const nested = baseSvg
-    .replace(/<svg([^>]*)>/, `<svg$1 x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice">`)
-    .replace(/width="[^"]*"/, `width="${W}"`)
-    .replace(/height="[^"]*"/, `height="${H}"`);
+  // Re-open the base's root <svg> with exactly one set of size/position
+  // attributes (duplicates make the file invalid outside an HTML page).
+  const nested = baseSvg.replace(/<svg\b([^>]*)>/, (_m, attrs: string) => {
+    const kept = attrs.replace(/\s(?:width|height|x|y|preserveAspectRatio)="[^"]*"/g, "");
+    return `<svg${kept} x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice">`;
+  });
   const texts = overlays
     .map((o) => {
       const x = Math.round((o.x / 100) * W);

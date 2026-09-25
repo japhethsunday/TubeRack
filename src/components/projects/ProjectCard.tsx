@@ -1,3 +1,4 @@
+import { ProjectCover } from "@/src/components/projects/ProjectCover";
 import Link from "next/link";
 import { Archive, Copy, Pencil, RotateCcw, Trash2, MoreHorizontal } from "lucide-react";
 import { useState } from "react";
@@ -70,10 +71,8 @@ export function ProjectCard({
       }
     >
       {view === "grid" ? (
-        <Link href={`/projects/${project.id}`} className="block aspect-video bg-muted" aria-label={`Open ${project.name}`}>
-          <span aria-hidden="true" className="flex h-full items-center justify-center text-2xl font-semibold text-disabled-text">
-            {project.name.slice(0, 1).toUpperCase()}
-          </span>
+        <Link href={`/projects/${project.id}`} className="block aspect-video overflow-hidden bg-muted" aria-label={`Open ${project.name}`}>
+          <ProjectCover projectId={project.id} name={project.name} />
         </Link>
       ) : null}
       <div className={view === "grid" ? "flex flex-1 flex-col p-4" : "min-w-0 flex-1"}>
