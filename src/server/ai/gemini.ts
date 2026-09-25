@@ -350,6 +350,34 @@ const TTS_CHUNK_CHARS = 1400;
  * Longer videos are voiced scene by scene.
  */
 export const TTS_MAX_CHARS = 14_000;
+const VOXTRAL_CHUNK_CHARS = 450;
+
+/** Seconds a piece of narration needs at a brisk speaking pace (~175 words/min). */
+function minSpeechSec(text: string): number {
+  return (text.split(/\s+/).filter(Boolean).length / 175) * 60;
+}
+
+/**
+ * Voice one chunk and make sure every word was spoken: if the audio is far
+ * shorter than the words need (the voice engine stopped early), split the
+ * text in two and voice each half, down to single sentences.
+ */
+export async function completeSpeech(
+  text: string,
+  voiceIt: (t: string) => Promise<{ pcm: Buffer; rate: number }>,
+  depth = 0,
+): Promise<{ pcm: Buffer; rate: number }[]> {
+  const part = await voiceIt(text);
+  const got = part.pcm.length / 2 / part.rate;
+  const need = minSpeechSec(text);
+  if (need < 6 || got >= need * 0.6 || depth >= 4) return [part];
+  const sentences = splitForSpeech(text, Math.max(80, Math.ceil(text.length / 2)));
+  if (sentences.length < 2) return [part];
+  console.error(`[tts] audio cut short (${got.toFixed(1)}s for ~${need.toFixed(0)}s of text); re-voicing in ${sentences.length} parts`);
+  const out: { pcm: Buffer; rate: number }[] = [];
+  for (const piece of sentences) out.push(...(await completeSpeech(piece, voiceIt, depth + 1)));
+  return out;
+}
 
 /**
  * Split narration into chunks of at most `max` characters, breaking at
@@ -441,13 +469,17 @@ export class GeminiTtsProvider implements TtsProvider {
     const chunks = splitForSpeech(text);
     const mistral = isMistralConfigured(env);
     // One provider per take, so the voice never changes mid-narration.
-    const viaMistral = async () => ({ parts: await mapLimit(chunks, 3, (chunk) => mistralSpeechChunk(chunk)), model: "voxtral-mini-tts" });
+    // Voxtral stops early on long inputs: shorter pieces, each checked.
+    const viaMistral = async () => ({
+      parts: (await mapLimit(splitForSpeech(text, VOXTRAL_CHUNK_CHARS), 3, (chunk) => completeSpeech(chunk, (t) => mistralSpeechChunk(t)))).flat(),
+      model: "voxtral-mini-tts",
+    });
     try {
       let result: { parts: { pcm: Buffer; rate: number }[]; model: string };
       if (!env.GEMINI_API_KEY && mistral) result = await viaMistral();
       else {
         try {
-          result = { parts: await mapLimit(chunks, 4, (chunk) => this.synthesizeChunk(chunk, voice, model)), model };
+          result = { parts: (await mapLimit(chunks, 4, (chunk) => completeSpeech(chunk, (t) => this.synthesizeChunk(t, voice, model)))).flat(), model };
         } catch (error) {
           if (!mistral || (error instanceof ProviderNotConfiguredError && !mistral)) throw error;
           console.error("[gemini] speech failed, using Voxtral:", error instanceof Error ? error.message.slice(0, 200) : error);
