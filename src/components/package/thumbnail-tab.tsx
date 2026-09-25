@@ -2,18 +2,17 @@
 
 import type { TextOverlay } from "@/src/lib/package/types";
 import { useProductionContext } from "@/src/components/projects/useProductionContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, ImagePlus, Sparkles } from "lucide-react";
 import { generateProviderImage } from "@/src/lib/ai-client";
 import { GeminiAssist } from "@/src/components/intelligence/GeminiAssist";
-import { DownloadButton } from "@/src/components/ui/DownloadButton";
-import { downloadStored, safeFileName } from "@/src/lib/download";
+import { safeFileName } from "@/src/lib/download";
 import type { MediaAsset } from "@/src/lib/media/types";
 import { storeThumbnailImage } from "@/src/lib/package/svg-images";
-import { solidBase } from "@/src/lib/package/thumbnails";
+import { composeThumbnail, solidBase } from "@/src/lib/package/thumbnails";
 import { usePackaging } from "@/src/components/package/PackagingProvider";
 import { useMedia } from "@/src/components/media/MediaProvider";
-import { ConceptBuilder, VariantEditor, VariantGallery } from "@/src/components/package/thumbnails";
+import { ConceptBuilder, VariantEditor, VariantGallery, downloadPng } from "@/src/components/package/thumbnails";
 import type { ThumbContext } from "@/src/components/package/thumbnails";
 import { Input, Select } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
@@ -62,8 +61,26 @@ export function ThumbnailTab({
   const [importingId, setImportingId] = useState<string | null>(null);
   const [artPrompt, setArtPrompt] = useState("");
   const [artBusy, setArtBusy] = useState(false);
-  const [artUrl, setArtUrl] = useState<string | null>(null);
   const [artError, setArtError] = useState<string | null>(null);
+
+  // The art prompt is kept per project so it is still there on return.
+  const promptKey = `tuberack:thumb-prompt:${projectId}`;
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restore once from device storage.
+      setArtPrompt(localStorage.getItem(promptKey) ?? "");
+    } catch {
+      // Storage unavailable: start empty.
+    }
+  }, [promptKey]);
+  function changePrompt(value: string) {
+    setArtPrompt(value);
+    try {
+      localStorage.setItem(promptKey, value);
+    } catch {
+      // Storage unavailable: the prompt still works for this visit.
+    }
+  }
 
   const production = useProductionContext(projectId);
   const headline = (primaryTitle || context.title || "").trim();
@@ -110,23 +127,26 @@ export function ThumbnailTab({
       setArtBusy(false);
       return;
     }
-    setArtUrl(outcome.data.url);
-    try {
-      const svg = await uploadToBase(outcome.data.url);
-      const variant = addVariant(projectId, {
-        name: `Art ${variants.length + 1}`,
-        baseKind: "upload",
-        baseSvg: svg,
-        overlays: headlineOverlays(),
-      });
-      setSelectedId(variant.id);
-    } catch {
-      setArtError("The image was generated but could not be loaded into the editor. You can still download it below.");
-    }
+    // The finished thumbnail is the art plus the exact title, saved as a
+    // variant so it is there when the user comes back.
+    const url = outcome.data.url;
+    const svg = await uploadToBase(url).catch(
+      () => `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><image href="${url}" x="0" y="0" width="1280" height="720" preserveAspectRatio="xMidYMid slice"/></svg>`,
+    );
+    const variant = addVariant(projectId, {
+      name: `Art ${artVariants.length + 1}`,
+      baseKind: "upload",
+      baseSvg: svg,
+      overlays: headlineOverlays(),
+    });
+    setSelectedId(variant.id);
     setArtBusy(false);
   }
 
   const variants = variantsFor(projectId);
+  const artVariants = variants.filter((v) => v.baseKind === "upload" && /^Art \d+/.test(v.name));
+  const latestArt = artVariants[artVariants.length - 1] ?? null;
+  const latestComposed = latestArt?.baseSvg ? composeThumbnail(latestArt.baseSvg, latestArt.overlays) : null;
   const selected = variants.find((v) => v.id === selectedId) ?? variants[0] ?? null;
   const approved = approvedVariantFor(projectId);
 
@@ -191,7 +211,7 @@ export function ThumbnailTab({
       <section aria-label="Thumbnail art" className="space-y-3 rounded-xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-end gap-2">
           <div className="min-w-0 flex-1">
-            <Input label="Thumbnail art prompt " value={artPrompt} onChange={(e) => setArtPrompt(e.target.value)} placeholder={defaultArtPrompt} />
+            <Input label="Thumbnail art prompt " value={artPrompt} onChange={(e) => changePrompt(e.target.value)} placeholder={defaultArtPrompt} />
           </div>
           <Button loading={artBusy} onClick={() => void generateArt()}>
             <Sparkles className="size-4" aria-hidden="true" /> Generate art
@@ -199,11 +219,28 @@ export function ThumbnailTab({
         </div>
         <p className="text-xs text-muted-text">Generates text-free 16:9 art and adds your exact title on top as editable text, so the words are always spelled right.</p>
         {artError && <p role="alert" className="text-xs text-destructive">{artError}</p>}
-        {artUrl && (
+        {latestArt && latestComposed && (
           <div className="ui-panel flex flex-wrap items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL. */}
-            <img src={artUrl} alt="Thumbnail art" className="aspect-video w-60 rounded-lg border border-border object-cover" />
-            <DownloadButton onDownload={() => downloadStored(artUrl, safeFileName(primaryTitle || "thumbnail", "png"))} />
+            {/* eslint-disable-next-line @next/next/no-img-element -- composed SVG thumbnail. */}
+            <img
+              src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(latestComposed)}`}
+              alt={`Thumbnail: ${headline}`}
+              className="aspect-video w-72 rounded-lg border border-border object-cover"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSelectedId(latestArt.id);
+                  document.getElementById("variant-editor")?.scrollIntoView({ behavior: "smooth" });
+                }}
+              >
+                Edit text & layout
+              </Button>
+              <Button variant="secondary" onClick={() => void downloadPng(latestComposed, safeFileName(primaryTitle || "thumbnail", "png")).catch(() => {})}>
+                Download PNG
+              </Button>
+            </div>
           </div>
         )}
       </section>
@@ -280,7 +317,7 @@ export function ThumbnailTab({
       </section>
 
       {selected && (
-        <section aria-label="Variant editor">
+        <section id="variant-editor" aria-label="Variant editor">
           <h3 className="mb-2 text-sm font-semibold">Editing — {selected.name}</h3>
           <VariantEditor
             projectId={projectId}

@@ -82,6 +82,24 @@ export async function nvidiaImageWith(
   throw new Error(last || `NVIDIA ${model.id} failed`);
 }
 
+/**
+ * Turn whatever the user pasted (often markdown concept notes) into a plain
+ * image prompt: no headings, bullets, bold markers or field labels, capped in
+ * length. Long, noisy prompts are what trip the image models' filters.
+ */
+export function cleanImagePrompt(raw: string, max = 900): string {
+  const text = raw
+    .replace(/[#*_`>]+/g, " ")
+    .replace(/^\s*[-•]\s*/gm, "")
+    .replace(/\b(Concept \d+|Focal Subject|Facial Emotion or Object|Text Overlay|Colou?r Palette|Composition|Background)\s*:/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const end = cut.lastIndexOf(".");
+  return (end > max * 0.5 ? cut.slice(0, end + 1) : cut).trim();
+}
+
 /** Try each NVIDIA image model in order until one returns an image. */
 export async function nvidiaGenerateImage(prompt: string, aspect: Aspect): Promise<{ dataUrl: string; model: string }> {
   const key = getServerEnv().NVIDIA_API_KEY;
@@ -89,10 +107,17 @@ export async function nvidiaGenerateImage(prompt: string, aspect: Aspect): Promi
   let lastError: unknown = new Error("No NVIDIA image model answered.");
   for (const model of NVIDIA_IMAGE_MODELS) {
     if ((unavailable.get(model.id) ?? 0) > Date.now()) continue;
-    try {
-      return await nvidiaImageWith(model, prompt, aspect, key);
-    } catch (error) {
-      lastError = error;
+    // A filtered reply is often a one-off for that seed: try again with a new
+    // seed, then with just the first sentences of the prompt.
+    const clean = cleanImagePrompt(prompt);
+    const attempts = [clean, clean, cleanImagePrompt(clean, 300)];
+    for (const p of attempts) {
+      try {
+        return await nvidiaImageWith(model, p, aspect, key);
+      } catch (error) {
+        lastError = error;
+        if (!/filtered|too small/i.test(error instanceof Error ? error.message : "")) break;
+      }
     }
   }
   throw lastError;

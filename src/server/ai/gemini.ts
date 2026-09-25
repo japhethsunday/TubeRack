@@ -3,7 +3,7 @@ import { normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPl
 import { stripMarkdown } from "@/src/lib/text/markdown";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
 import { isNvidiaConfigured, nvidiaGenerateText } from "@/src/server/ai/nvidia";
-import { isNvidiaImageConfigured, nvidiaGenerateImage } from "@/src/server/ai/nvidia-image";
+import { cleanImagePrompt, isNvidiaImageConfigured, nvidiaGenerateImage } from "@/src/server/ai/nvidia-image";
 import { isMistralConfigured, mistralGenerateText, mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
 
 type TextRequest = { prompt: string; maxTokens?: number; json?: boolean };
@@ -271,7 +271,7 @@ export class GeminiImageProvider implements ImageProvider {
   readonly name = "gemini";
 
   async generateImage(request: { prompt: string; aspectRatio?: string }): Promise<{ url: string; prompt: string }> {
-    const prompt = request.prompt.trim();
+    const prompt = cleanImagePrompt(request.prompt, 1800);
     if (!prompt) throw new Error("Image generation failed: prompt cannot be empty.");
     const env = getServerEnv();
     const model = env.GEMINI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL;
@@ -310,6 +310,9 @@ export class GeminiImageProvider implements ImageProvider {
           return { url: (await nvidiaGenerateImage(prompt, aspect)).dataUrl, prompt: request.prompt };
         } catch (nvidiaError) {
           console.error("[nvidia] image fallback failed:", nvidiaError instanceof Error ? nvidiaError.message.slice(0, 300) : nvidiaError);
+          if (/filtered/i.test(nvidiaError instanceof Error ? nvidiaError.message : "")) {
+            throw new Error("The image service declined this prompt. Describe the scene in plain words (subject, setting, mood) and try again.");
+          }
         }
       }
       throw providerError("image generation", error);
@@ -485,7 +488,7 @@ const TASK_LABELS: Record<string, string> = {
   "retention-analysis": "Identify retention risks and suggest pacing improvements.",
   "content-gap-analysis": "Find content gaps: unanswered questions and uncovered angles.",
   "brief-generation": "Write a concise production brief from this context.",
-  "thumbnail-concepts": "Propose 4 distinct YouTube thumbnail concepts. For each: focal subject, facial emotion or object, 2-4 word text overlay, color/contrast plan, composition, and why it earns the click honestly. End each with a one-line image-generation prompt prefixed 'PROMPT:'.",
+  "thumbnail-concepts": "Propose 4 distinct YouTube thumbnail concepts. For each: focal subject, facial emotion or object, 2-4 word text overlay, color/contrast plan, composition, and why it earns the click honestly. End each with a one-line image-generation prompt prefixed 'PROMPT:'. Keep each concept under 90 words.",
   "repurpose-plan": "Repurpose this video into ready-to-post pieces: 3 short-form clip scripts (hook, beats, on-screen text, CTA), one X/Twitter thread, one LinkedIn post, and one community post. Write the final copy, not advice.",
   "platform-copy": "Write publish-ready copy for each platform listed (default: YouTube, YouTube Shorts, TikTok, Instagram Reels, X, LinkedIn): title or first line, caption/description within that platform's limits, and 3-8 relevant hashtags. Label each platform clearly.",
   "storyboard-plan": "Create a shot-by-shot storyboard for these scenes: for each scene list shots with visual description, camera framing/motion, b-roll ideas, on-screen text, sound/music cue, and transition. Keep it filmable on a creator budget.",
@@ -509,7 +512,7 @@ export async function runIntelligenceTask(request: IntelligenceRequest): Promise
   const provider = new GeminiTextProvider();
   const { text, model } = await provider.generateText({
     prompt: `You are TubeRack's YouTube strategy analyst. ${label}\nContext (JSON):\n${context}\n\nRules: respond in plain text with concrete, actionable reasoning. Never invent views, rankings, metrics, or channel data — reason only from the context given.`,
-    maxTokens: 2000,
+    maxTokens: 4096,
   });
   return { task: request.task, text, model };
 }
