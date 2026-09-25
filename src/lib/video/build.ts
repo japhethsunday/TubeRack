@@ -99,13 +99,33 @@ export function captionsFromNarration(narration: string, startSec: number, total
 export function captionsFromSegments(
   segments: { startSec: number; endSec: number; text: string }[],
   offsetSec: number,
+  clip?: { durationSec: number; inSec?: number; speed?: number },
 ): TimelineClip[] {
-  return segments
-    .filter((s) => s.text.trim() && Number.isFinite(s.startSec) && s.endSec > s.startSec)
-    .map((s) => ({
-      ...clipBase("track_captions", "captions", s.text.trim().slice(0, 48), Math.round((offsetSec + s.startSec) * 10) / 10, s.endSec - s.startSec),
-      text: s.text.trim(),
-    }));
+  // Audio time → timeline time for the voice clip (trim and speed applied),
+  // kept in order, never overlapping, and inside the clip.
+  const inSec = clip?.inSec ?? 0;
+  const speed = clip?.speed && clip.speed > 0 ? clip.speed : 1;
+  const limit = clip ? clip.durationSec : Infinity;
+  const out: TimelineClip[] = [];
+  let cursor = 0;
+  for (const s of [...segments].sort((a, b) => a.startSec - b.startSec)) {
+    const text = s.text.trim();
+    if (!text || !Number.isFinite(s.startSec) || !(s.endSec > s.startSec)) continue;
+    let start = Math.max((s.startSec - inSec) / speed, cursor);
+    let end = Math.min((s.endSec - inSec) / speed, limit);
+    if (end <= 0 || start >= limit) continue;
+    start = Math.max(0, start);
+    if (end - start < 0.3) end = Math.min(limit, start + 0.3);
+    if (end <= start) continue;
+    start = Math.round(start * 100) / 100;
+    end = Math.round(end * 100) / 100;
+    cursor = end;
+    out.push({
+      ...clipBase("track_captions", "captions", text.slice(0, 48), Math.round((offsetSec + start) * 100) / 100, Math.round((end - start) * 100) / 100),
+      text,
+    });
+  }
+  return out;
 }
 
 export interface SceneSegment {

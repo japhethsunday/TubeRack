@@ -667,15 +667,88 @@ export interface TimedSegment {
  * segments. Timings come from the model; they are validated, sorted, and
  * clamped — segments that are not well-formed are dropped, never invented.
  */
+/** Length of a WAV file in seconds from its header (null for other formats). */
+export function wavDurationSec(bytes: Uint8Array): number | null {
+  const b = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (b.length < 44 || b.toString("ascii", 0, 4) !== "RIFF" || b.toString("ascii", 8, 12) !== "WAVE") return null;
+  let off = 12;
+  let byteRate = 0;
+  while (off + 8 <= b.length) {
+    const id = b.toString("ascii", off, off + 4);
+    const size = b.readUInt32LE(off + 4);
+    if (id === "fmt ") byteRate = b.readUInt32LE(off + 16);
+    if (id === "data") return byteRate > 0 ? Math.min(size, b.length - off - 8) / byteRate : null;
+    off += 8 + size + (size % 2);
+  }
+  return null;
+}
+
+/**
+ * Captions must follow the audio: sorted, never overlapping, inside the take.
+ * Returns null when the timings clearly don't cover the audio (a model that
+ * squeezed or cut them short), so the caller can try another route.
+ */
+export function tidySegments(segments: TimedSegment[], durationSec: number | null): TimedSegment[] | null {
+  const sorted = [...segments].sort((a, b) => a.startSec - b.startSec);
+  const out: TimedSegment[] = [];
+  for (const s of sorted) {
+    const prevEnd = out.length ? out[out.length - 1].endSec : 0;
+    const start = Math.max(s.startSec, prevEnd);
+    let end = durationSec ? Math.min(s.endSec, durationSec) : s.endSec;
+    if (end - start < 0.3) end = start + 0.3;
+    if (durationSec && start >= durationSec) break;
+    out.push({ startSec: Math.round(start * 100) / 100, endSec: Math.round(end * 100) / 100, text: s.text });
+  }
+  if (out.length === 0) return null;
+  if (durationSec && durationSec > 15 && out[out.length - 1].endSec < durationSec * 0.75) return null;
+  return out;
+}
+
+/** Last resort: the words spread across the take by word count (always in order, full length). */
+export function spreadText(text: string, durationSec: number, maxWords = 8): TimedSegment[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (!words.length || durationSec <= 0) return [];
+  const per = durationSec / words.length;
+  const out: TimedSegment[] = [];
+  for (let i = 0; i < words.length; i += maxWords) {
+    const n = Math.min(maxWords, words.length - i);
+    out.push({ startSec: Math.round(i * per * 100) / 100, endSec: Math.round((i + n) * per * 100) / 100, text: words.slice(i, i + n).join(" ") });
+  }
+  return out;
+}
+
+/**
+ * Timed captions for a voice take. Speech recognition (Voxtral) gives real
+ * timestamps, so it goes first; Gemini is the backup. Every result is checked
+ * against the audio's true length before it is used.
+ */
 export async function transcribeAudio(bytes: Uint8Array, mimeType: string): Promise<{ text: string; segments: TimedSegment[]; model: string }> {
   if (bytes.byteLength === 0) throw new Error("Transcription failed: audio is empty.");
-  if (!isGeminiConfigured() && isMistralConfigured()) {
+  const duration = wavDurationSec(bytes);
+  let bestText = "";
+  let lastError: unknown = null;
+  const routes: (() => Promise<{ text: string; segments: TimedSegment[]; model: string }>)[] = [];
+  if (isMistralConfigured()) routes.push(() => mistralTranscribe(bytes, mimeType));
+  if (isGeminiConfigured()) routes.push(() => geminiTranscribe(bytes, mimeType));
+  if (routes.length === 0) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
+  for (const route of routes) {
     try {
-      return await mistralTranscribe(bytes, mimeType);
+      const r = await route();
+      if (r.text.length > bestText.length) bestText = r.text;
+      const tidy = tidySegments(r.segments, duration);
+      if (tidy) return { text: r.text, segments: tidy, model: r.model };
+      console.error("[captions] timings did not cover the audio; trying the next route");
     } catch (error) {
-      throw providerError("transcription", error);
+      lastError = error;
+      console.error("[captions] transcription route failed:", error instanceof Error ? error.message.slice(0, 200) : error);
     }
   }
+  if (bestText && duration) return { text: bestText, segments: spreadText(bestText, duration), model: "estimated" };
+  throw providerError("transcription", lastError ?? new Error("no usable captions"));
+}
+
+async function geminiTranscribe(bytes: Uint8Array, mimeType: string): Promise<{ text: string; segments: TimedSegment[]; model: string }> {
+  if (bytes.byteLength === 0) throw new Error("Transcription failed: audio is empty.");
   if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   const env = getServerEnv();
   const model = env.GEMINI_TEXT_MODEL || DEFAULT_TEXT_MODEL;
@@ -709,14 +782,7 @@ export async function transcribeAudio(bytes: Uint8Array, mimeType: string): Prom
     return { text: segments.map((s) => s.text).join(" "), segments, model };
   } catch (error) {
     if (error instanceof ProviderNotConfiguredError) throw error;
-    if (isMistralConfigured()) {
-      try {
-        return await mistralTranscribe(bytes, mimeType);
-      } catch (mistralError) {
-        console.error("[mistral] transcription fallback failed:", mistralError instanceof Error ? mistralError.message.slice(0, 200) : mistralError);
-      }
-    }
-    throw providerError("transcription", error);
+    throw error;
   }
 }
 

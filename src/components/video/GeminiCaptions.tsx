@@ -47,8 +47,8 @@ export function GeminiCaptions({
     }
     const start = clip.startSec;
     const end = start + clip.durationSec;
-    const kept = clips.filter((c) => !(c.kind === "captions" && c.startSec >= start && c.startSec < end));
-    const added = captionsFromSegments(outcome.data.segments, start);
+    const kept = clips.filter((c) => !(c.kind === "captions" && c.startSec < end && c.startSec + c.durationSec > start));
+    const added = captionsFromSegments(outcome.data.segments, start, clip);
     onCaptions([...kept, ...added]);
     setLast({ name: clip.name, segments: outcome.data.segments });
     setMessage({ ok: true, text: `Added ${added.length} caption line(s) from “${clip.name}”.` });

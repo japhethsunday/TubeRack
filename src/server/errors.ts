@@ -51,7 +51,13 @@ export const conflict = (message: string) => new BackendError("CONFLICT", messag
 export const rateLimited = (retryAfterSec: number) =>
   new BackendError("RATE_LIMITED", `Too many requests. Retry in ${retryAfterSec} seconds.`);
 export const backendUnavailable = (what: string) =>
-  new BackendError("BACKEND_UNAVAILABLE", `${what} is not configured yet. Add credentials to enable it.`);
+  new BackendError("BACKEND_UNAVAILABLE", `${publicName(what)} isn't available right now. Please try again later.`);
+
+/** Users never see credential or vendor names: "YouTube (YOUTUBE_API_KEY)" → "YouTube". */
+export function publicName(what: string): string {
+  const name = what.replace(/\s*\([A-Z0-9_ /]+\)/g, "").trim();
+  return /gemini|mistral|nvidia|voxtral|byteplus/i.test(name) ? "This feature" : name || "This feature";
+}
 export const internalError = () =>
   new BackendError("INTERNAL_ERROR", "Something went wrong. Nothing was changed.");
 
