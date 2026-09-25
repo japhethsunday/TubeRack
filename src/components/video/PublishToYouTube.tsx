@@ -250,7 +250,7 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
   const [includeThumb, setIncludeThumb] = useState(Boolean(variant));
   const [includeCaptions, setIncludeCaptions] = useState(cueCount > 0);
   const [madeForKids, setMadeForKids] = useState(false);
-  const [synthetic, setSynthetic] = useState(true);
+  const [synthetic, setSynthetic] = useState(false);
   const [notify, setNotify] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [thumbPreview, setThumbPreview] = useState<string | null>(null);
@@ -615,7 +615,7 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
           <div className="grid gap-2 rounded-lg border border-border p-3 text-sm sm:grid-cols-2">
             <label className="flex items-center gap-2"><input type="checkbox" checked={includeCaptions} disabled={!vtt || !conn.canManage} onChange={(e) => setIncludeCaptions(e.target.checked)} /> Upload captions {vtt ? `(${cueCount} lines)` : "(none on timeline)"}</label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} /> Notify subscribers</label>
-            <label className="flex items-center gap-2" title="YouTube requires disclosure of realistic AI-generated or altered content."><input type="checkbox" checked={synthetic} onChange={(e) => setSynthetic(e.target.checked)} /> Contains AI-generated or altered content</label>
+            <label className="flex items-start gap-2" title="Only needed for realistic content that could be mistaken for a real person, place or event."><input type="checkbox" className="mt-0.5" checked={synthetic} onChange={(e) => setSynthetic(e.target.checked)} /> <span>Shows realistic altered content (YouTube adds a “Made with AI” label)<span className="block text-[11px] text-muted-text">Leave off for illustrations, animation, stock-style visuals and voice-overs. Turn on only if the video shows real people, places or events that were realistically faked.</span></span></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={madeForKids} onChange={(e) => setMadeForKids(e.target.checked)} /> Made for kids (COPPA)</label>
           </div>
 

@@ -153,6 +153,56 @@ function seek(el: HTMLVideoElement, time: number): Promise<void> {
   });
 }
 
+/**
+ * Play the finished file back before handing it over: it must have a
+ * picture, the right length, frames that decode, and sound when the mix had
+ * sound. A file that fails is never used (the caller falls back to the
+ * real-time recorder).
+ */
+async function verifyExport(blob: Blob, expectSec: number, expectSound: boolean): Promise<string | null> {
+  const url = URL.createObjectURL(blob);
+  const v = document.createElement("video");
+  v.muted = true;
+  v.preload = "auto";
+  try {
+    const ok = await new Promise<boolean>((resolve) => {
+      const t = window.setTimeout(() => resolve(false), 20_000);
+      v.onloadedmetadata = () => (window.clearTimeout(t), resolve(true));
+      v.onerror = () => (window.clearTimeout(t), resolve(false));
+      v.src = url;
+    });
+    if (!ok) return "the file couldn't be opened";
+    if (!v.videoWidth || !v.videoHeight) return "the file has no picture";
+    if (Number.isFinite(v.duration) && Math.abs(v.duration - expectSec) > Math.max(1.5, expectSec * 0.03)) return `wrong length (${v.duration.toFixed(1)}s)`;
+    const seeked = await new Promise<boolean>((resolve) => {
+      const t = window.setTimeout(() => resolve(false), 10_000);
+      v.onseeked = () => (window.clearTimeout(t), resolve(true));
+      v.currentTime = Math.min(expectSec / 2, Math.max(0, expectSec - 0.5));
+    });
+    if (!seeked) return "the frames don't decode";
+    const c = document.createElement("canvas");
+    c.width = 32;
+    c.height = 18;
+    const x = c.getContext("2d");
+    x?.drawImage(v, 0, 0, 32, 18);
+    if (expectSound) {
+      const buf = await blob.arrayBuffer();
+      const ac = new OfflineAudioContext(1, 1, SAMPLE_RATE);
+      const audio = await ac.decodeAudioData(buf).catch(() => null);
+      if (!audio) return "the sound track doesn't decode";
+      const ch = audio.getChannelData(0);
+      let peak = 0;
+      for (let i = 0; i < ch.length; i += 97) peak = Math.max(peak, Math.abs(ch[i]));
+      if (peak < 0.001) return "the sound track is silent";
+    }
+    return null;
+  } finally {
+    v.removeAttribute("src");
+    v.load();
+    URL.revokeObjectURL(url);
+  }
+}
+
 export async function renderFast(o: RenderOptions): Promise<RenderResult | null> {
   if (!fastExportSupported()) return null;
   const W = Math.round(o.width / 2) * 2;
@@ -271,5 +321,11 @@ export async function renderFast(o: RenderOptions): Promise<RenderResult | null>
   }
   const blob = new Blob([muxer.target.buffer], { type: "video/mp4" });
   if (blob.size < 1000) throw new RenderError("The export produced an empty file. Please try again.");
+  // Did the mix actually contain sound? (then the file must too)
+  let mixPeak = 0;
+  for (let i = 0; i < left.length; i += 97) mixPeak = Math.max(mixPeak, Math.abs(left[i]));
+  o.onProgress({ phase: "finalizing", ratio: 1, message: "Checking the file…" });
+  const problem = await verifyExport(blob, span, mixPeak > 0.001);
+  if (problem) throw new Error(`fast export check failed: ${problem}`);
   return { blob, mime: "video/mp4", warnings, width: W, height: H, fps, durationSec: span };
 }
