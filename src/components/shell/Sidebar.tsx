@@ -41,22 +41,30 @@ function Item({
   item,
   active,
   onNavigate,
+  collapsed = false,
 }: {
   item: NavItem;
   active: boolean;
   onNavigate?: () => void;
+  collapsed?: boolean;
 }) {
   const Icon = item.icon;
 
   const cls = cx(
-    "group relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-[color,background-color] duration-200",
+    "group relative flex w-full items-center rounded-lg py-2 text-sm transition-[color,background-color] duration-200",
+    collapsed ? "justify-center px-0" : "gap-2.5 px-3",
     active
       ? "bg-muted font-medium text-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-gradient-to-b before:from-fuchsia-500 before:to-sky-400"
       : "text-muted-text hover:bg-muted/60 hover:text-foreground",
     item.status === "planned" && "cursor-not-allowed opacity-60",
   );
 
-  const inner = (
+  const inner = collapsed ? (
+    <>
+      <Icon className="size-[18px] shrink-0" aria-hidden="true" />
+      <span className="sr-only">{item.label}</span>
+    </>
+  ) : (
     <>
       <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
       <span className="flex-1 truncate text-left">{item.label}</span>
@@ -88,29 +96,33 @@ function Item({
   }
   return (
     <li>
-      <Link href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={cls}>
+      <Link href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} title={collapsed ? item.label : undefined} className={cls}>
         {inner}
       </Link>
     </li>
   );
 }
 
-function NavList({ onNavigate, activeFor }: { onNavigate?: () => void; activeFor: (item: NavItem) => boolean }) {
+function NavList({ onNavigate, activeFor, collapsed = false }: { onNavigate?: () => void; activeFor: (item: NavItem) => boolean; collapsed?: boolean }) {
   return (
-    <nav aria-label="Primary" className="flex h-full flex-col gap-6 overflow-y-auto px-3 py-4">
+    <nav aria-label="Primary" className={cx("flex h-full flex-col overflow-y-auto overflow-x-hidden py-4", collapsed ? "gap-3 px-2" : "gap-6 px-3")}>
       {NAV_SECTIONS.map((section, si) => (
         <div key={section.title}>
-          <h2
-            className={cx(
-              "px-3 text-[11px] font-semibold uppercase tracking-wider text-disabled-text",
-              si > 0 && "mt-1",
-            )}
-          >
-            {section.title}
-          </h2>
-          <ul className="mt-1.5 space-y-0.5">
+          {collapsed ? (
+            si > 0 && <div className="mx-2 mb-2 border-t border-border" aria-hidden="true" />
+          ) : (
+            <h2
+              className={cx(
+                "px-3 text-[11px] font-semibold uppercase tracking-wider text-disabled-text",
+                si > 0 && "mt-1",
+              )}
+            >
+              {section.title}
+            </h2>
+          )}
+          <ul className={cx("space-y-0.5", !collapsed && "mt-1.5")}>
             {section.items.map((item) => (
-              <Item key={item.slug} item={item} active={activeFor(item)} onNavigate={onNavigate} />
+              <Item key={item.slug} item={item} active={activeFor(item)} onNavigate={onNavigate} collapsed={collapsed} />
             ))}
           </ul>
         </div>
@@ -119,16 +131,16 @@ function NavList({ onNavigate, activeFor }: { onNavigate?: () => void; activeFor
   );
 }
 
-function SidebarLive({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarLive({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed?: boolean }) {
   const activeFor = useActiveFor();
-  return <NavList onNavigate={onNavigate} activeFor={activeFor} />;
+  return <NavList onNavigate={onNavigate} activeFor={activeFor} collapsed={collapsed} />;
 }
 
 /** Hierarchized sidebar nav: primary work first, pipeline second, system last. */
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function Sidebar({ onNavigate, collapsed = false }: { onNavigate?: () => void; collapsed?: boolean }) {
   return (
-    <Suspense fallback={<NavList activeFor={() => false} />}>
-      <SidebarLive onNavigate={onNavigate} />
+    <Suspense fallback={<NavList activeFor={() => false} collapsed={collapsed} />}>
+      <SidebarLive onNavigate={onNavigate} collapsed={collapsed} />
     </Suspense>
   );
 }

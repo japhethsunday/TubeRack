@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppBackdrop } from "@/src/components/shell/AppBackdrop";
 import { AppFooter } from "@/src/components/shell/AppFooter";
-import { Clapperboard, X } from "lucide-react";
+import { Clapperboard, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { cx } from "@/src/components/ui/cx";
 import { Sidebar } from "@/src/components/shell/Sidebar";
 import { Header } from "@/src/components/shell/Header";
 import { AccountNotice } from "@/src/components/shell/AccountNotice";
@@ -28,23 +29,71 @@ export function AppShell({
 }) {
   const [navOpen, setNavOpen] = useState(false);
   const pathname = usePathname();
+  // Desktop sidebar: full menu or a slim icon rail. Remembered on this device.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- read the saved choice after hydration.
+      if (localStorage.getItem("sidebar-collapsed") === "1") setCollapsed(true);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const toggleCollapsed = () =>
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem("sidebar-collapsed", c ? "0" : "1");
+      } catch {
+        /* storage unavailable */
+      }
+      return !c;
+    });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b" && !(e.target instanceof HTMLElement && e.target.closest("input, textarea, [contenteditable=true]"))) {
+        e.preventDefault();
+        toggleCollapsed();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <ToastProvider>
       <AppBackdrop />
       <div className="relative flex min-h-screen text-foreground">
         {/* Desktop sidebar */}
-        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-border bg-surface backdrop-blur-xl lg:block">
-          <div className="flex h-16 items-center gap-2 border-b border-border px-4">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white shadow-lg shadow-violet-900/30">
-              <Clapperboard className="size-4" aria-hidden="true" />
-            </span>
-            <Link href="/dashboard" className="text-sm font-semibold tracking-tight">
-              TubeRack
-            </Link>
+        <aside
+          className={cx(
+            "sticky top-0 hidden h-screen shrink-0 border-r border-border bg-surface backdrop-blur-xl transition-[width] duration-200 lg:block",
+            collapsed ? "w-16" : "w-64",
+          )}
+        >
+          <div className={cx("flex h-16 items-center border-b border-border", collapsed ? "justify-center px-2" : "gap-2 px-4")}>
+            {!collapsed && (
+              <>
+                <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white shadow-lg shadow-violet-900/30">
+                  <Clapperboard className="size-4" aria-hidden="true" />
+                </span>
+                <Link href="/dashboard" className="flex-1 text-sm font-semibold tracking-tight">
+                  TubeRack
+                </Link>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label={collapsed ? "Open the tools menu" : "Close the tools menu"}
+              aria-expanded={!collapsed}
+              title={`${collapsed ? "Open" : "Close"} menu (Ctrl+B)`}
+              className="rounded-lg p-1.5 text-muted-text hover:bg-muted hover:text-foreground"
+            >
+              {collapsed ? <PanelLeftOpen className="size-5" aria-hidden="true" /> : <PanelLeftClose className="size-5" aria-hidden="true" />}
+            </button>
           </div>
           <div className="h-[calc(100vh-4rem)]">
-            <Sidebar />
+            <Sidebar collapsed={collapsed} />
           </div>
         </aside>
 
