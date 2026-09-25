@@ -1,6 +1,7 @@
 "use client";
 import { mixGain, MUSIC_DUCK, trackVolume, voiceRanges } from "@/src/lib/video/mix";
 import { isChunked } from "@/src/lib/media/chunked";
+import { loadAudio } from "@/src/lib/video/audio-load";
 
 import type { Composition, TimelineClip } from "@/src/lib/video/types";
 import { renderMusic, renderSfx, musicRecipe, type MusicMood, type SfxType } from "@/src/lib/media/audio";
@@ -20,6 +21,8 @@ export interface RenderAsset {
   title: string;
   /** Object URL for device-stored uploads (null when the bytes are unavailable). */
   blobUrl: string | null;
+  /** Length of the media file, when known. */
+  durationSec?: number;
 }
 
 export type ExportQuality = "draft" | "standard" | "high" | "max";
@@ -194,7 +197,7 @@ async function renderRealtime(o: RenderOptions): Promise<RenderResult> {
   const dest = audioCtx.createMediaStreamDestination();
   const master = audioCtx.createGain();
   master.connect(dest);
-  const scheduled: { clip: TimelineClip; buffer: AudioBuffer; loop: boolean; gain: number }[] = [];
+  const scheduled: { clip: TimelineClip; buffer: AudioBuffer; loop: boolean; gain: number; bufferStart: number }[] = [];
   const audioClips = clips.filter((c) => (c.kind === "voice" || c.kind === "music" || c.kind === "sfx") && !c.muted && !mutedTracks.has(c.trackId));
   let deviceVoices = 0;
   for (const clip of audioClips) {
@@ -203,10 +206,14 @@ async function renderRealtime(o: RenderOptions): Promise<RenderResult> {
     const gain = mixGain(o.comp, clip);
     try {
       let buffer: AudioBuffer | null = null;
+      let bufferStart = 0;
       if (a.source === "provider-output" || a.source === "upload-session") {
-        const url = a.source === "provider-output" ? a.payload : a.blobUrl;
-        if (!url) throw new Error("bytes unavailable");
-        buffer = await decode(audioCtx, url);
+        const speed = clip.speed ?? 1;
+        const needFrom = (clip.inSec ?? 0) + Math.max(0, from - clip.startSec) * speed;
+        const needTo = clip.kind === "music" || clip.reverse ? Infinity : (clip.inSec ?? 0) + (Math.min(clip.startSec + clip.durationSec, to) - clip.startSec) * speed;
+        const loaded = await loadAudio(audioCtx, a, clip.reverse ? 0 : needFrom, needTo);
+        buffer = loaded.buffer;
+        bufferStart = loaded.startSec;
       } else if (clip.kind === "music") {
         const recipe = JSON.parse(a.payload) as { mood?: MusicMood; seconds?: number };
         if (recipe.mood) buffer = renderMusic(musicRecipe(recipe.mood, recipe.seconds ?? 30)).buffer;
@@ -214,9 +221,11 @@ async function renderRealtime(o: RenderOptions): Promise<RenderResult> {
         const recipe = JSON.parse(a.payload) as { type?: SfxType };
         if (recipe.type) buffer = renderSfx({ type: recipe.type, seconds: 3 }).buffer;
       } else if (clip.kind === "voice") deviceVoices++;
-      if (buffer) scheduled.push({ clip, buffer: clip.reverse ? reversed(audioCtx, buffer) : buffer, loop: clip.kind === "music", gain });
-    } catch {
-      warnings.push(`Audio “${clip.name}” couldn't be loaded and was left out.`);
+      if (buffer) scheduled.push({ clip, buffer: clip.reverse ? reversed(audioCtx, buffer) : buffer, loop: clip.kind === "music", gain, bufferStart });
+    } catch (error) {
+      const why = error instanceof Error ? error.message : "";
+      console.error(`export audio "${clip.name}" failed:`, why);
+      warnings.push(`Audio “${clip.name}” couldn't be loaded and was left out${why ? ` (${why})` : ""}.`);
     }
   }
   if (deviceVoices) {
@@ -277,7 +286,7 @@ async function renderRealtime(o: RenderOptions): Promise<RenderResult> {
     const start = t0 + (clipStart - from);
     const end = t0 + (clipEnd - from);
     // Offset into the source: in-point plus any part cut off by the range.
-    const offset = (s.clip.inSec ?? 0) + (clipStart - s.clip.startSec) * speed;
+    const offset = (s.clip.inSec ?? 0) + (clipStart - s.clip.startSec) * speed - s.bufferStart;
     const fi = s.clip.fadeInSec;
     const fo = s.clip.fadeOutSec;
     g.gain.setValueAtTime(fi > 0 ? 0 : s.gain, start);

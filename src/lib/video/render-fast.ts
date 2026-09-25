@@ -4,6 +4,7 @@ import { Muxer, ArrayBufferTarget } from "mp4-muxer";
 import type { TimelineClip } from "@/src/lib/video/types";
 import { drawComposition, sourceTime, type VisualSource } from "@/src/lib/video/compositor";
 import { mixGain, MUSIC_DUCK, trackVolume, voiceRanges } from "@/src/lib/video/mix";
+import { loadAudio } from "@/src/lib/video/audio-load";
 import { renderMusic, renderSfx, musicRecipe, type MusicMood, type SfxType } from "@/src/lib/media/audio";
 import { assetUrl, estimateBitrate, loadImage, loadVideo, RenderError, type RenderOptions, type RenderResult } from "@/src/lib/video/render";
 
@@ -49,12 +50,6 @@ async function pickAudioConfig(bitrate: number): Promise<{ config: AudioEncoderC
   return null;
 }
 
-async function fetchBuffer(ctx: BaseAudioContext, url: string): Promise<AudioBuffer> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`audio fetch failed (${res.status})`);
-  return ctx.decodeAudioData(await res.arrayBuffer());
-}
-
 function reversed(ctx: BaseAudioContext, b: AudioBuffer): AudioBuffer {
   const out = ctx.createBuffer(b.numberOfChannels, b.length, b.sampleRate);
   for (let ch = 0; ch < b.numberOfChannels; ch++) out.getChannelData(ch).set(Array.from(b.getChannelData(ch)).reverse());
@@ -72,18 +67,24 @@ async function mixAudio(o: RenderOptions, clips: TimelineClip[], from: number, s
   for (const clip of audible) {
     const a = o.assetFor(clip.assetId);
     if (!a) continue;
+    const clipStart0 = Math.max(clip.startSec, from);
+    const clipEnd0 = Math.min(clip.startSec + clip.durationSec, to);
+    const speed0 = clip.speed ?? 1;
+    const needFrom = (clip.inSec ?? 0) + (clipStart0 - clip.startSec) * speed0;
+    const needTo = clip.kind === "music" ? Infinity : needFrom + (clipEnd0 - clipStart0) * speed0;
     let buffer: AudioBuffer | null = null;
+    let bufferStart = 0;
     try {
       if (clip.kind === "video") {
         if (clip.reverse || clip.volume <= 0) continue;
-        const url = assetUrl(a, "video");
-        if (!url) continue;
-        buffer = await fetchBuffer(ctx, url).catch(() => null);
-        if (!buffer) continue; // silent or unreadable track: nothing to mix
+        const loaded = await loadAudio(ctx, a, needFrom, needTo).catch(() => null);
+        if (!loaded) continue; // no sound track, or unreadable: nothing to mix
+        buffer = loaded.buffer;
+        bufferStart = loaded.startSec;
       } else if (a.source === "provider-output" || a.source === "upload-session") {
-        const url = a.source === "provider-output" ? a.payload : a.blobUrl;
-        if (!url) throw new Error("bytes unavailable");
-        buffer = await fetchBuffer(ctx, url);
+        const loaded = await loadAudio(ctx, a, clip.reverse ? 0 : needFrom, clip.reverse ? Infinity : needTo);
+        buffer = loaded.buffer;
+        bufferStart = loaded.startSec;
       } else if (clip.kind === "music") {
         const recipe = JSON.parse(a.payload) as { mood?: MusicMood; seconds?: number };
         if (recipe.mood) buffer = renderMusic(musicRecipe(recipe.mood, recipe.seconds ?? 30)).buffer;
@@ -91,8 +92,10 @@ async function mixAudio(o: RenderOptions, clips: TimelineClip[], from: number, s
         const recipe = JSON.parse(a.payload) as { type?: SfxType };
         if (recipe.type) buffer = renderSfx({ type: recipe.type, seconds: 3 }).buffer;
       } else if (clip.kind === "voice") deviceVoices++;
-    } catch {
-      warnings.push(`Audio “${clip.name}” couldn't be loaded and was left out.`);
+    } catch (error) {
+      const why = error instanceof Error ? error.message : "";
+      console.error(`export audio "${clip.name}" failed:`, why);
+      warnings.push(`Audio “${clip.name}” couldn't be loaded and was left out${why ? ` (${why})` : ""}.`);
       continue;
     }
     if (!buffer) continue;
@@ -127,7 +130,7 @@ async function mixAudio(o: RenderOptions, clips: TimelineClip[], from: number, s
       node = node.connect(duck);
     }
     node.connect(ctx.destination);
-    const offset = (clip.inSec ?? 0) + (clipStart - clip.startSec) * speed;
+    const offset = (clip.inSec ?? 0) + (clipStart - clip.startSec) * speed - bufferStart;
     src.start(start, src.loop ? offset % Math.max(0.01, buffer.duration) : Math.min(offset, buffer.duration));
     src.stop(end);
   }

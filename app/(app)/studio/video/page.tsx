@@ -240,7 +240,7 @@ function Studio() {
   /** Asset lookup for the compositor/exporter (device bytes resolved to object URLs). */
   const renderAsset = (assetId: string | undefined): RenderAsset | null => {
     const a = assets.find((x) => x.id === assetId);
-    return a ? { kind: a.kind, source: a.source, payload: a.payload, mime: a.mime, title: a.title, blobUrl: mediaApi.blobUrlFor(a.id) } : null;
+    return a ? { kind: a.kind, source: a.source, payload: a.payload, mime: a.mime, title: a.title, blobUrl: mediaApi.blobUrlFor(a.id), durationSec: a.durationSec } : null;
   };
   latest.current = { clips, canvas };
   /** Viewable URL for an asset's bytes (device copy first), or null while unavailable. */

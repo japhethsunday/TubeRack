@@ -377,9 +377,16 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
               signal: ac.signal,
               onProgress: (p) => setStep("render", { progress: Math.round(p.ratio * 100), detail: p.message }),
             });
+            setWarnings(out.warnings);
+            // Never send YouTube a video that silently lost its voice or music.
+            const lostAudio = out.warnings.filter((w) => w.startsWith("Audio "));
+            if (lostAudio.length) {
+              throw new Error(
+                `Stopped before uploading: ${lostAudio.length === 1 ? "one audio track" : `${lostAudio.length} audio tracks`} couldn't be included, so the video would be missing sound. Press Retry to try again, or remove that clip in the Video Studio if you want to publish without it.`,
+              );
+            }
             r.blob = out.blob;
             r.mime = out.mime;
-            setWarnings(out.warnings);
           }
           finish(`${fmtMb(r.blob.size)} ${r.mime.includes("mp4") ? "MP4" : "WebM"}`);
         }
