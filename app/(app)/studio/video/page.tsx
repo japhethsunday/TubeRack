@@ -35,7 +35,7 @@ import { GenerateVideoDialog } from "@/src/components/video/AutoVideo";
 import { Portal } from "@/src/components/ui/Portal";
 import { Input } from "@/src/components/ui/fields";
 import { newTrack, sceneSegments, buildFromScenes, captionsFromNarration, durationOf, validateComposition, healthOf } from "@/src/lib/video/build";
-import { moveClip, trimClip, splitClipAt, deleteClip, duplicateClip, addClip, snapTime, snapCandidates, pasteClips, maxDurationFor, rippleDelete } from "@/src/lib/video/ops";
+import { moveClip, trimClip, splitClipAt, deleteClip, duplicateClip, addClip, insertClip, snapTime, snapCandidates, pasteClips, maxDurationFor, rippleDelete } from "@/src/lib/video/ops";
 import { presetById, textPresetById, brandedTitleStyle } from "@/src/lib/video/presets";
 import type { MediaAsset } from "@/src/lib/media/types";
 import type { Composition, TimelineClip } from "@/src/lib/video/types";
@@ -270,7 +270,10 @@ function Studio() {
     const startSec = at ?? endOf(tid);
     const full = asset.durationSec && asset.durationSec > 0 ? asset.durationSec : kind === "image" ? 5 : 5;
     const seg = segments.find((s) => startSec >= s.startSec && startSec < s.startSec + s.durationSec);
-    const next = addClip(clips, {
+    // Never drop a clip on top of another: the main track makes room,
+    // other tracks use the next free gap.
+    const mainTrackId = trackFor("video");
+    const next = insertClip(clips, {
       trackId: tid,
       sceneId: seg?.sceneId,
       kind,
@@ -284,7 +287,7 @@ function Studio() {
       muted: false,
       inSec: kind === "image" ? undefined : 0,
       speed: kind === "image" ? undefined : 1,
-    });
+    }, tid === mainTrackId);
     commit(next);
     setSelectedClipId(next[next.length - 1].id);
     // First import sets the project frame to the footage's orientation.
@@ -320,7 +323,7 @@ function Studio() {
       setSelectedClipId(null);
     },
     duplicate: () => {
-      if (selectedClipId) commit(duplicateClip(latest.current.clips, selectedClipId));
+      if (selectedClipId) commit(duplicateClip(latest.current.clips, selectedClipId, latest.current.clips.find((c) => c.id === selectedClipId)?.trackId === trackFor("video")));
     },
   };
 
@@ -366,7 +369,7 @@ function Studio() {
       ? brandedTitleStyle(dna?.positioning ?? "", undefined)
       : (preset?.style ?? textPresetById("subtitle").style);
     const seg = segments.find((s) => playhead >= s.startSec && playhead < s.startSec + s.durationSec);
-    commit(addClip(clips, {
+    commit(insertClip(clips, {
       trackId: trackFor("text"),
       sceneId: seg?.sceneId,
       kind: "text",
@@ -434,7 +437,7 @@ function Studio() {
           background={canvas.background ?? BLUR_BACKGROUND}
           onBackground={(background) => video.setCanvas(pid, { ...canvas, background })}
           onAddElement={(text, style, name) => {
-            const next = addClip(clips, {
+            const next = insertClip(clips, {
               trackId: trackFor("text"),
               kind: "text",
               name,
@@ -494,7 +497,7 @@ function Studio() {
             commit(clips.map((c) => (c.id === selectedClip.id ? next : c)));
           }}
           onSplit={() => selectedClip && commit(splitClipAt(clips, selectedClip.id, playhead))}
-          onDuplicate={() => selectedClip && commit(duplicateClip(clips, selectedClip.id))}
+          onDuplicate={() => selectedClip && commit(duplicateClip(clips, selectedClip.id, selectedClip.trackId === trackFor("video")))}
           onDelete={() => {
             if (!selectedClip) return;
             commit(removeClip(clips, selectedClip.id));
@@ -807,7 +810,7 @@ function Studio() {
             setSelectedClipId(null);
           }}
           onDuplicate={() => {
-            if (selectedClipId) commit(duplicateClip(clips, selectedClipId));
+            if (selectedClipId) commit(duplicateClip(clips, selectedClipId, clips.find((c) => c.id === selectedClipId)?.trackId === trackFor("video")));
           }}
           onSpeed={(speed) => {
             const c = clips.find((x) => x.id === selectedClipId);

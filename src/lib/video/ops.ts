@@ -84,13 +84,51 @@ export function splitClipAt(clips: TimelineClip[], id: string, atSec: number): T
   return clips.flatMap((c) => (c.id === id ? [first, second] : [c]));
 }
 
-export function duplicateClip(clips: TimelineClip[], id: string): TimelineClip[] {
+/**
+ * Duplicate a clip right after itself. On a magnetic (main) track later
+ * clips shift right to make room; elsewhere the copy goes into the first
+ * free gap after the original, so it never lands on top of another clip.
+ */
+export function duplicateClip(clips: TimelineClip[], id: string, magnetic = false): TimelineClip[] {
   const target = clips.find((c) => c.id === id);
   if (!target) return clips;
-  return [
-    ...clips,
-    { ...target, id: nextId("clip"), name: `${target.name} (copy)`, startSec: round1(target.startSec + target.durationSec) },
-  ];
+  const { id: _old, ...rest } = target;
+  void _old;
+  return insertClip(clips, { ...rest, name: `${target.name} (copy)`, startSec: round1(target.startSec + target.durationSec) }, magnetic);
+}
+
+/** First start time ≥ `from` on `trackId` where `dur` seconds fit without overlapping. */
+export function freeSlot(clips: TimelineClip[], trackId: string, from: number, dur: number, ignoreId?: string): number {
+  const onTrack = clips.filter((c) => c.trackId === trackId && c.id !== ignoreId).sort((a, b) => a.startSec - b.startSec);
+  let t = Math.max(0, from);
+  for (const c of onTrack) {
+    const end = c.startSec + c.durationSec;
+    if (end <= t + 0.001) continue;
+    if (c.startSec >= t + dur - 0.001) break;
+    t = end;
+  }
+  return round2(t);
+}
+
+/**
+ * Insert a clip without covering another one. Magnetic (main) track:
+ * snap to the nearest clip edge at or after the requested time and push
+ * later clips right. Other tracks: use the first free gap at/after it.
+ */
+export function insertClip(clips: TimelineClip[], clip: Omit<TimelineClip, "id">, magnetic = false): TimelineClip[] {
+  const dur = clip.durationSec;
+  if (!magnetic) return addClip(clips, { ...clip, startSec: freeSlot(clips, clip.trackId, clip.startSec, dur) });
+  const onTrack = clips.filter((c) => c.trackId === clip.trackId);
+  let at = Math.max(0, clip.startSec);
+  // Inside a clip? Insert at its end rather than splitting it.
+  const inside = onTrack.find((c) => at > c.startSec + 0.001 && at < c.startSec + c.durationSec - 0.001);
+  if (inside) at = inside.startSec + inside.durationSec;
+  // Past the end of the track? Butt up against the last clip.
+  const trackEnd = onTrack.reduce((m, c) => Math.max(m, c.startSec + c.durationSec), 0);
+  if (at > trackEnd) at = trackEnd;
+  at = round2(at);
+  const shifted = clips.map((c) => (c.trackId === clip.trackId && c.startSec >= at - 0.001 ? { ...c, startSec: round2(c.startSec + dur) } : c));
+  return addClip(shifted, { ...clip, startSec: at });
 }
 
 export function deleteClip(clips: TimelineClip[], id: string): TimelineClip[] {
