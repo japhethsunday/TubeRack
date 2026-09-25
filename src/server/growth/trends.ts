@@ -21,9 +21,22 @@ function db() {
   return d;
 }
 
+/** Saved results can come back as JSON text (older rows): always return an object. */
+function normalize(w: TrendWatch): TrendWatch {
+  let r: unknown = w.last_results;
+  if (typeof r === "string") {
+    try {
+      r = JSON.parse(r);
+    } catch {
+      r = {};
+    }
+  }
+  return { ...w, last_results: r && typeof r === "object" ? (r as TrendWatch["last_results"]) : {} };
+}
+
 export async function listWatches(workspaceId: string): Promise<TrendWatch[]> {
   const rows = await db()`SELECT id, user_id, query, region, email_digest, last_run_at, last_results FROM trend_watches WHERE workspace_id = ${workspaceId} ORDER BY created_at`;
-  return rows as unknown as TrendWatch[];
+  return (rows as unknown as TrendWatch[]).map(normalize);
 }
 
 export async function addWatch(workspaceId: string, userId: string, input: { query: string; region: string; emailDigest: boolean }): Promise<TrendWatch> {
@@ -35,7 +48,7 @@ export async function addWatch(workspaceId: string, userId: string, input: { que
     VALUES (${workspaceId}, ${userId}, ${input.query}, ${input.region}, ${input.emailDigest})
     RETURNING id, user_id, query, region, email_digest, last_run_at, last_results
   `;
-  return rows[0] as unknown as TrendWatch;
+  return normalize(rows[0] as unknown as TrendWatch);
 }
 
 export async function updateWatch(workspaceId: string, id: string, emailDigest: boolean): Promise<void> {
@@ -49,7 +62,8 @@ export async function removeWatch(workspaceId: string, id: string): Promise<void
 /** Scan one watch: most-viewed uploads of the last 7 days, ranked by views/hour. */
 export async function runWatch(watch: TrendWatch): Promise<TrendResult> {
   const { samples } = await scanNiche(watch.query, { days: 7, maxResults: 20, regionCode: watch.region || undefined });
-  const prev = "videos" in watch.last_results ? watch.last_results.videos.map((v) => v.videoId) : [];
+  const last = normalize(watch).last_results;
+  const prev = "videos" in last && Array.isArray(last.videos) ? last.videos.map((v) => v.videoId) : [];
   const result = trendResult(samples, prev);
   await db()`UPDATE trend_watches SET last_results = ${JSON.stringify(result)}::jsonb, last_run_at = now() WHERE id = ${watch.id}`;
   return result;

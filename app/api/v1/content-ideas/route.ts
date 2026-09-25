@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } from "@/src/server/ai/guard";
+import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller, youtubeSearchBudget } from "@/src/server/ai/guard";
 import { toErrorResponse, validationError } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 import { generateContentIdeas } from "@/src/server/content/ideas";
@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
     caller = await guardProviderCall();
+    await youtubeSearchBudget(caller);
     const input = await parseBody(request, body);
     let result;
     try {

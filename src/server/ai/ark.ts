@@ -64,7 +64,7 @@ export async function arkGenerateImage(prompt: string, aspect: "16:9" | "9:16" |
         method: "POST",
         headers: { Authorization: `Bearer ${key(env)}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model, prompt, size: IMAGE_SIZES[aspect], response_format: "b64_json", watermark: false }),
-        signal: AbortSignal.timeout(90_000),
+        signal: AbortSignal.timeout(60_000),
       });
       if (!res.ok) {
         last = await arkError(res, `image ${model}`);
@@ -83,6 +83,8 @@ export async function arkGenerateImage(prompt: string, aspect: "16:9" | "9:16" |
       last = new Error(`BytePlus image ${model}: no image in reply`);
     } catch (error) {
       last = error;
+      // A timeout means the service is slow right now: don't wait on every other model too.
+      if (error instanceof Error && /timeout|aborted/i.test(`${error.name} ${error.message}`)) break;
     }
   }
   throw last;

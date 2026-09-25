@@ -31,6 +31,14 @@ export async function guardProviderCall(): Promise<ProviderCaller> {
   return { user, workspaceId };
 }
 
+/**
+ * YouTube search costs ~100 of the app's 10,000 daily API units, so each
+ * user gets a daily budget of searches (shared across all instances).
+ */
+export async function youtubeSearchBudget(caller: ProviderCaller): Promise<void> {
+  await sharedLimit(`yt-search:${caller.user.id}`, 40, 86400);
+}
+
 /** Best-effort usage record; never fails the request. */
 export async function recordUsage(
   caller: ProviderCaller,

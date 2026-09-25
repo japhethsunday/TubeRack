@@ -63,7 +63,7 @@ export async function nvidiaImageWith(
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(60_000),
     });
     if (res.ok) {
       const b64 = extractImage(await res.json().catch(() => null));

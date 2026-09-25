@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sharedLimit } from "@/src/server/shared-limit";
 import { z } from "zod";
 import { guardProviderCall, storeGenerated } from "@/src/server/ai/guard";
 import { toErrorResponse, BackendError } from "@/src/server/errors";
@@ -17,6 +18,8 @@ const body = z.object({ id: z.string().regex(/^(?:[0-9a-f-]{36}|jm-\d{1,12})$/i,
 export async function POST(request: Request) {
   try {
     const caller = await guardProviderCall();
+    // Each import stores a file: cap per user per day.
+    await sharedLimit(`music-import:${caller.user.id}`, 150, 86400);
     const { id } = await parseBody(request, body);
     let track;
     let file;

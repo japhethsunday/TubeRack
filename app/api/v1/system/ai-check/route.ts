@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeEqual } from "@/src/server/crypto";
 import { getServerEnv } from "@/src/lib/env";
 import { chatGenerateText, type ChatProvider } from "@/src/server/ai/chat-compat";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
@@ -220,7 +221,12 @@ async function run() {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Operator-only: this runs every provider (including paid image and video jobs)
+  // and reveals the model setup, so it needs the server's CRON_SECRET.
+  const secret = getServerEnv().CRON_SECRET;
+  const auth = request.headers.get("authorization") ?? "";
+  if (!secret || !safeEqual(auth, `Bearer ${secret}`)) return NextResponse.json({ error: "UNAUTHORIZED", message: "Not available." }, { status: 401 });
   if (cache && Date.now() - cache.at < 20 * 60_000) return NextResponse.json({ data: cache.report, cached: true });
   running ??= run()
     .then((report) => {

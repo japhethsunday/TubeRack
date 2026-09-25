@@ -76,7 +76,9 @@ export function createTestLimiter(capacity: number, refillPerSecond: number): Ra
 }
 
 export function clientKey(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
+  // Prefer the platform-set client address (can't be spoofed by the caller).
+  const h = request.headers;
+  const forwarded = h.get("x-vercel-forwarded-for") ?? h.get("x-real-ip") ?? h.get("x-forwarded-for");
   const ip = forwarded?.split(",")[0].trim() || "unknown";
   return `ip:${ip}`;
 }

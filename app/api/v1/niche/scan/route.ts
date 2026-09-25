@@ -3,7 +3,7 @@ import { z } from "zod";
 import { scanNiche } from "@/src/server/youtube/client";
 import { expandNiches, isTextConfigured, type NicheCandidate } from "@/src/server/ai/gemini";
 import { nicheMetrics, nicheScores, type NicheMetrics, type NicheScores, type NicheVideoSample } from "@/src/lib/niche/score";
-import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } from "@/src/server/ai/guard";
+import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller, youtubeSearchBudget } from "@/src/server/ai/guard";
 import { toErrorResponse, validationError } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 
@@ -27,6 +27,7 @@ export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
     caller = await guardProviderCall();
+    await youtubeSearchBudget(caller);
     const input = await parseBody(request, body);
     let candidates: NicheCandidate[];
     let model: string | null = null;

@@ -62,7 +62,6 @@ export async function PATCH(request: Request) {
       if (body[key] === undefined) continue;
       if (key === "status" && body[key] !== "archived") {
         sets.push(`archived_at = NULL`);
-        continue;
       }
       if (key === "status" && body[key] === "archived") {
         sets.push(`archived_at = now()`);

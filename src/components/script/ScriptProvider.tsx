@@ -106,10 +106,15 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
     };
   }, [cloud]);
 
+  const lastWritten = useRef("");
   useEffect(() => {
     if (!ready) return;
+    // Nothing changed since the last save: skip the write and the state update.
+    const serialized = JSON.stringify(bundle);
+    if (serialized === lastWritten.current) return;
+    lastWritten.current = serialized;
     try {
-      localStorage.setItem(SCRIPTS_STORAGE_KEY, JSON.stringify(bundle));
+      localStorage.setItem(SCRIPTS_STORAGE_KEY, serialized);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- status reflects the external write above; the effect exists to sync storage.
       setSavedAt(new Date().toISOString());
     } catch {

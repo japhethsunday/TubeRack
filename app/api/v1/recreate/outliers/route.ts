@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { guardProviderCall, providerFailure } from "@/src/server/ai/guard";
+import { guardProviderCall, providerFailure, youtubeSearchBudget } from "@/src/server/ai/guard";
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 import { findOutliers } from "@/src/server/content/recreate";
@@ -16,7 +16,7 @@ const body = z.object({
 /** POST /api/v1/recreate/outliers — videos beating their channel's size in a niche. */
 export async function POST(request: Request) {
   try {
-    await guardProviderCall();
+    await youtubeSearchBudget(await guardProviderCall());
     const input = await parseBody(request, body);
     return NextResponse.json({ data: await findOutliers(input) });
   } catch (error) {

@@ -142,10 +142,16 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
     };
   }, [cloud]);
 
+  const lastWritten = useRef("");
   useEffect(() => {
     if (!ready) return;
+    // Identical content (e.g. a refresh that brought nothing new): no write, no
+    // state update — re-rendering on every no-op fed an update loop.
+    const serialized = JSON.stringify(bundle);
+    if (serialized === lastWritten.current) return;
+    lastWritten.current = serialized;
     try {
-      localStorage.setItem(VIDEO_STORAGE_KEY, JSON.stringify(bundle));
+      localStorage.setItem(VIDEO_STORAGE_KEY, serialized);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- status reflects the external write above.
       setSavedAt(new Date().toISOString());
     } catch {
@@ -184,7 +190,10 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
         if (remote) {
           const incoming = parseVideoBundle(remote);
           rememberServer(incoming);
-          setBundle((cur) => mergeRemoteBundle(cur, incoming));
+          setBundle((cur) => {
+            const merged = mergeRemoteBundle(cur, incoming);
+            return JSON.stringify(merged) === JSON.stringify(cur) ? cur : merged;
+          });
         }
       })
       .catch(() => undefined);

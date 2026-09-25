@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { searchVideos } from "@/src/server/youtube/client";
-import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } from "@/src/server/ai/guard";
+import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller, youtubeSearchBudget } from "@/src/server/ai/guard";
 import { toErrorResponse, validationError } from "@/src/server/errors";
 
 /** GET /api/v1/youtube/search?q=&limit= — keyword research via Data API (editor+, metered). */
@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
     caller = await guardProviderCall();
+    await youtubeSearchBudget(caller);
     const params = new URL(request.url).searchParams;
     const q = (params.get("q") ?? "").trim();
     if (!q || q.length > 200) throw validationError("Enter a search query (max 200 characters).");

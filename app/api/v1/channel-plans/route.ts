@@ -5,7 +5,7 @@ import { requireWorkspace } from "@/src/server/workspace";
 import { marketProfile } from "@/src/server/market/store";
 import { channelUploads, handleTaken, resolveChannel } from "@/src/server/youtube/client";
 import { isTextConfigured, writeChannelPlan } from "@/src/server/ai/gemini";
-import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } from "@/src/server/ai/guard";
+import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller, youtubeSearchBudget } from "@/src/server/ai/guard";
 import { CATEGORIES, guessCategory, type CategoryId } from "@/src/lib/market/signals";
 import { median } from "@/src/lib/niche/score";
 import type { ChannelEvidence, ChannelInputs } from "@/src/lib/channel/plan";
@@ -47,6 +47,7 @@ export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
     caller = await guardProviderCall();
+    await youtubeSearchBudget(caller);
     const input = await parseBody(request, body);
     if (!isTextConfigured()) throw validationError("The Channel Creator isn't available right now.");
     const db = getDb();
