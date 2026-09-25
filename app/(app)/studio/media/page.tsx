@@ -14,6 +14,7 @@ import { ImageStudio } from "@/src/components/media/image-studio";
 import { VoiceStudio } from "@/src/components/media/voice-studio";
 import { MusicStudio, SfxStudio } from "@/src/components/media/music-studio";
 import { MusicLibrary } from "@/src/components/media/music-library";
+import { StockLibrary } from "@/src/components/media/StockLibrary";
 import { UploadZone } from "@/src/components/media/uploads";
 import { ConsistencyPanel } from "@/src/components/media/style";
 import { QueueView } from "@/src/components/media/queue";
@@ -198,6 +199,15 @@ function Studio() {
           context={production}
           onSceneVisual={(sceneId, visual) => updateScene(project.id, sceneId, { visual })}
         />
+      ),
+    },
+    {
+      id: "stock",
+      label: "Stock footage",
+      content: (
+        <div className="max-w-3xl rounded-xl border border-border bg-surface p-4">
+          <StockLibrary projectId={project.id} orientation={project.contentType === "Short" ? "vertical" : "horizontal"} />
+        </div>
       ),
     },
     {

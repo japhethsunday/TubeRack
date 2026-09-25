@@ -68,6 +68,8 @@ const serverSchema = z.object({
   NVIDIA_API_KEY: z.string().optional(),
   /** Jamendo developer client ID (free at devportal.jamendo.com) for the background music library. */
   JAMENDO_CLIENT_ID: z.string().optional(),
+  /** Pixabay API key (free at pixabay.com/api/docs) for stock videos and photos. */
+  PIXABAY_API_KEY: z.string().optional(),
   // Optional comma-separated override of the NVIDIA model order
   NVIDIA_TEXT_MODELS: z.string().optional(),
 

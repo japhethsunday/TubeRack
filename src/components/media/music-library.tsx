@@ -5,6 +5,7 @@ import { Check, Copy, Library, Plus, Search } from "lucide-react";
 import { api, ApiError } from "@/src/lib/api";
 import { useMedia } from "@/src/components/media/MediaProvider";
 import { MediaPlayer } from "@/src/components/media/players";
+import type { MediaAsset } from "@/src/lib/media/types";
 import { Button } from "@/src/components/ui/Button";
 import { Input } from "@/src/components/ui/fields";
 import { Alert } from "@/src/components/ui/Alert";
@@ -44,7 +45,7 @@ function fmt(sec: number | null): string {
  * commercial use (fine for monetized YouTube). Adding a track copies it into
  * the project and keeps its credit line for the video description.
  */
-export function MusicLibrary({ projectId }: { projectId: string }) {
+export function MusicLibrary({ projectId, onAdded }: { projectId: string; onAdded?: (asset: MediaAsset) => void }) {
   const { addAsset, assetsFor } = useMedia();
   const [mood, setMood] = useState<string>("piano");
   const [extra, setExtra] = useState("");
@@ -79,7 +80,7 @@ export function MusicLibrary({ projectId }: { projectId: string }) {
     setError(null);
     try {
       const data = await api.post<{ url: string; mime: string; fileSize: number }>("/api/v1/music/import", { id: track.id });
-      addAsset({
+      const asset = addAsset({
         projectId,
         sceneIds: [],
         kind: "music",
@@ -93,6 +94,7 @@ export function MusicLibrary({ projectId }: { projectId: string }) {
         tags: ["library", `track:${track.id}`, `license:${track.license}`, `credit:${track.attribution}`],
         approval: "draft",
       });
+      onAdded?.(asset);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Couldn't add this track. Please try another one.");
     }

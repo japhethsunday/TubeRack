@@ -7,7 +7,7 @@ import { isChunked } from "@/src/lib/media/chunked";
 import { sanitizeSvg } from "@/src/lib/security/svg";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Undo2, Redo2, Wand2, Plus, Clipboard, ClipboardPaste, ArrowLeft, ArrowRight, Download, Clapperboard, FolderOpen, Type, Shapes, LayoutList, SlidersHorizontal, X } from "lucide-react";
+import { Undo2, Redo2, Wand2, Plus, Clipboard, ClipboardPaste, ArrowLeft, ArrowRight, Download, Clapperboard, FolderOpen, Film, Music, Type, Shapes, LayoutList, SlidersHorizontal, X } from "lucide-react";
 import { useProjects, LocalStorageNote } from "@/src/components/projects/ProjectsProvider";
 import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { useScripts } from "@/src/components/script/ScriptProvider";
@@ -21,6 +21,8 @@ import { GeminiCaptions } from "@/src/components/video/GeminiCaptions";
 import { PublishButton, type Prerendered } from "@/src/components/video/PublishToYouTube";
 import { ClipInspector } from "@/src/components/video/ClipInspector";
 import { MediaImporter } from "@/src/components/video/MediaImporter";
+import { StockLibrary } from "@/src/components/media/StockLibrary";
+import { MusicLibrary } from "@/src/components/media/music-library";
 import { ExportStudio, sizeFor, type FinishedExport } from "@/src/components/video/ExportStudio";
 import { ElementsPanel } from "@/src/components/video/ElementsPanel";
 import type { RenderAsset } from "@/src/lib/video/render";
@@ -506,6 +508,14 @@ function Studio() {
           <MediaPanel assets={assets} onAddAtPlayhead={addAssetAtPlayhead} urlFor={mediaUrl} />
         </div>
       )}
+      {leftTab === "stock" && (
+        <StockLibrary
+          projectId={pid}
+          orientation={composition.canvas.aspect === "9:16" || composition.canvas.aspect === "4:5" ? "vertical" : composition.canvas.aspect === "1:1" ? "any" : "horizontal"}
+          onAdded={(asset) => placeAsset(asset)}
+        />
+      )}
+      {leftTab === "music" && <MusicLibrary projectId={pid} onAdded={(asset) => placeAsset(asset)} />}
       {leftTab === "elements" && (
         <ElementsPanel
           background={canvas.background ?? BLUR_BACKGROUND}
@@ -624,6 +634,8 @@ function Studio() {
   };
   const LEFT_TABS = [
     { id: "media", label: "Media", icon: FolderOpen },
+    { id: "stock", label: "Stock", icon: Film },
+    { id: "music", label: "Music", icon: Music },
     { id: "text", label: "Text", icon: Type },
     { id: "elements", label: "Elements", icon: Shapes },
     { id: "scenes", label: "Scenes", icon: LayoutList },
