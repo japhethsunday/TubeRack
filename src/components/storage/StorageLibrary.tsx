@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Copy, FileText, Film, FolderInput, ImageIcon, Mic, Music, Search } from "lucide-react";
 import type { MediaAsset } from "@/src/lib/media/types";
 import { useMedia } from "@/src/components/media/MediaProvider";
@@ -82,6 +82,13 @@ export function StorageLibrary() {
         .filter(({ project }) => !query.trim() || project.name.toLowerCase().includes(query.trim().toLowerCase())),
     [projects, scripts, projectFilter, query],
   );
+
+  // Download device copies only for what's on screen.
+  const visibleIds = tab === "thumbnails" || tab === "scripts" ? "" : assets.slice(0, 60).map((a) => a.id).join(",");
+  const { want } = media;
+  useEffect(() => {
+    if (visibleIds) want(visibleIds.split(","));
+  }, [visibleIds, want]);
 
   const counts = {
     all: media.assets.filter((a) => a.status === "ready" && a.source !== "provider-request").length,

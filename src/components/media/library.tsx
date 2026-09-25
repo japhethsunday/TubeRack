@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, X, Trash2, Columns2, RotateCcw } from "lucide-react";
 import type { ApprovalState, MediaAsset, MediaKind, MediaStatus } from "@/src/lib/media/types";
 import { useMedia } from "@/src/components/media/MediaProvider";
@@ -280,7 +280,7 @@ function AssignScenes({ asset, sceneOptions }: { asset: MediaAsset; sceneOptions
 
 /** Library: search, filters, grid, side-by-side compare. */
 export function LibraryView({ projectId, sceneOptions }: { projectId: string; sceneOptions: { id: string; title: string }[] }) {
-  const { assetsFor } = useMedia();
+  const { assetsFor, want } = useMedia();
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<"all" | MediaKind>("all");
   const [status, setStatus] = useState<"all" | "active" | "ready" | "failed">("all");
@@ -288,6 +288,10 @@ export function LibraryView({ projectId, sceneOptions }: { projectId: string; sc
   const [comparedIds, setComparedIds] = useState<string[]>([]);
 
   const assets = assetsFor(projectId);
+  const assetIds = assets.map((a) => a.id).join(",");
+  useEffect(() => {
+    if (assetIds) want(assetIds.split(","));
+  }, [assetIds, want]);
   const shown = assets.filter((a) => {
     if (kind !== "all" && a.kind !== kind) return false;
     if (status === "active" && !["pending", "preparing", "generating", "processing"].includes(a.status)) return false;

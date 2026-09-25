@@ -2,7 +2,7 @@
 
 import type { TextOverlay } from "@/src/lib/package/types";
 import { useProductionContext } from "@/src/components/projects/useProductionContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { Plus, ImagePlus, Sparkles } from "lucide-react";
 import { generateProviderImage } from "@/src/lib/ai-client";
@@ -54,7 +54,7 @@ export function ThumbnailTab({
   imageDrafts: MediaAsset[];
 }) {
   const { variantsFor, addVariant, approvedVariantFor } = usePackaging();
-  const { blobUrlFor } = useMedia();
+  const { blobUrlFor, want } = useMedia();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [baseId, setBaseId] = useState("solid");
   const [variantName, setVariantName] = useState("");
@@ -188,6 +188,10 @@ export function ThumbnailTab({
   }
 
   const uploads = imageDrafts.filter((a) => a.source === "upload-session" && a.status === "ready");
+  const uploadIds = uploads.map((u) => u.id).join(",");
+  useEffect(() => {
+    if (uploadIds) want(uploadIds.split(","));
+  }, [uploadIds, want]);
 
   return (
     <div className="space-y-6">

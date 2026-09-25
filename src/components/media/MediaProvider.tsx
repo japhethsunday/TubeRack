@@ -56,6 +56,11 @@ export interface MediaContextValue {
   putBlob: (id: string, blob: Blob) => string;
   /** Save bytes to this device (survives reloads) and attach them to an asset. */
   persistBlob: (id: string, blob: Blob, onProgress?: (ratio: number) => void, signal?: AbortSignal) => Promise<string>;
+  /**
+   * Ask for these assets' bytes (cloud uploads are downloaded only when a
+   * screen needs them — never all of them on every page).
+   */
+  want: (ids: string[]) => void;
   /** Bumps when device-stored media finishes loading after a reload. */
   blobVersion: number;
   /** Download progress (0–1) for media arriving from another device. */
@@ -194,11 +199,16 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     bumpFailed((n) => n + 1);
   };
   const [downloads, setDownloads] = useState<Record<string, number>>({});
+  const [wanted, setWanted] = useState<ReadonlySet<string>>(() => new Set());
+  const want = useCallback((ids: string[]) => {
+    setWanted((cur) => (ids.every((id) => cur.has(id)) ? cur : new Set([...cur, ...ids])));
+  }, []);
   useEffect(() => {
     if (!ready) return;
     const missing = bundle.assets.filter(
       (a) =>
         a.status === "ready" &&
+        wanted.has(a.id) &&
         !blobs.current.has(a.id) &&
         !fetching.current.has(a.id) &&
         !failedDownloads.has(a.id) &&
@@ -234,7 +244,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         }
       }
     })();
-  }, [ready, cloud, bundle.assets]);
+  }, [ready, cloud, bundle.assets, wanted]);
 
   useEffect(() => {
     if (!ready) return;
@@ -336,6 +346,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         });
       },
       blobUrlFor: (id) => blobs.current.get(id)?.url ?? null,
+      want,
       putBlob: (id, blob) => {
         const prev = blobs.current.get(id);
         if (prev) URL.revokeObjectURL(prev.url);
@@ -402,7 +413,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         return { assets: incoming.assets.length, voices: incoming.voices.length };
       },
     }),
-    [bundle, ready, touchAsset, blobVersion, downloads],
+    [bundle, ready, touchAsset, blobVersion, downloads, want],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

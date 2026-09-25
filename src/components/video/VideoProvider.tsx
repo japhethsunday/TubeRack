@@ -101,6 +101,16 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [histories, setHistories] = useState<Record<string, HistoryState>>({});
   const tombstones = useRef<{ requests: string[]; compositions: string[] }>({ requests: [], compositions: [] });
+  /** What the server already has, per project (so saves only send changes). */
+  const sentRef = useRef(new Map<string, string>());
+  const sentRequests = useRef("");
+  /** Server copies need no re-upload: remember them as already sent. */
+  const rememberServer = (b: ReturnType<typeof parseVideoBundle>) => {
+    sentRequests.current = JSON.stringify(b.requests);
+    for (const c of b.compositions) {
+      sentRef.current.set(c.projectId, JSON.stringify([c, b.snapshots.filter((sn) => sn.data.projectId === c.projectId)]));
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -111,6 +121,7 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
           const remote = await pullBundle("video", true);
           if (!cancelled && remote) {
             const incoming = parseVideoBundle(remote);
+            rememberServer(incoming);
             // Merge into the device copy — never replace it (unsynced work survives).
             setBundle(() => mergeRemoteBundle(readBundle(), incoming));
             setReady(true);
@@ -145,8 +156,24 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
       deletedRequestIds: [...new Set(tombstones.current.requests)],
       deletedCompositions: [...new Set(tombstones.current.compositions)],
     };
-    schedulePush("video", { ...bundle, ...tomb }, () => {
+    // Send only the projects whose timeline or snapshots changed since the
+    // last successful save (every edit used to re-upload every project).
+    const snapsOf = (pid: string) => bundle.snapshots.filter((sn) => sn.data.projectId === pid);
+    const changed = bundle.compositions.filter((c) => sentRef.current.get(c.projectId) !== JSON.stringify([c, snapsOf(c.projectId)]));
+    const stamps = new Map(changed.map((c) => [c.projectId, JSON.stringify([c, snapsOf(c.projectId)])]));
+    const requestsChanged = JSON.stringify(bundle.requests) !== sentRequests.current;
+    if (!changed.length && !requestsChanged && !tomb.deletedCompositions.length && !tomb.deletedRequestIds.length) return;
+    const body = {
+      ...bundle,
+      compositions: changed,
+      snapshots: changed.flatMap((c) => snapsOf(c.projectId)),
+      ...tomb,
+    };
+    const requestsStamp = JSON.stringify(bundle.requests);
+    schedulePush("video", body, () => {
       tombstones.current = { requests: [], compositions: [] };
+      for (const [pid, stamp] of stamps) sentRef.current.set(pid, stamp);
+      sentRequests.current = requestsStamp;
     });
   }, [bundle, ready, cloud]);
 
@@ -156,6 +183,7 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
       .then((remote) => {
         if (remote) {
           const incoming = parseVideoBundle(remote);
+          rememberServer(incoming);
           setBundle((cur) => mergeRemoteBundle(cur, incoming));
         }
       })

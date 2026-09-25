@@ -215,6 +215,7 @@ async function flush(kind: SyncKind) {
     setStatus("too-large");
     return;
   }
+  if (ok) lastPushed.set(kind, JSON.stringify(body));
   if (ok && latest && latest.body === body) {
     queue.delete(kind);
   } else if (latest) {
@@ -230,8 +231,12 @@ async function flush(kind: SyncKind) {
  * Queue the latest bundle for `kind`. Debounced; retried with backoff until
  * the server confirms; flushed immediately when the tab is hidden.
  */
+/** The last body each kind saved successfully: identical saves are skipped. */
+const lastPushed = new Map<SyncKind, string>();
+
 export function schedulePush(kind: SyncKind, body: unknown, onResult?: (r: SyncResult) => void, delayMs = 800): void {
   ensureLifecycleHooks();
+  if (!queue.has(kind) && lastPushed.get(kind) === JSON.stringify(body)) return;
   const existing = queue.get(kind);
   if (existing?.timer) window.clearTimeout(existing.timer);
   const p: Pending = { body, onResult, timer: null, attempt: existing?.attempt ?? 0, inFlight: existing?.inFlight ?? false };

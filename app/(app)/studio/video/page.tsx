@@ -122,6 +122,11 @@ function Studio() {
   const scenes = useMemo(() => (project ? scriptsApi.scenesFor(project.id) : []), [project, scriptsApi]);
   const scriptSections = project ? scriptsApi.scriptFor(project.id)?.sections ?? [] : [];
   const assets = useMemo(() => (project ? mediaApi.assetsFor(project.id) : []), [project, mediaApi]);
+  // Only this project's files are downloaded to the device, and only here.
+  const { want } = mediaApi;
+  useEffect(() => {
+    if (assets.length) want(assets.map((a) => a.id));
+  }, [assets, want]);
   const dna = project ? dnaFor(project.channelId) : null;
 
   const segments = useMemo(() => sceneSegments(scenes), [scenes]);
