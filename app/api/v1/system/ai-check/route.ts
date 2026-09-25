@@ -9,6 +9,7 @@ import { NVIDIA_IMAGE_MODELS, nvidiaImageWith } from "@/src/server/ai/nvidia-ima
 import { GeminiImageProvider } from "@/src/server/ai/gemini";
 import { arkGenerateImage, arkGenerateText, arkImageModels, arkListModels, arkStartVideo, arkTextModels, arkVideoModels, arkVideoStatus } from "@/src/server/ai/ark";
 import { mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
+import { downloadTrack, searchLibraryMusic } from "@/src/server/music/library";
 
 export const maxDuration = 300;
 
@@ -191,6 +192,13 @@ async function run() {
       timed("app", "image chain", "scene image", async () => {
         const out = await new GeminiImageProvider().generateImage({ prompt: "A cozy home workout corner with a yoga mat, photo", aspectRatio: "9:16" });
         if (!out.url.startsWith("data:image/") || out.url.length < 5_000) throw new Error("no image returned");
+      }),
+    () =>
+      timed("app", "music library", "search + download", async () => {
+        const tracks = await searchLibraryMusic("piano");
+        if (tracks.length === 0) throw new Error("no tracks found");
+        const file = await downloadTrack(tracks[0]);
+        if (file.bytes.byteLength < 10_000) throw new Error("empty file");
       }),
     () =>
       timed("app", "voice chain", "voice-over", async () => {

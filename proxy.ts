@@ -22,7 +22,7 @@ export function proxy(request: NextRequest) {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     `img-src 'self' data: blob: https://*.supabase.co${storage} https://i.ytimg.com https://*.ytimg.com https://yt3.ggpht.com https://*.googleusercontent.com`,
-    `media-src 'self' blob: data: https://*.supabase.co${storage}`,
+    `media-src 'self' blob: data: https:`,
     `connect-src 'self' blob: data: https://*.supabase.co${storage} https://www.googleapis.com`,
     "frame-src https://www.youtube-nocookie.com https://www.youtube.com",
     "worker-src 'self' blob:",

@@ -12,6 +12,7 @@ import { SceneNeeds } from "@/src/components/media/needs";
 import { ImageStudio } from "@/src/components/media/image-studio";
 import { VoiceStudio } from "@/src/components/media/voice-studio";
 import { MusicStudio, SfxStudio } from "@/src/components/media/music-studio";
+import { MusicLibrary } from "@/src/components/media/music-library";
 import { UploadZone } from "@/src/components/media/uploads";
 import { ConsistencyPanel } from "@/src/components/media/style";
 import { QueueView } from "@/src/components/media/queue";
@@ -205,6 +206,7 @@ function Studio() {
         <div className="space-y-8">
           <section aria-label="Music studio">
             <h2 className="mb-3 text-sm font-semibold">Music</h2>
+            <div className="mb-4"><MusicLibrary projectId={project.id} /></div>
             <MusicStudio projectId={project.id} registerRerun={registerRerun} />
           </section>
           <section aria-label="Sound effects studio">
