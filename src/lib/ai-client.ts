@@ -138,6 +138,12 @@ export interface PackagingContext {
   title: string;
   script: string;
   chapters: string;
+  /** Channel name + niche, the shared production brief, the opening hook, "Short" or "Long-form", and length. */
+  channel?: string;
+  brief?: string;
+  hook?: string;
+  format?: string;
+  durationSec?: number;
 }
 
 export function suggestTitlesWithProvider(context: PackagingContext) {

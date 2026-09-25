@@ -14,6 +14,8 @@ export interface ChannelInputs {
 
 export interface ChannelPlan {
   names: { name: string; why: string }[];
+  /** The name the creator confirmed (a suggestion or their own); used for every video from this plan. */
+  chosenName?: string;
   handles: { handle: string; available: boolean | null }[];
   positioning: string;
   tagline: string;
@@ -67,6 +69,7 @@ export function normalisePlan(raw: unknown): ChannelPlan {
   const pub = obj(r.publishing);
   return {
     names: arr(r.names, 8).map((x) => ({ name: str(x.name, 60), why: str(x.why, 200) })).filter((x) => x.name),
+    ...(typeof r.chosenName === "string" && r.chosenName.trim() ? { chosenName: r.chosenName.trim().slice(0, 60) } : {}),
     handles: strs(r.handles, 10, 30)
       .map((h) => h.replace(/^@/, "").replace(/[^A-Za-z0-9._-]/g, ""))
       .filter((h) => h.length >= 3)
@@ -109,4 +112,9 @@ export function channelKeywordsField(keywords: string[]): string {
     out = (out + " " + term).trim();
   }
   return out;
+}
+
+/** The channel name a plan's videos use: the creator's choice, else the lead suggestion. */
+export function planChannelName(plan: ChannelPlan, fallback: string): string {
+  return plan.chosenName?.trim() || plan.names[0]?.name || fallback;
 }

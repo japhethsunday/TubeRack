@@ -20,6 +20,11 @@ const body = z.object({
     title: field(200),
     script: field(20000),
     chapters: field(3000),
+    channel: field(200),
+    brief: field(2000),
+    hook: field(500),
+    format: field(40),
+    durationSec: z.number().min(0).max(86400).optional(),
   }),
 });
 

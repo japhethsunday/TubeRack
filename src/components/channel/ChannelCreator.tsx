@@ -7,7 +7,7 @@ import { Rocket, Copy, Check, Loader2, Trash2, CalendarPlus, Clapperboard, Plus 
 import { api, ApiError } from "@/src/lib/api";
 import { retryBusy } from "@/src/lib/ai-client";
 import type { ChannelEvidence, ChannelInputs, ChannelPlan } from "@/src/lib/channel/plan";
-import { channelKeywordsField } from "@/src/lib/channel/plan";
+import { channelKeywordsField, planChannelName } from "@/src/lib/channel/plan";
 import { CATEGORIES } from "@/src/lib/market/signals";
 import { REGIONS, regionName } from "@/src/lib/market/regions";
 import { useProjects } from "@/src/components/projects/ProjectsProvider";
@@ -103,6 +103,36 @@ export function ChannelCreator() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const planId = params.get("plan");
+  const [nameDraft, setNameDraft] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+
+  /**
+   * Confirm the channel name. Every video started from this plan uses it, and
+   * a channel already created under the old name is renamed, so projects,
+   * briefs and AI tools all carry the creator's real channel name.
+   */
+  async function saveChannelName(name: string) {
+    if (!current) return;
+    const clean = name.trim().slice(0, 60);
+    if (!clean) return;
+    setSavingName(true);
+    setError(null);
+    try {
+      const previous = planChannelName(current.plan, current.niche);
+      const row = await api.patch<PlanRow>(`/api/v1/channel-plans/${encodeURIComponent(current.id)}`, { chosenName: clean });
+      setCurrent(row);
+      setPlans((list) => list.map((x) => (x.id === row.id ? { ...x, lead_name: clean } : x)));
+      const existing = projects.channels.find((c) => c.name === previous);
+      if (existing && previous !== clean) projects.renameChannel(existing.id, clean);
+      setEditingName(false);
+      setNotice(`Channel name set to “${clean}”. New videos and ideas will use it.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not save the channel name.");
+    } finally {
+      setSavingName(false);
+    }
+  }
 
   useEffect(() => {
     api.get<PlanListItem[]>("/api/v1/channel-plans").then(setPlans).catch(() => setPlans([]));
@@ -156,7 +186,7 @@ export function ChannelCreator() {
   /** The project already made from this idea (same channel, same title), if any. */
   function existingFor(idea: ChannelPlan["ideas"][number]) {
     if (!current) return undefined;
-    const channelName = current.plan.names[0]?.name ?? current.niche;
+    const channelName = planChannelName(current.plan, current.niche);
     const channel = projects.channels.find((c) => c.name === channelName);
     if (!channel) return undefined;
     const title = idea.title.trim().toLowerCase();
@@ -171,7 +201,7 @@ export function ChannelCreator() {
       return;
     }
     const p = current.plan;
-    const channelName = p.names[0]?.name ?? current.niche;
+    const channelName = planChannelName(p, current.niche);
     const channel = projects.channels.find((c) => c.name === channelName) ?? projects.addChannel(channelName, current.niche);
     const short = /short/i.test(idea.format);
     const format = p.formats.find((f) => f.name.toLowerCase() === idea.format.toLowerCase());
@@ -340,7 +370,14 @@ export function ChannelCreator() {
           <div className="space-y-6">
             <header className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-semibold">{plan.names[0]?.name ?? current.niche}</h2>
+                <h2 className="flex items-center gap-2 text-xl font-semibold">
+                  {planChannelName(plan, current.niche)}
+                  {plan.chosenName && !editingName && (
+                    <button type="button" onClick={() => { setNameDraft(plan.chosenName ?? ""); setEditingName(true); }} className="rounded-md px-2 py-0.5 text-xs font-medium text-muted-text hover:bg-muted hover:text-foreground">
+                      Change name
+                    </button>
+                  )}
+                </h2>
                 <p className="text-sm text-muted-text">{current.niche} · {regionName(current.region) || "Worldwide"} · {new Date(current.created_at).toLocaleString()}</p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -354,6 +391,41 @@ export function ChannelCreator() {
                 )}
               </div>
             </header>
+
+            {(!plan.chosenName || editingName) && (
+              <section aria-label="Confirm channel name" className="rounded-xl border border-primary/40 bg-primary/5 p-4">
+                <h3 className="text-sm font-semibold">{plan.chosenName ? "Change your channel name" : "Keep this channel name?"}</h3>
+                <p className="mt-1 text-xs text-muted-text">
+                  Every video, idea and script from this plan will use the name you confirm — pick a suggestion or use your own (for example, your existing channel&apos;s name).
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {plan.names.slice(0, 5).map((n) => (
+                    <Button key={n.name} size="sm" variant={n.name === planChannelName(plan, current.niche) ? "primary" : "outline"} disabled={savingName} onClick={() => void saveChannelName(n.name)}>
+                      {n.name === planChannelName(plan, current.niche) && !plan.chosenName ? `Keep “${n.name}”` : n.name}
+                    </Button>
+                  ))}
+                </div>
+                <form
+                  className="mt-3 flex flex-wrap items-end gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void saveChannelName(nameDraft);
+                  }}
+                >
+                  <div className="min-w-0 flex-1">
+                    <Input label="Or use your own name" value={nameDraft} maxLength={60} onChange={(e) => setNameDraft(e.target.value)} placeholder="Your channel name" />
+                  </div>
+                  <Button type="submit" size="sm" loading={savingName} disabled={!nameDraft.trim()}>
+                    Use this name
+                  </Button>
+                  {editingName && (
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setEditingName(false)}>
+                      Cancel
+                    </Button>
+                  )}
+                </form>
+              </section>
+            )}
 
             {ev && (
               <div className="rounded-xl border border-border bg-surface p-4 text-sm">

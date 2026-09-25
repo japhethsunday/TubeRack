@@ -6,9 +6,9 @@ import { productionContext, type ProductionContext } from "@/src/lib/projects/pr
 
 /** The shared production brief for a project (null until the project loads). */
 export function useProductionContext(projectId: string | null | undefined): ProductionContext | null {
-  const { projects } = useProjects();
+  const { projects, channels } = useProjects();
   const intel = useIntel();
   const project = projects.find((p) => p.id === projectId);
   if (!project) return null;
-  return productionContext({ project, dna: intel.dnaFor(project.channelId), intel: intel.intelFor(project.id) });
+  return productionContext({ project, channel: channels.find((c) => c.id === project.channelId) ?? null, dna: intel.dnaFor(project.channelId), intel: intel.intelFor(project.id) });
 }

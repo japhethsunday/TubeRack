@@ -1,4 +1,4 @@
-import type { Project } from "@/src/lib/projects/types";
+import type { Channel, Project } from "@/src/lib/projects/types";
 import type { ChannelDNA } from "@/src/lib/intelligence/dna";
 import type { ProjectIntel } from "@/src/lib/intelligence/shelf";
 
@@ -19,6 +19,9 @@ export interface ProductionContext {
   angle: string;
   promise: string;
   hook: string;
+  /** The channel this video is for (name + niche), when known. */
+  channel: string;
+  channelNiche: string;
   /** Short plain-text summary for prompts. */
   brief: string;
 }
@@ -29,8 +32,10 @@ export function aspectForPlatform(platform: string, contentType = ""): "16:9" | 
 
 const clip = (s: string | undefined | null, n: number) => (s ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 
-export function productionContext(input: { project: Project; dna?: ChannelDNA | null; intel?: ProjectIntel | null }): ProductionContext {
+export function productionContext(input: { project: Project; channel?: Channel | null; dna?: ChannelDNA | null; intel?: ProjectIntel | null }): ProductionContext {
   const { project, dna, intel } = input;
+  const channel = clip(input.channel?.name, 100);
+  const channelNiche = clip(input.channel?.niche, 150);
   const strategy = intel?.strategy ?? null;
   const audienceProfile = intel?.audience ?? null;
   const topic = clip(strategy?.topic || project.topic || project.name, 200);
@@ -43,6 +48,7 @@ export function productionContext(input: { project: Project; dna?: ChannelDNA | 
   const hook = clip(strategy?.hook, 200);
   const goal = clip(project.goal, 200);
   const brief = [
+    channel && `Channel: ${channel}${channelNiche ? ` (${channelNiche})` : ""}`,
     `Video: ${topic}`,
     angle && `Angle: ${angle}`,
     promise && `Promise to the viewer: ${promise}`,
@@ -54,5 +60,5 @@ export function productionContext(input: { project: Project; dna?: ChannelDNA | 
   ]
     .filter(Boolean)
     .join(". ");
-  return { topic, goal, platform: project.platform, aspect: aspectForPlatform(project.platform, project.contentType), audience, tone, visualStyle, avoid, angle, promise, hook, brief };
+  return { topic, goal, platform: project.platform, aspect: aspectForPlatform(project.platform, project.contentType), audience, tone, visualStyle, avoid, angle, promise, hook, channel, channelNiche, brief };
 }

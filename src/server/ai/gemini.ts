@@ -597,14 +597,31 @@ const strings = (v: unknown, max: number) =>
 /** Packaging helpers: title options, or an SEO description + tags + hashtags. */
 export async function writePackaging(
   kind: "titles" | "seo",
-  context: { topic: string; audience: string; promise: string; takeaway: string; cta: string; title: string; script: string; chapters: string },
+  context: {
+    topic: string;
+    audience: string;
+    promise: string;
+    takeaway: string;
+    cta: string;
+    title: string;
+    script: string;
+    chapters: string;
+    channel?: string;
+    brief?: string;
+    hook?: string;
+    format?: string;
+    durationSec?: number;
+  },
 ): Promise<{ titles?: { text: string; category: string }[]; description?: string; tags?: string[]; hashtags?: string[]; model: string }> {
   if (!isTextConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   const brief = JSON.stringify({ ...context, script: context.script.slice(0, 5000) });
-  const rules = "Never invent statistics, rankings, or view counts. No clickbait that the video does not deliver.";
+  const rules =
+    "Base everything on what the video actually says (script) and who it is for. Never invent statistics, rankings, or view counts. " +
+    "No clickbait the video does not deliver — over-promising kills retention and hurts reach." +
+    (context.format === "Short" ? " This is a YouTube Short: keep it punchy and mobile-first." : "");
   if (kind === "titles") {
     const { text, model } = await new GeminiTextProvider().generateText({
-      prompt: `You are a YouTube packaging strategist. Write 8 distinct title options (max 70 characters each) for this video, one per category: Curiosity, Benefit, Story, Question, Specific outcome, Contrarian, Educational, Curiosity.\n${rules}\nVideo (JSON): ${brief}\nRespond ONLY with JSON: {"titles":[{"text":"...","category":"..."}]}`,
+      prompt: `You are a YouTube growth strategist who writes titles that earn clicks from the right viewers. Write 8 distinct title options for this video, one per category: Curiosity, Benefit, Story, Question, Specific outcome, Contrarian, Educational, Search. Each: under 60 characters where possible (70 max), the main searchable keyword near the front, a clear payoff or open loop, and it must match the video's real hook and promise. The Search option is what someone would type into YouTube.\n${rules}\nVideo (JSON): ${brief}\nRespond ONLY with JSON: {"titles":[{"text":"...","category":"..."}]}`,
       maxTokens: 1500,
       json: true,
     });
@@ -618,7 +635,7 @@ export async function writePackaging(
     return { titles, model };
   }
   const { text, model } = await new GeminiTextProvider().generateText({
-    prompt: `You are a YouTube SEO writer. Write a YouTube description (150-300 words): a strong first two lines that restate the promise, a short summary, then the chapters exactly as given (if any), then the call to action. Also give 10-15 search tags and 3 hashtags.\n${rules}\nVideo (JSON): ${brief}\nRespond ONLY with JSON: {"description":"...","tags":["..."],"hashtags":["#..."]}`,
+    prompt: `You are a YouTube growth strategist. Write the upload copy that helps this video get discovered and watched. Description (150-300 words): the first two lines (shown in search and above "more") must hook the viewer and contain the main keyword naturally; then 2-3 short lines on what they'll learn or feel, using the words people search for; then the chapters exactly as given (if any); then a call to action that names the channel (subscribe / watch next). Also give 12-15 tags ordered from exact topic phrases to broader related searches (no channel-spam, no misleading tags), and 3 relevant hashtags.\n${rules}\nVideo (JSON): ${brief}\nRespond ONLY with JSON: {"description":"...","tags":["..."],"hashtags":["#..."]}`,
     maxTokens: 2000,
     json: true,
   });

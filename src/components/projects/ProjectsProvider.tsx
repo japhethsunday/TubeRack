@@ -54,6 +54,7 @@ interface ProjectsContextValue {
   setStage: (id: string, stage: DomainStage, state: StageState) => void;
   touch: (id: string) => void;
   addChannel: (name: string, niche: string) => Channel;
+  renameChannel: (id: string, name: string) => void;
   recordSearch: (q: string) => void;
   importBundle: (data: unknown) => { projects: number; channels: number };
   exportBundle: () => WorkspaceBundle;
@@ -384,6 +385,11 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
           events: [event, ...b.events].slice(0, 200),
         }));
         return channel;
+      },
+      renameChannel: (id, name) => {
+        const clean = name.trim().slice(0, 60);
+        if (!clean) return;
+        mutate((b) => ({ ...b, channels: b.channels.map((c) => (c.id === id ? { ...c, name: clean } : c)) }));
       },
       recordSearch: (q) => {
         const clean = q.trim();

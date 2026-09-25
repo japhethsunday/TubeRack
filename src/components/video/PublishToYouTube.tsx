@@ -49,6 +49,8 @@ import { Input, Select, Textarea } from "@/src/components/ui/fields";
 import { Badge } from "@/src/components/ui/Badge";
 import { downloadBlob } from "@/src/lib/download";
 import { cx } from "@/src/components/ui/cx";
+import { useProductionContext } from "@/src/components/projects/useProductionContext";
+import { useScripts } from "@/src/components/script/ScriptProvider";
 
 type StepId = "render" | "upload" | "thumbnail" | "playlist" | "processing" | "captions";
 type StepState = "pending" | "active" | "done" | "skipped" | "failed";
@@ -173,7 +175,7 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
   const [playlists, setPlaylists] = useState<{ id: string; title: string }[]>([]);
   const [title, setTitle] = useState(clampTitle(primary?.text || source.projectName));
   const [titleIdeas, setTitleIdeas] = useState<{ text: string; category: string }[]>([]);
-  const [aiBusy, setAiBusy] = useState<"titles" | "seo" | null>(null);
+  const [aiBusy, setAiBusy] = useState<"titles" | "seo" | "all" | null>(null);
   const [aiError, setAiError] = useState("");
   // What the video actually says (captions) — grounds the AI metadata.
   const transcript = useMemo(
@@ -186,16 +188,41 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
         .slice(0, 6000),
     [source.comp.clips],
   );
+  // The whole production feeds the upload copy: script, brief, hook, channel.
+  const production = useProductionContext(source.projectId);
+  const { scriptFor } = useScripts();
+  const scriptText = (scriptFor(source.projectId)?.sections ?? []).map((sec) => sec.text).join("\n\n").slice(0, 15000);
   const aiContext = () => ({
-    topic: source.topic || source.projectName,
-    audience: seo.audience || "",
-    promise: "",
-    takeaway: "",
-    cta: "",
+    topic: production?.topic || source.topic || source.projectName,
+    audience: seo.audience || production?.audience || "",
+    promise: production?.promise || "",
+    takeaway: production?.angle || "",
+    cta: production?.channel ? `Subscribe to ${production.channel}` : "",
     title,
-    script: transcript || source.comp.clips.filter((c) => c.kind === "text" && c.text).map((c) => c.text).join(" ").slice(0, 3000),
+    script: scriptText || transcript || source.comp.clips.filter((c) => c.kind === "text" && c.text).map((c) => c.text).join(" ").slice(0, 3000),
     chapters: seo.chapters.map((c) => `${Math.floor(c.timeSec / 60)}:${String(Math.floor(c.timeSec % 60)).padStart(2, "0")} ${c.title}`).join("\n"),
+    channel: production?.channel ? `${production.channel}${production.channelNiche ? ` — ${production.channelNiche}` : ""}` : "",
+    brief: production?.brief ?? "",
+    hook: production?.hook ?? "",
+    format: source.duration <= 60 && (source.render?.height ?? 0) > (source.render?.width ?? 1) ? "Short" : "Long-form",
+    durationSec: Math.round(source.duration),
   });
+  /** Titles + description + tags in one go; the strongest title is applied. */
+  async function genAll() {
+    setAiBusy("all");
+    setAiError("");
+    const [t, o] = await Promise.all([suggestTitlesWithProvider(aiContext()), writeSeoWithProvider(aiContext())]);
+    setAiBusy(null);
+    if (t.ok) {
+      setTitleIdeas(t.data.titles);
+      if (t.data.titles[0]) setTitle(clampTitle(t.data.titles[0].text));
+    }
+    if (o.ok) {
+      setDescription(buildDescription({ description: o.data.description, chapters: seo.chapters, hashtags: o.data.hashtags }));
+      setTags(normalizeTags(o.data.tags).join(", "));
+    }
+    if (!t.ok && !o.ok) setAiError(o.message);
+  }
   async function genTitles() {
     setAiBusy("titles");
     setAiError("");
@@ -493,6 +520,14 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
         </div>
       ) : phase === "review" ? (
         <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 p-3">
+            <p className="min-w-0 flex-1 text-xs text-muted-text">
+              Write the title, description and tags from your script, audience and channel — tuned for search and clicks without over-promising.
+            </p>
+            <Button size="sm" loading={aiBusy === "all"} disabled={aiBusy !== null && aiBusy !== "all"} onClick={() => void genAll()}>
+              <Sparkles className="size-4" aria-hidden="true" /> Optimize for reach
+            </Button>
+          </div>
           <div className="grid gap-4 sm:grid-cols-[200px_minmax(0,1fr)]">
             <div className="space-y-2">
               {thumbPreview && includeThumb ? (

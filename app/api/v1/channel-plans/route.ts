@@ -27,7 +27,7 @@ const body = z.object({
   brandName: z.string().trim().max(60).default(""),
 });
 
-const LIST_COLS = "id, niche, region, inputs, plan->'names'->0->>'name' AS lead_name, created_at";
+const LIST_COLS = "id, niche, region, inputs, COALESCE(plan->>'chosenName', plan->'names'->0->>'name') AS lead_name, created_at";
 
 /** GET /api/v1/channel-plans — saved plans for this workspace (newest first). */
 export async function GET() {
