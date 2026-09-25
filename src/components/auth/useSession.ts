@@ -54,17 +54,25 @@ function claimDeviceData(userId: string): void {
 
 function load(): Promise<SessionState> {
   if (!cached) {
-    cached = api
-      .get<SessionInfo | null>("/api/v1/users/me")
-      .then((user): SessionState => {
-        if (user) claimDeviceData(user.id);
-        return user ? { status: "signed-in", user } : { status: "signed-out", user: null };
-      })
-      .catch((error: unknown): SessionState => {
-        // Transient failures should not pin the tab to "signed out".
-        if (!(error instanceof ApiError) || error.isUnavailable()) cached = null;
-        return { status: "signed-out", user: null };
-      });
+    cached = (async (): Promise<SessionState> => {
+      // Only "not signed in" (401) means signed out. Anything else — too many
+      // requests, a network blip, a server hiccup — is retried, so a busy
+      // moment never throws the user out of the app.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const user = await api.get<SessionInfo | null>("/api/v1/users/me");
+          if (user) claimDeviceData(user.id);
+          return user ? { status: "signed-in", user } : { status: "signed-out", user: null };
+        } catch (error: unknown) {
+          if (error instanceof ApiError && (error.status === 401 || error.code === "UNAUTHORIZED")) return { status: "signed-out", user: null };
+          if (attempt >= 4) {
+            cached = null;
+            return { status: "signed-out", user: null };
+          }
+          await new Promise((r) => setTimeout(r, Math.min(8000, 800 * 2 ** attempt)));
+        }
+      }
+    })();
   }
   return cached;
 }
