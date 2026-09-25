@@ -40,3 +40,18 @@ describe("duplicateClip", () => {
     assert.equal(copy.startSec, 4);
   });
 });
+
+import { fitVisualsTo } from "@/src/lib/video/ops";
+
+describe("fitVisualsTo", () => {
+  it("stretches pictures to end with the voice and trims music", () => {
+    const c = (id: string, kind: TimelineClip["kind"], startSec: number, durationSec: number) =>
+      ({ id, trackId: `t_${kind}`, kind, name: id, startSec, durationSec, volume: 1, fadeInSec: 0, fadeOutSec: 0, muted: false }) as TimelineClip;
+    const out = fitVisualsTo([c("a", "image", 0, 20), c("b", "image", 20, 22), c("v", "voice", 0, 87), c("m", "music", 0, 120)], 87);
+    const byId = Object.fromEntries(out.map((x) => [x.id, x]));
+    assert.equal(byId.b.startSec + byId.b.durationSec, 87);
+    assert.equal(byId.a.durationSec, Math.round(20 * (87 / 42) * 100) / 100);
+    assert.equal(byId.v.durationSec, 87);
+    assert.equal(byId.m.durationSec, 87);
+  });
+});

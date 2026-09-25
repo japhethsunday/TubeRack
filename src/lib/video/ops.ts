@@ -170,3 +170,27 @@ export function rippleDelete(clips: TimelineClip[], id: string): TimelineClip[] 
 export function addClip(clips: TimelineClip[], clip: Omit<TimelineClip, "id">): TimelineClip[] {
   return [...clips, { ...clip, id: nextId("clip") }];
 }
+
+/**
+ * Stretch or squeeze the pictures (video/image clips and text over them) so
+ * they end exactly when the voice-over ends; background music is trimmed to
+ * the same point. Relative timing between clips is kept. Captions and voice
+ * are untouched (they already follow the voice).
+ */
+export function fitVisualsTo(clips: TimelineClip[], targetEnd: number): TimelineClip[] {
+  const visual = (c: TimelineClip) => c.kind === "image" || c.kind === "video" || c.kind === "text";
+  const end = clips.filter(visual).reduce((n, c) => Math.max(n, c.startSec + c.durationSec), 0);
+  if (end <= 0 || targetEnd <= 0) return clips;
+  const k = targetEnd / end;
+  const r = (n: number) => Math.round(n * 100) / 100;
+  return clips.map((c) => {
+    if (visual(c)) {
+      const next = { ...c, startSec: r(c.startSec * k), durationSec: r(c.durationSec * k) };
+      return next;
+    }
+    if (c.kind === "music" && c.startSec + c.durationSec > targetEnd) {
+      return { ...c, durationSec: r(Math.max(0.5, targetEnd - c.startSec)), fadeOutSec: Math.min(3, Math.max(c.fadeOutSec, 1.5)) };
+    }
+    return c;
+  });
+}

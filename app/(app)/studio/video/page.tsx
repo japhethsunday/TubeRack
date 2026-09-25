@@ -13,7 +13,7 @@ import { useMedia } from "@/src/components/media/MediaProvider";
 import { useVideo, VideoStorageNote } from "@/src/components/video/VideoProvider";
 import { useIntelQuery } from "@/src/components/intelligence/chrome";
 import { TimelinePro } from "@/src/components/video/TimelinePro";
-import { Preview } from "@/src/components/video/Preview";
+import { Preview, fmtTimecode } from "@/src/components/video/Preview";
 import { ScenesPanel, MediaPanel, TextPanel, Inspector, ExportPanel } from "@/src/components/video/panels";
 import { GeminiCaptions } from "@/src/components/video/GeminiCaptions";
 import { PublishButton, type Prerendered } from "@/src/components/video/PublishToYouTube";
@@ -35,7 +35,7 @@ import { GenerateVideoDialog } from "@/src/components/video/AutoVideo";
 import { Portal } from "@/src/components/ui/Portal";
 import { Input } from "@/src/components/ui/fields";
 import { newTrack, sceneSegments, buildFromScenes, captionsFromNarration, durationOf, validateComposition, healthOf } from "@/src/lib/video/build";
-import { moveClip, trimClip, splitClipAt, deleteClip, duplicateClip, addClip, insertClip, snapTime, snapCandidates, pasteClips, maxDurationFor, rippleDelete } from "@/src/lib/video/ops";
+import { moveClip, trimClip, splitClipAt, deleteClip, duplicateClip, addClip, insertClip, fitVisualsTo, snapTime, snapCandidates, pasteClips, maxDurationFor, rippleDelete } from "@/src/lib/video/ops";
 import { presetById, textPresetById, brandedTitleStyle } from "@/src/lib/video/presets";
 import type { MediaAsset } from "@/src/lib/media/types";
 import type { Composition, TimelineClip } from "@/src/lib/video/types";
@@ -778,11 +778,32 @@ function Studio() {
         )}
       </>
     );
+    // Pictures and voice-over out of step (black screen or silent pictures at the end)?
+    const voiceEnd = clips.filter((c) => c.kind === "voice").reduce((n, c) => Math.max(n, c.startSec + c.durationSec), 0);
+    const pictureEnd = clips.filter((c) => c.kind === "image" || c.kind === "video").reduce((n, c) => Math.max(n, c.startSec + c.durationSec), 0);
+    const mismatch = voiceEnd > 0 && pictureEnd > 0 && Math.abs(voiceEnd - pictureEnd) > 1.5;
     return (
-      <div className="h-full" onDrop={(e) => {
+      <div className="flex h-full flex-col" onDrop={(e) => {
         // Drop onto empty timeline space appends to a fitting track.
         if (e.dataTransfer.getData("application/x-tuberack-asset")) onDropAsset(e);
       }} onDragOver={(e) => e.preventDefault()}>
+        {mismatch && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-warning/40 bg-warning/10 px-3 py-1.5 text-xs">
+            <span className="min-w-0 flex-1">
+              {pictureEnd < voiceEnd
+                ? `Pictures end at ${fmtTimecode(pictureEnd, 30, false)} but the voice-over runs to ${fmtTimecode(voiceEnd, 30, false)} — the rest would be a black screen.`
+                : `Pictures run to ${fmtTimecode(pictureEnd, 30, false)} but the voice-over ends at ${fmtTimecode(voiceEnd, 30, false)} — the end would be silent.`}
+            </span>
+            <button
+              type="button"
+              onClick={() => commit(fitVisualsTo(latest.current.clips, voiceEnd))}
+              className="rounded-md bg-warning px-2.5 py-1 font-semibold text-black hover:opacity-90"
+            >
+              Fit pictures to voice
+            </button>
+          </div>
+        )}
+        <div className="min-h-0 flex-1">
         <TimelinePro
           fill
           leading={leading}
@@ -849,6 +870,7 @@ function Studio() {
             })
           }
         />
+        </div>
       </div>
     );
   }

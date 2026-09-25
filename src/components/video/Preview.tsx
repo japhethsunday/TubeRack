@@ -26,12 +26,18 @@ const SILENT_WAV =
  * and played from there.
  */
 const audioCache = new Map<string, Promise<string>>();
+/** Files already downloaded in full (object URL ready now). */
+const audioReady = new Map<string, string>();
 function cachedAudio(url: string): Promise<string> {
   if (url.startsWith("blob:") || url.startsWith("data:")) return Promise.resolve(url);
   let p = audioCache.get(url);
   if (!p) {
     p = sharedBlob(url)
-      .then((b) => URL.createObjectURL(b))
+      .then((b) => {
+        const local = URL.createObjectURL(b);
+        audioReady.set(url, local);
+        return local;
+      })
       .catch((e) => {
         audioCache.delete(url);
         throw e;
@@ -48,8 +54,11 @@ function playCached(
 ): { el: () => HTMLAudioElement | null; stop: () => void } {
   let stopped = false;
   let audio: HTMLAudioElement | null = null;
-  void (opts.stream ? Promise.resolve(url) : cachedAudio(url))
-    .catch(() => url)
+  // Play at once: the downloaded copy when it's ready, otherwise stream now
+  // (and keep downloading in the background for smooth seeking next time).
+  const ready = url.startsWith("blob:") || url.startsWith("data:") ? url : audioReady.get(url);
+  if (!ready && !opts.stream) void cachedAudio(url).catch(() => {});
+  void Promise.resolve(ready ?? url)
     .then((src) => {
       if (stopped) return;
       // A player unlocked by the Play tap (phones block audio started later).
