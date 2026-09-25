@@ -1,4 +1,5 @@
 import { skillsFor, skillsForTask, type SkillId } from "@/src/server/ai/skills";
+import { CLOUD_TTS_CHUNK_CHARS, cloudTtsChunk, isCloudTtsConfigured, isVertexConfigured, vertexOptions } from "@/src/server/ai/google-cloud";
 import { GoogleGenAI } from "@google/genai";
 import { normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPlan } from "@/src/lib/channel/plan";
 import { stripMarkdown } from "@/src/lib/text/markdown";
@@ -66,12 +67,12 @@ export interface GeminiModels {
 
 /** Presence check without leaking values. */
 export function isGeminiConfigured(env = getServerEnv()): boolean {
-  return Boolean(env.GEMINI_API_KEY);
+  return Boolean(env.GEMINI_API_KEY) || isVertexConfigured(env);
 }
 
 /** Text features work with Gemini, Mistral, NVIDIA, or any mix. */
 export function isTextConfigured(env = getServerEnv()): boolean {
-  return Boolean(env.GEMINI_API_KEY) || isMistralConfigured(env) || isNvidiaConfigured(env);
+  return isGeminiConfigured(env) || isMistralConfigured(env) || isNvidiaConfigured(env);
 }
 
 /** Resolved model names (env overrides, safe defaults). */
@@ -86,6 +87,9 @@ export function getGeminiModels(env = getServerEnv()): GeminiModels {
 
 /** Lazy SDK client. Throws the gateway boundary error when unconfigured. */
 export function getGeminiClient(env = getServerEnv()): GoogleGenAI {
+  // Production: Gemini on Vertex AI (Cloud billing, higher limits) when a
+  // service account is set; otherwise the Gemini API key.
+  if (isVertexConfigured(env)) return new GoogleGenAI(vertexOptions(env));
   if (!env.GEMINI_API_KEY) {
     throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   }
@@ -102,7 +106,8 @@ const FALLBACK_MODELS = {
   // fast when Pro is overloaded or slow. Missing models are skipped fast.
   text: ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-pro", "gemini-2.5-flash"],
   image: ["gemini-3.1-flash-image", "gemini-3-pro-image-preview", "gemini-2.5-flash-image"],
-  tts: ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"],
+  // Preview names on the Gemini API; GA names on Vertex AI.
+  tts: ["gemini-2.5-flash-preview-tts", "gemini-2.5-flash-tts", "gemini-2.5-pro-preview-tts", "gemini-2.5-pro-tts"],
 } as const;
 
 function errorText(error: unknown): string {
@@ -214,7 +219,7 @@ export class GeminiTextProvider implements TextProvider {
     const env = getServerEnv();
     const hasBackup = backupTextProviders(env).length > 0;
     // No Gemini key: use the other providers directly.
-    if (!env.GEMINI_API_KEY && hasBackup) {
+    if (!isGeminiConfigured(env) && hasBackup) {
       try {
         return await backupText({ ...request, prompt }, env);
       } catch (error) {
@@ -305,7 +310,7 @@ export class GeminiImageProvider implements ImageProvider {
     const aspect = request.aspectRatio === "9:16" || request.aspectRatio === "1:1" ? request.aspectRatio : "16:9";
     const backups = isNvidiaImageConfigured(env) || isArkConfigured(env);
     // No Gemini key: the backup image models directly.
-    if (!env.GEMINI_API_KEY && backups) {
+    if (!isGeminiConfigured(env) && backups) {
       try {
         return { url: await backupImage(prompt, aspect), prompt: request.prompt };
       } catch (error) {
@@ -492,24 +497,37 @@ export class GeminiTtsProvider implements TtsProvider {
     const voice = request.voice?.trim() || env.GEMINI_TTS_VOICE || DEFAULT_TTS_VOICE;
     const chunks = splitForSpeech(text);
     const mistral = isMistralConfigured(env);
+    const cloudTts = isCloudTtsConfigured(env);
     // One provider per take, so the voice never changes mid-narration.
     // Voxtral stops early on long inputs: shorter pieces, each checked.
     const viaMistral = async () => ({
       parts: (await mapLimit(splitForSpeech(text, VOXTRAL_CHUNK_CHARS), 3, (chunk) => completeSpeech(chunk, (t) => mistralSpeechChunk(t)))).flat(),
       model: "voxtral-mini-tts",
     });
+    // Google Cloud Text-to-Speech: its own quota, studio voices. A Gemini voice
+    // name ("Kore") isn't a Cloud voice, so the configured Cloud voice is used.
+    const viaCloud = async () => ({
+      parts: await mapLimit(splitForSpeech(text, CLOUD_TTS_CHUNK_CHARS), 4, (chunk) => cloudTtsChunk(chunk, request.voice?.includes("-") ? request.voice : undefined)),
+      model: "google-cloud-tts",
+    });
+    const routes: { name: string; run: () => Promise<{ parts: { pcm: Buffer; rate: number }[]; model: string }> }[] = [];
+    if (isGeminiConfigured(env)) routes.push({ name: "gemini", run: async () => ({ parts: (await mapLimit(chunks, 4, (chunk) => completeSpeech(chunk, (t) => this.synthesizeChunk(t, voice, model)))).flat(), model }) });
+    if (cloudTts) routes.push({ name: "cloud-tts", run: viaCloud });
+    if (mistral) routes.push({ name: "voxtral", run: viaMistral });
     try {
-      let result: { parts: { pcm: Buffer; rate: number }[]; model: string };
-      if (!env.GEMINI_API_KEY && mistral) result = await viaMistral();
-      else {
+      if (!routes.length) throw new ProviderNotConfiguredError("tts", "Voice generation is not configured.");
+      let result: { parts: { pcm: Buffer; rate: number }[]; model: string } | null = null;
+      let lastError: unknown = null;
+      for (const route of routes) {
         try {
-          result = { parts: (await mapLimit(chunks, 4, (chunk) => completeSpeech(chunk, (t) => this.synthesizeChunk(t, voice, model)))).flat(), model };
+          result = await route.run();
+          break;
         } catch (error) {
-          if (!mistral || (error instanceof ProviderNotConfiguredError && !mistral)) throw error;
-          console.error("[gemini] speech failed, using Voxtral:", error instanceof Error ? error.message.slice(0, 200) : error);
-          result = await viaMistral();
+          lastError = error;
+          console.error(`[speech] ${route.name} failed${route === routes[routes.length - 1] ? "" : ", trying the next voice service"}:`, error instanceof Error ? error.message.slice(0, 200) : error);
         }
       }
+      if (!result) throw lastError ?? new Error("no voice service answered");
       const parts = result.parts;
       const rate = parts[0].rate;
       const pause = Buffer.alloc(Math.round(rate * 0.25) * 2); // 250 ms of silence between chunks

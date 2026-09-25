@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { safeEqual } from "@/src/server/crypto";
+import { cloudTtsChunk, isCloudTtsConfigured, isVertexConfigured } from "@/src/server/ai/google-cloud";
 import { getServerEnv } from "@/src/lib/env";
 import { chatGenerateText, type ChatProvider } from "@/src/server/ai/chat-compat";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
-import { getGeminiClient, GeminiTextProvider, GeminiTtsProvider } from "@/src/server/ai/gemini";
+import { getGeminiClient, GeminiTextProvider, GeminiTtsProvider, isGeminiConfigured } from "@/src/server/ai/gemini";
 import { NVIDIA_TEXT_MODELS } from "@/src/server/ai/nvidia";
 import { MISTRAL_TEXT_MODELS } from "@/src/server/ai/mistral";
 import { NVIDIA_IMAGE_MODELS, nvidiaImageWith } from "@/src/server/ai/nvidia-image";
@@ -91,7 +92,7 @@ async function run() {
   const mistralJobs: (() => Promise<Check>)[] = [];
   const catalogs: Record<string, string[]> = {};
 
-  if (env.GEMINI_API_KEY) {
+  if (isGeminiConfigured(env)) {
     for (const model of ["gemini-pro-latest", "gemini-3.6-flash", "gemini-flash-latest"]) {
       jobs.push(() =>
         timed("gemini", model, "text", async () => {
@@ -208,13 +209,21 @@ async function run() {
       }),
   ];
   // Mistral's free tier allows about one request per second: run its checks one at a time.
+  if (isCloudTtsConfigured(env)) {
+    jobs.push(() =>
+      timed("google-cloud", "text-to-speech", "tts", async () => {
+        const out = await cloudTtsChunk("This is a short voice test for your channel.");
+        if (out.pcm.length < 4800) throw new Error("audio too short");
+      }),
+    );
+  }
   const [checks, mistralChecks, appChecks, arkChecks] = await Promise.all([pool(jobs, 4), pool(mistralJobs, 1), pool(appJobs, 1), pool(arkJobs, 3)]);
   checks.push(...mistralChecks, ...appChecks, ...arkChecks);
   // Catalog excerpts help pick replacements; chat-capable families only.
   const pick = (ids: string[]) => ids.filter((id) => /instruct|chat|large|medium|small|nemotron|llama|qwen|deepseek|kimi|glm|gemma|mistral|magistral|ministral|gpt-oss|seed|doubao|skylark|wan/i.test(id)).slice(0, 150);
   return {
     ranAt: new Date().toISOString(),
-    configured: { gemini: Boolean(env.GEMINI_API_KEY), mistral: Boolean(env.MISTRAL_API_KEY), nvidia: Boolean(env.NVIDIA_API_KEY), byteplus: Boolean(env.ARK_API_KEY) },
+    configured: { gemini: Boolean(env.GEMINI_API_KEY), vertex: isVertexConfigured(env), cloudTts: isCloudTtsConfigured(env), mistral: Boolean(env.MISTRAL_API_KEY), nvidia: Boolean(env.NVIDIA_API_KEY), byteplus: Boolean(env.ARK_API_KEY) },
     summary: { passed: checks.filter((c) => c.ok).length, failed: checks.filter((c) => !c.ok).length },
     checks,
     catalogs: Object.fromEntries(Object.entries(catalogs).map(([k, v]) => [k, pick(v)])),

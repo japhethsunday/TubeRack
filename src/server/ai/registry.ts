@@ -1,5 +1,6 @@
 import { getServerEnv } from "@/src/lib/env";
 import { isGeminiConfigured, getGeminiModels } from "@/src/server/ai/gemini";
+import { isCloudTtsConfigured, isVertexConfigured } from "@/src/server/ai/google-cloud";
 import { isYouTubeConfigured } from "@/src/server/youtube/client";
 
 /**
@@ -32,7 +33,17 @@ export function describeProviders(): ProviderDescriptor[] {
       local: false,
       gpuRequired: false,
       configured: isGeminiConfigured(env),
-      detail: isGeminiConfigured(env) ? "GEMINI_API_KEY is set." : "Set GEMINI_API_KEY to enable.",
+      detail: isVertexConfigured(env) ? "Running on Vertex AI (Google Cloud)." : isGeminiConfigured(env) ? "GEMINI_API_KEY is set." : "Set GEMINI_API_KEY, or a Google Cloud service account for Vertex AI.",
+    },
+    {
+      provider: "google-cloud-tts",
+      type: "cloud",
+      capabilities: ["tts"],
+      models: [env.GOOGLE_TTS_VOICE || "en-US-Chirp3-HD-Charon"],
+      local: false,
+      gpuRequired: false,
+      configured: isCloudTtsConfigured(env),
+      detail: isCloudTtsConfigured(env) ? "Cloud Text-to-Speech is set." : "Set GOOGLE_TTS_API_KEY or GOOGLE_SERVICE_ACCOUNT_KEY to enable.",
     },
     {
       provider: "mistral",

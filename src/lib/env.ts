@@ -68,6 +68,18 @@ const serverSchema = z.object({
   NVIDIA_API_KEY: z.string().optional(),
   /** Jamendo developer client ID (free at devportal.jamendo.com) for the background music library. */
   JAMENDO_CLIENT_ID: z.string().optional(),
+  /**
+   * Google Cloud (production AI). A service-account key (JSON, raw or base64)
+   * for a project with Vertex AI and/or Cloud Text-to-Speech enabled.
+   * When set with GOOGLE_CLOUD_PROJECT, Gemini runs on Vertex AI (Cloud
+   * billing, higher limits) instead of the free API key.
+   */
+  GOOGLE_CLOUD_PROJECT: z.string().optional(),
+  GOOGLE_CLOUD_LOCATION: z.string().optional(),
+  GOOGLE_SERVICE_ACCOUNT_KEY: z.string().optional(),
+  /** Cloud Text-to-Speech: an API key (or the service account above) and an optional voice name. */
+  GOOGLE_TTS_API_KEY: z.string().optional(),
+  GOOGLE_TTS_VOICE: z.string().optional(),
   /** Pixabay API key (free at pixabay.com/api/docs) for stock videos and photos. */
   PIXABAY_API_KEY: z.string().optional(),
   // Optional comma-separated override of the NVIDIA model order
