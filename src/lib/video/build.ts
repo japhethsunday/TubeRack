@@ -1,3 +1,4 @@
+import { sceneSpeech } from "@/src/lib/script/engine";
 import type {
   ClipKind,
   Composition,
@@ -210,7 +211,7 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
         },
       });
     }
-    const narration = scene?.narration?.trim() || scene?.scriptText?.trim() || "";
+    const narration = scene ? sceneSpeech(scene) : "";
     for (const cap of captionsFromNarration(narration, seg.startSec, seg.durationSec)) {
       clips.push({ ...cap, sceneId: seg.sceneId });
     }
@@ -276,7 +277,7 @@ export function validateComposition(comp: Composition, scenes: Scene[], assets: 
       });
     }
     const scene = scenes.find((s) => s.id === seg.sceneId);
-    const narrationWords = (scene?.narration || scene?.scriptText || "").trim().split(/\s+/).filter(Boolean).length;
+    const narrationWords = (scene ? sceneSpeech(scene) : "").split(/\s+/).filter(Boolean).length;
     const voiceClip = sceneClips.find((c) => c.kind === "voice");
     if (narrationWords > 20 && !voiceClip) {
       issues.push({

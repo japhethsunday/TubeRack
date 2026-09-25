@@ -1,5 +1,6 @@
 "use client";
 
+import { sceneSpeech } from "@/src/lib/script/engine";
 import { useProductionContext } from "@/src/components/projects/useProductionContext";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -136,7 +137,7 @@ export function GenerateVideoDialog({
       let voiced = 0;
       const voiceErrors: string[] = [];
       await pool(scenes, 2, isCancelled, async (scene) => {
-        const out = await synthesizeProviderSpeech(scene.narration);
+        const out = await synthesizeProviderSpeech(sceneSpeech(scene));
         if (!out.ok) {
           voiceErrors.push(out.message);
         } else {

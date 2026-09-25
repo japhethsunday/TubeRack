@@ -1,5 +1,6 @@
 "use client";
 
+import { sceneSpeech } from "@/src/lib/script/engine";
 import { ArrowUp, ArrowDown, Trash2, RefreshCw, Clapperboard } from "lucide-react";
 import type { Scene, ShotType } from "@/src/lib/script/types";
 import { formatDuration } from "@/src/lib/script/measure";
@@ -70,8 +71,8 @@ export function SceneCard({
         />
         <Textarea
           label="Narration"
-          rows={3}
-          value={scene.narration}
+          rows={4}
+          value={sceneSpeech(scene)}
           onChange={(e) => onPatch({ narration: e.target.value })}
           placeholder="Voiceover for this scene…"
         />

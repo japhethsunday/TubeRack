@@ -30,3 +30,12 @@ test("a long background song doesn't make the video longer than its content", ()
   assert.equal(durationOf([v, m]), 180);
   assert.equal(durationOf([m]), 7178);
 });
+
+import { sceneSpeech } from "@/src/lib/script/engine";
+
+test("voice uses the full script when narration was a cut-off copy", () => {
+  const full = "word ".repeat(120).trim();
+  assert.equal(sceneSpeech({ narration: full.slice(0, 280), scriptText: full }), full);
+  assert.equal(sceneSpeech({ narration: "My own narration.", scriptText: full }), "My own narration.");
+  assert.equal(sceneSpeech({ narration: "", scriptText: full }), full);
+});

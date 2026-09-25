@@ -1,5 +1,6 @@
 "use client";
 
+import { sceneSpeech } from "@/src/lib/script/engine";
 import { BLUR_BACKGROUND } from "@/src/lib/video/compositor";
 import { isChunked } from "@/src/lib/media/chunked";
 import { sanitizeSvg } from "@/src/lib/security/svg";
@@ -402,7 +403,7 @@ function Studio() {
     for (const seg of segments) {
       if (existing.has(seg.sceneId)) continue;
       const scene = scenes.find((s) => s.id === seg.sceneId);
-      const narration = scene?.narration?.trim() || scene?.scriptText?.trim() || "";
+      const narration = scene ? sceneSpeech(scene) : "";
       if (!narration) continue;
       for (const cap of captionsFromNarration(narration, seg.startSec, seg.durationSec)) {
         fresh.push({ ...cap, sceneId: seg.sceneId });

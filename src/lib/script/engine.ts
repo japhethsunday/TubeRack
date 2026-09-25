@@ -248,7 +248,7 @@ export function scenesFromSections(sections: ScriptSection[], wpm: number, at?: 
     scriptText: s.text,
     durationSec: estimateSeconds(Math.max(1, countWords(s.text)), wpm),
     visual: "",
-    narration: s.text.slice(0, 280),
+    narration: s.text,
     onScreenText: "",
     transition: "",
     shot: "",
@@ -302,4 +302,18 @@ export function markSceneSynced(scene: Scene, sections: ScriptSection[], at?: st
 
 function structuredClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/**
+ * The words spoken over a scene. Storyboards made before this fix stored only
+ * the first 280 characters of the script as narration, so the voice-over
+ * came out far shorter than the video: a cut-off copy of the script falls
+ * back to the full script text. Narration the creator wrote themselves is used as is.
+ */
+export function sceneSpeech(scene: { narration?: string; scriptText?: string }): string {
+  const narration = (scene.narration ?? "").trim();
+  const script = (scene.scriptText ?? "").trim();
+  if (!narration) return script;
+  if (script.length > narration.length && script.startsWith(narration)) return script;
+  return narration;
 }

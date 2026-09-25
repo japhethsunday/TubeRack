@@ -1,5 +1,6 @@
 "use client";
 
+import { sceneSpeech } from "@/src/lib/script/engine";
 import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -139,7 +140,7 @@ function Studio() {
   const voiceSources = [
     ...(fullScript ? [{ id: "full", label: "Full script", text: fullScript }] : []),
     ...(script?.sections.map((s) => ({ id: `sec-${s.id}`, label: `Script: ${s.heading}`, text: s.text })) ?? []),
-    ...scenes.map((s) => ({ id: `scn-${s.id}`, label: `Scene ${s.number}: ${s.title}`, text: s.narration || s.scriptText })),
+    ...scenes.map((s) => ({ id: `scn-${s.id}`, label: `Scene ${s.number}: ${s.title}`, text: sceneSpeech(s) })),
   ];
 
   function jump(toTab: string, sceneId: string) {
