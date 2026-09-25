@@ -253,7 +253,6 @@ body {
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
-html { scroll-behavior: smooth; }
 body { transition: background-color 300ms var(--ease-out), color 300ms var(--ease-out); }
 
 /* Smooth state changes on every interactive element. */
@@ -318,3 +317,6 @@ a[class*="rounded-2xl"][class*="border"]:hover {
   box-shadow: 0 12px 36px -14px rgba(139, 92, 246, 0.45);
   border-color: rgba(196, 181, 253, 0.3);
 }
+
+/* Long lists: the browser skips drawing items that are off-screen. */
+.cv-auto { content-visibility: auto; contain-intrinsic-size: auto 320px; }

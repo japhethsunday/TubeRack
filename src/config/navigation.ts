@@ -1,4 +1,5 @@
 import {
+  Wand2,
   HardDrive,
   Lightbulb,
   LayoutDashboard,
@@ -153,6 +154,15 @@ export const NAV_SECTIONS: NavSection[] = [
         status: "live",
         phase: "Phase 13",
         blurb: "Video ideas from your channel and your niche's winners.",
+      },
+      {
+        slug: "video-recreator",
+        label: "Video Recreator",
+        href: "/video-recreator",
+        icon: Wand2,
+        status: "live",
+        phase: "Phase 13",
+        blurb: "Find your niche's breakout videos and make a better, original one.",
       },
       {
         slug: "niche",

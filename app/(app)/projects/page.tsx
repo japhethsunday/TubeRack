@@ -19,6 +19,8 @@ import { Badge } from "@/src/components/ui/Badge";
 import { cx } from "@/src/components/ui/cx";
 
 /** Project index: search, filter, sort, grid/list, archive, import/export. */
+const PAGE_SIZE = 24;
+
 export default function ProjectsPage() {
   const {
     ready,
@@ -45,10 +47,19 @@ export default function ProjectsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
-  const shown = useMemo(
+  const matching = useMemo(
     () => sortProjects(filterProjects(projects, query, filter, channelId), sort),
     [projects, query, filter, channelId, sort],
   );
+  // Draw a page at a time: hundreds of cards at once made scrolling heavy.
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [limitKey, setLimitKey] = useState("");
+  const filterKey = `${query}|${filter}|${channelId}|${sort}`;
+  if (limitKey !== filterKey) {
+    setLimitKey(filterKey);
+    setLimit(PAGE_SIZE);
+  }
+  const shown = matching.slice(0, limit);
 
   if (!ready) {
     return (
@@ -154,7 +165,7 @@ export default function ProjectsPage() {
               className={cx(view === "grid" ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3" : "space-y-3")}
             >
               {shown.map((p) => (
-                <li key={p.id}>
+                <li key={p.id} className="cv-auto">
                   {view === "grid" ? (
                     <ProjectCard
                       project={p}
@@ -188,10 +199,20 @@ export default function ProjectsPage() {
               ))}
             </ul>
           )}
+          {matching.length > shown.length && (
+            <div className="flex flex-col items-center gap-1">
+              <Button variant="outline" onClick={() => setLimit((n) => n + PAGE_SIZE)}>
+                Show more projects
+              </Button>
+              <span className="text-xs text-muted-text">
+                Showing {shown.length} of {matching.length}
+              </span>
+            </div>
+          )}
           {filter === "archived" && (
             <p className="flex items-center gap-2 text-xs text-muted-text">
               Archived projects are read-only history until restored.
-              <Badge tone="neutral">{shown.length} archived</Badge>
+              <Badge tone="neutral">{matching.length} archived</Badge>
             </p>
           )}
         </>

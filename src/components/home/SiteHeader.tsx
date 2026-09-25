@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  Wand2,
   BarChart3, ChevronDown, Clapperboard, CircleDollarSign, Compass, FileText, Film, FlaskConical,
   ImageIcon, LayoutPanelTop, Lightbulb, Menu, Package, Radar, Rocket, Search, X,
 } from "lucide-react";
@@ -16,6 +17,7 @@ const MENUS: { label: string; links: NavLink[] }[] = [
     links: [
       { href: "/channel-creator", label: "Channel Creator", body: "A full channel plan with 30 video ideas.", icon: Rocket },
       { href: "/content-creator", label: "Content Creator", body: "Ideas built on your channel and your niche's winners.", icon: Lightbulb },
+      { href: "/video-recreator", label: "Video Recreator", body: "Recreate your niche's breakout videos, better and original.", icon: Wand2 },
       { href: "/studio/script", label: "Script Studio", body: "Write and rewrite scripts section by section.", icon: FileText },
       { href: "/studio/storyboard", label: "Storyboard", body: "Plan every shot before you record.", icon: LayoutPanelTop },
       { href: "/studio/media", label: "Media Studio", body: "Images, voice-over and music for each scene.", icon: ImageIcon },
