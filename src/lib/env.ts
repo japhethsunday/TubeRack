@@ -74,6 +74,14 @@ const serverSchema = z.object({
   // Optional overrides
   MISTRAL_TEXT_MODELS: z.string().optional(),
   MISTRAL_TTS_VOICE: z.string().optional(),
+
+  // BytePlus ModelArk (ai.byteplus.com/ark): Seed text, Seedream images, Seedance video
+  ARK_API_KEY: z.string().optional(),
+  ARK_BASE_URL: z.string().optional(),
+  // Optional comma-separated model (or endpoint "ep-…") overrides
+  ARK_TEXT_MODELS: z.string().optional(),
+  ARK_IMAGE_MODELS: z.string().optional(),
+  ARK_VIDEO_MODELS: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;

@@ -7,6 +7,7 @@ import { NVIDIA_TEXT_MODELS } from "@/src/server/ai/nvidia";
 import { MISTRAL_TEXT_MODELS } from "@/src/server/ai/mistral";
 import { NVIDIA_IMAGE_MODELS, nvidiaImageWith } from "@/src/server/ai/nvidia-image";
 import { GeminiImageProvider } from "@/src/server/ai/gemini";
+import { arkGenerateImage, arkGenerateText, arkImageModels, arkListModels, arkStartVideo, arkTextModels, arkVideoModels, arkVideoStatus } from "@/src/server/ai/ark";
 import { mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
 
 export const maxDuration = 300;
@@ -133,6 +134,46 @@ async function run() {
     jobs.push(...textChecks({ name: "NVIDIA", baseUrl: "https://integrate.api.nvidia.com/v1", key: env.NVIDIA_API_KEY }, "nvidia", wanted.filter((m) => live.has(m))));
   }
 
+  const arkJobs: (() => Promise<Check>)[] = [];
+  if (env.ARK_API_KEY) {
+    const listed = await arkListModels();
+    if (listed) catalogs.byteplus = listed;
+    for (const model of arkTextModels(env)) {
+      arkJobs.push(() =>
+        timed("byteplus", model, "text", async () => {
+          const out = await arkGenerateText({ prompt: "Write one short sentence about YouTube thumbnails.", maxTokens: 150 }, { budgetMs: 60_000, attemptMs: 55_000 }, [model]);
+          if (out.text.length < 10) throw new Error("reply too short");
+        }),
+      );
+    }
+    for (const model of arkImageModels(env)) {
+      arkJobs.push(() =>
+        timed("byteplus", model, "image", async () => {
+          const out = await arkGenerateImage("A bright studio desk with a camera and a laptop, photo", "16:9", [model]);
+          if (out.dataUrl.length < 5_000) throw new Error("image too small");
+        }),
+      );
+    }
+    for (const model of arkVideoModels(env)) {
+      arkJobs.push(() =>
+        timed("byteplus", model, "video (5s clip)", async () => {
+          const id = await arkStartVideo("A slow camera push-in on a coffee cup on a wooden desk, morning light", { model, aspect: "16:9", seconds: 5 });
+          const until = Date.now() + 170_000;
+          while (Date.now() < until) {
+            await new Promise((r) => setTimeout(r, 8_000));
+            const st = await arkVideoStatus(id);
+            if (st.status === "succeeded") {
+              if (!st.videoUrl) throw new Error("finished without a video link");
+              return;
+            }
+            if (st.status === "failed" || st.status === "cancelled") throw new Error(st.error || st.status);
+          }
+          throw new Error("still rendering after ~3 minutes");
+        }),
+      );
+    }
+  }
+
   // The app's real paths, with every fallback in play.
   const appJobs: (() => Promise<Check>)[] = [
     () =>
@@ -158,13 +199,13 @@ async function run() {
       }),
   ];
   // Mistral's free tier allows about one request per second: run its checks one at a time.
-  const [checks, mistralChecks, appChecks] = await Promise.all([pool(jobs, 4), pool(mistralJobs, 1), pool(appJobs, 1)]);
-  checks.push(...mistralChecks, ...appChecks);
+  const [checks, mistralChecks, appChecks, arkChecks] = await Promise.all([pool(jobs, 4), pool(mistralJobs, 1), pool(appJobs, 1), pool(arkJobs, 3)]);
+  checks.push(...mistralChecks, ...appChecks, ...arkChecks);
   // Catalog excerpts help pick replacements; chat-capable families only.
-  const pick = (ids: string[]) => ids.filter((id) => /instruct|chat|large|medium|small|nemotron|llama|qwen|deepseek|kimi|glm|gemma|mistral|magistral|ministral|gpt-oss/i.test(id)).slice(0, 150);
+  const pick = (ids: string[]) => ids.filter((id) => /instruct|chat|large|medium|small|nemotron|llama|qwen|deepseek|kimi|glm|gemma|mistral|magistral|ministral|gpt-oss|seed|doubao|skylark|wan/i.test(id)).slice(0, 150);
   return {
     ranAt: new Date().toISOString(),
-    configured: { gemini: Boolean(env.GEMINI_API_KEY), mistral: Boolean(env.MISTRAL_API_KEY), nvidia: Boolean(env.NVIDIA_API_KEY) },
+    configured: { gemini: Boolean(env.GEMINI_API_KEY), mistral: Boolean(env.MISTRAL_API_KEY), nvidia: Boolean(env.NVIDIA_API_KEY), byteplus: Boolean(env.ARK_API_KEY) },
     summary: { passed: checks.filter((c) => c.ok).length, failed: checks.filter((c) => !c.ok).length },
     checks,
     catalogs: Object.fromEntries(Object.entries(catalogs).map(([k, v]) => [k, pick(v)])),
