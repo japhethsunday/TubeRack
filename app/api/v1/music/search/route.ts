@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/src/server/auth";
 import { limiterFor } from "@/src/server/rate-limit";
 import { rateLimited, toErrorResponse, validationError, BackendError } from "@/src/server/errors";
-import { MUSIC_MOODS, searchLibraryMusic, type MusicMoodId } from "@/src/server/music/library";
+import { isMusicLibraryConfigured, MUSIC_MOODS, searchLibraryMusic, type MusicMoodId } from "@/src/server/music/library";
 
 /** GET /api/v1/music/search?mood=piano&page=1 — royalty-free, commercial-use instrumental tracks. */
 export async function GET(request: Request) {
@@ -20,7 +20,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ data: { tracks } });
     } catch (error) {
       console.error("[music] search failed:", error instanceof Error ? error.message : error);
-      throw new BackendError("BACKEND_UNAVAILABLE", "The music library is busy right now. Please try again in a minute.");
+      throw new BackendError(
+        "BACKEND_UNAVAILABLE",
+        isMusicLibraryConfigured() ? "The music library is busy right now. Please try again in a minute." : "The music library isn't connected yet.",
+      );
     }
   } catch (error) {
     return toErrorResponse(error);

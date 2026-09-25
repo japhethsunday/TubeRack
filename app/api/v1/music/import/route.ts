@@ -7,7 +7,7 @@ import { downloadTrack, libraryTrack } from "@/src/server/music/library";
 
 export const maxDuration = 120;
 
-const body = z.object({ id: z.string().regex(/^[0-9a-f-]{36}$/i, "Unknown track.") });
+const body = z.object({ id: z.string().regex(/^(?:[0-9a-f-]{36}|jm-\d{1,12})$/i, "Unknown track.") });
 
 /**
  * POST /api/v1/music/import — copy a library track into the workspace's

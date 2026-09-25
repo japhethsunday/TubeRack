@@ -17,3 +17,18 @@ test("drops vocal tracks, non-commercial licenses and unsupported formats", () =
   assert.equal(toTrack({ ...base, license: "by-nc" }), null);
   assert.equal(toTrack({ ...base, filetype: "flac", url: "https://cdn.example/t.flac" }), null);
 });
+
+import { jamendoTrack, licenseFromUrl } from "@/src/server/music/library";
+
+test("Jamendo licenses: commercial-use only", () => {
+  assert.equal(licenseFromUrl("http://creativecommons.org/licenses/by-sa/3.0/"), "CC BY-SA 3.0");
+  assert.equal(licenseFromUrl("http://creativecommons.org/licenses/by-nc-sa/3.0/"), null);
+  assert.equal(licenseFromUrl("http://creativecommons.org/licenses/by-nd/4.0/"), null);
+});
+
+test("Jamendo track maps with credit and download", () => {
+  const t = jamendoTrack({ id: "123", name: "Rise Up", artist_name: "Kai", duration: 150, audio: "https://a/stream.mp3", audiodownload: "https://a/dl.mp3", license_ccurl: "http://creativecommons.org/licenses/by/3.0/" })!;
+  assert.equal(t.id, "jm-123");
+  assert.match(t.attribution, /Rise Up.*Kai.*CC BY 3.0/);
+  assert.equal(jamendoTrack({ id: "1", name: "x", audio: "https://a", license_ccurl: "http://creativecommons.org/licenses/by-nc/3.0/" }), null);
+});

@@ -1,3 +1,5 @@
+import { getServerEnv } from "@/src/lib/env";
+
 /**
  * Royalty-free background music from Openverse (Jamendo, ccMixter, Freesound
  * and other open libraries). Only tracks licensed for commercial use are
@@ -8,14 +10,14 @@ const API = "https://api.openverse.org/v1/audio/";
 const UA = "TubeRack/1.0 (background music search)";
 
 export const MUSIC_MOODS = {
-  piano: { label: "Piano", query: "piano instrumental" },
-  keyboard: { label: "Keyboard", query: "keyboard synth instrumental" },
-  motivational: { label: "Motivational", query: "motivational instrumental" },
-  inspirational: { label: "Inspirational", query: "inspirational instrumental" },
-  cinematic: { label: "Cinematic", query: "cinematic instrumental" },
-  lofi: { label: "Lo-fi", query: "lofi chill instrumental" },
-  ambient: { label: "Ambient", query: "ambient background" },
-  corporate: { label: "Upbeat", query: "upbeat corporate background" },
+  piano: { label: "Piano", query: "piano instrumental", tags: "piano" },
+  keyboard: { label: "Keyboard", query: "keyboard synth instrumental", tags: "synthesizer electronic" },
+  motivational: { label: "Motivational", query: "motivational instrumental", tags: "motivational energetic" },
+  inspirational: { label: "Inspirational", query: "inspirational instrumental", tags: "inspiring uplifting" },
+  cinematic: { label: "Cinematic", query: "cinematic instrumental", tags: "soundtrack epic" },
+  lofi: { label: "Lo-fi", query: "lofi chill instrumental", tags: "lofi chillout" },
+  ambient: { label: "Ambient", query: "ambient background", tags: "ambient" },
+  corporate: { label: "Upbeat", query: "upbeat corporate background", tags: "corporate pop" },
 } as const;
 export type MusicMoodId = keyof typeof MUSIC_MOODS;
 
@@ -88,7 +90,103 @@ async function get(url: string): Promise<unknown> {
   return res.json();
 }
 
+// ---- Jamendo (primary when a client ID is set): instrumental filter, CC licenses. ----
+const JAMENDO = "https://api.jamendo.com/v3.0/tracks/";
+
+type JamendoRaw = {
+  id?: string;
+  name?: string;
+  artist_name?: string;
+  duration?: number;
+  audio?: string;
+  audiodownload?: string;
+  audiodownload_allowed?: boolean;
+  license_ccurl?: string;
+  shareurl?: string;
+};
+
+/** "https://creativecommons.org/licenses/by-sa/3.0/" → "CC BY-SA 3.0" (null for anything non-commercial or no-derivatives). */
+export function licenseFromUrl(url: string): string | null {
+  const m = /licenses\/([a-z-]+)\/([\d.]+)/i.exec(url);
+  if (!m) return /publicdomain\/zero/i.test(url) ? "CC0" : null;
+  const kind = m[1].toLowerCase();
+  if (/nc|nd/.test(kind)) return null;
+  return `CC ${kind.toUpperCase()} ${m[2]}`;
+}
+
+export function jamendoTrack(r: JamendoRaw): LibraryTrack | null {
+  const file = r.audiodownload_allowed !== false && r.audiodownload ? r.audiodownload : r.audio;
+  if (!r.id || !file || !r.license_ccurl) return null;
+  const license = licenseFromUrl(r.license_ccurl);
+  if (!license) return null;
+  const title = (r.name || "Untitled").trim();
+  if (VOCAL.test(title)) return null;
+  const creator = (r.artist_name || "Unknown artist").trim();
+  return {
+    id: `jm-${r.id}`,
+    title,
+    creator,
+    source: "jamendo",
+    license,
+    licenseUrl: r.license_ccurl,
+    attribution: `"${title}" by ${creator} (Jamendo), ${license} — ${r.license_ccurl}`,
+    durationSec: typeof r.duration === "number" && r.duration > 0 ? Math.round(r.duration) : null,
+    previewUrl: r.audio || file,
+    fileType: "mp3",
+  };
+}
+
+/** The file to store for a Jamendo track (full download when the artist allows it). */
+const jamendoFiles = new Map<string, string>();
+
+async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, extra: string): Promise<LibraryTrack[]> {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    format: "json",
+    limit: "40",
+    offset: String((Math.max(1, Math.min(20, page)) - 1) * 40),
+    vocalinstrumental: "instrumental",
+    fuzzytags: MUSIC_MOODS[mood].tags.replace(/ /g, "+"),
+    audioformat: "mp32",
+    order: "popularity_total",
+    durationbetween: "45_900",
+    ccnc: "false",
+    ccnd: "false",
+  });
+  if (extra) params.set("search", extra);
+  const body = (await get(`${JAMENDO}?${params}`)) as { headers?: { status?: string; error_message?: string }; results?: JamendoRaw[] };
+  if (body.headers?.status && body.headers.status !== "success") throw new Error(`Music library: ${body.headers.error_message ?? body.headers.status}`);
+  const out: LibraryTrack[] = [];
+  for (const r of body.results ?? []) {
+    const t = jamendoTrack(r);
+    if (!t) continue;
+    if (r.audiodownload_allowed !== false && r.audiodownload) jamendoFiles.set(t.id, r.audiodownload);
+    out.push(t);
+  }
+  return out.slice(0, 24);
+}
+
+async function jamendoOne(clientId: string, id: string): Promise<LibraryTrack> {
+  const params = new URLSearchParams({ client_id: clientId, format: "json", id: id.slice(3), audioformat: "mp32" });
+  const body = (await get(`${JAMENDO}?${params}`)) as { results?: JamendoRaw[] };
+  const raw = body.results?.[0];
+  const t = raw ? jamendoTrack(raw) : null;
+  if (!t || !raw) throw new Error("This track can't be used (license or format).");
+  if (raw.audiodownload_allowed !== false && raw.audiodownload) jamendoFiles.set(t.id, raw.audiodownload);
+  return t;
+}
+
+export function isMusicLibraryConfigured(): boolean {
+  return Boolean(getServerEnv().JAMENDO_CLIENT_ID);
+}
+
 export async function searchLibraryMusic(mood: MusicMoodId, page = 1, extra = ""): Promise<LibraryTrack[]> {
+  const clientId = getServerEnv().JAMENDO_CLIENT_ID;
+  if (clientId) return jamendoSearch(clientId, mood, page, extra);
+  return openverseSearch(mood, page, extra);
+}
+
+async function openverseSearch(mood: MusicMoodId, page = 1, extra = ""): Promise<LibraryTrack[]> {
   const q = `${MUSIC_MOODS[mood].query} ${extra}`.trim();
   const params = new URLSearchParams({
     q,
@@ -105,6 +203,11 @@ export async function searchLibraryMusic(mood: MusicMoodId, page = 1, extra = ""
 }
 
 export async function libraryTrack(id: string): Promise<LibraryTrack> {
+  if (/^jm-\d+$/.test(id)) {
+    const clientId = getServerEnv().JAMENDO_CLIENT_ID;
+    if (!clientId) throw new Error("Unknown track");
+    return jamendoOne(clientId, id);
+  }
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Unknown track");
   const track = toTrack((await get(`${API}${id}/`)) as Raw);
   if (!track) throw new Error("This track can't be used (license or format).");
@@ -113,7 +216,7 @@ export async function libraryTrack(id: string): Promise<LibraryTrack> {
 
 /** Download the track's audio (size-capped) so it can be stored with the project. */
 export async function downloadTrack(track: LibraryTrack, maxBytes = 25 * 1024 * 1024): Promise<{ bytes: Uint8Array; mime: string; ext: "mp3" | "wav" }> {
-  const res = await fetch(track.previewUrl, { headers: { "User-Agent": UA }, redirect: "follow", signal: AbortSignal.timeout(60_000) });
+  const res = await fetch(jamendoFiles.get(track.id) ?? track.previewUrl, { headers: { "User-Agent": UA }, redirect: "follow", signal: AbortSignal.timeout(60_000) });
   if (!res.ok) throw new Error(`Track download failed (${res.status})`);
   const len = Number(res.headers.get("content-length") ?? 0);
   if (len > maxBytes) throw new Error("This track is too large to add.");

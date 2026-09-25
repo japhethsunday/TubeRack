@@ -66,6 +66,8 @@ const serverSchema = z.object({
 
   // NVIDIA hosted models (build.nvidia.com): extra text models used when Gemini is busy or unavailable
   NVIDIA_API_KEY: z.string().optional(),
+  /** Jamendo developer client ID (free at devportal.jamendo.com) for the background music library. */
+  JAMENDO_CLIENT_ID: z.string().optional(),
   // Optional comma-separated override of the NVIDIA model order
   NVIDIA_TEXT_MODELS: z.string().optional(),
 
