@@ -326,7 +326,16 @@ export function PackagingProvider({ children }: { children: React.ReactNode }) {
         return setBundle((b) => ({ ...b, titles: b.titles.filter((t) => !(t.id === id && t.projectId === projectId)) }));
       },
       primaryTitleFor: (projectId) => scoped(bundle.titles, projectId).find((t) => t.isPrimary) ?? null,
-      seoFor: (projectId) => bundle.seo.find((s) => s.projectId === projectId) ?? emptySeo(projectId),
+      seoFor: (projectId) => {
+        // Records saved by older versions or partial syncs can miss fields:
+        // fill them from the empty package so every screen can rely on them.
+        const found = bundle.seo.find((s) => s.projectId === projectId);
+        const base = emptySeo(projectId);
+        if (!found) return base;
+        const merged = { ...base } as Record<string, unknown>;
+        for (const [k, v] of Object.entries(found)) if (v !== undefined && v !== null) merged[k] = v;
+        return merged as unknown as SeoPackage;
+      },
       saveSeo: (seo) =>
         setBundle((b) => ({
           ...b,

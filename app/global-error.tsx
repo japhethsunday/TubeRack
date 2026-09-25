@@ -13,11 +13,9 @@ export default function GlobalError({
       <body className="min-h-screen bg-background text-foreground">
         <main id="main">
           <Container className="py-14">
-            <h1 className="text-2xl font-semibold tracking-tight">Application error</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Something went wrong</h1>
             <p className="mt-2 max-w-prose text-sm text-muted-text">
-              A critical error escaped the route boundary. Retry to reload the
-              app shell — report includes only a local console entry until
-              reload the page to try again.
+              TubeRack hit a problem. Your work is saved — reload the page to continue.
             </p>
             <button
               type="button"
