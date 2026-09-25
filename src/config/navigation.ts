@@ -1,4 +1,5 @@
 import {
+  HardDrive,
   Lightbulb,
   LayoutDashboard,
   FolderKanban,
@@ -75,6 +76,15 @@ export const NAV_SECTIONS: NavSection[] = [
         status: "live",
         phase: "Phase 2",
         blurb: "All content projects.",
+      },
+      {
+        slug: "storage",
+        label: "Storage",
+        href: "/storage",
+        icon: HardDrive,
+        status: "live",
+        phase: "Phase 13",
+        blurb: "Everything generated across projects: download or reuse.",
       },
       {
         slug: "activity",
