@@ -222,7 +222,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
           // A missing file won't appear by retrying; don't request it again this session.
           markFailed(a.id);
-          console.error("media download failed:", error instanceof Error ? error.message : error);
+          console.warn("media download failed:", error instanceof Error ? error.message : error);
         } finally {
           fetching.current.delete(a.id);
           setDownloads((d) => {

@@ -926,14 +926,17 @@ export interface SceneVisual {
 }
 
 /** Shot list for auto-video: one concrete image prompt + short on-screen text per scene. */
-export async function planSceneVisuals(input: { topic: string; aspect: "16:9" | "9:16"; style: string; scenes: { title: string; text: string }[] }): Promise<{ visuals: SceneVisual[]; model: string }> {
+export async function planSceneVisuals(input: { topic: string; aspect: "16:9" | "9:16"; style: string; brief?: string; scenes: { title: string; text: string; direction?: string }[] }): Promise<{ visuals: SceneVisual[]; model: string }> {
   const provider = new GeminiTextProvider();
-  const list = input.scenes.map((s, i) => `${i + 1}. [${s.title}] ${s.text.slice(0, 600)}`).join("\n");
+  const list = input.scenes
+    .map((s, i) => `${i + 1}. [${s.title}] ${s.text.slice(0, 600)}${s.direction ? ` (storyboard direction: ${s.direction.slice(0, 200)})` : ""}`)
+    .join("\n");
   const { text, model } = await provider.generateText({
     prompt:
       `You are the art director for a YouTube video about "${input.topic.slice(0, 200)}". Frame: ${input.aspect}.` +
       (input.style ? ` Visual style: ${input.style.slice(0, 200)}.` : "") +
-      `\nFor each scene below write: visual — one concrete, photographic image prompt (subject, setting, composition, lighting) that illustrates what the narration says; ` +
+      (input.brief ? `\nProduction brief (every image must fit it): ${input.brief.slice(0, 1200)}` : "") +
+      `\nFor each scene below write: visual — one concrete, photographic image prompt (subject, setting, composition, lighting) that shows exactly what that scene's narration is about, for this video's audience; follow the storyboard direction when given; ` +
       `keep a consistent look across scenes; NO text, letters, logos or watermarks in the image. onScreenText — at most 6 words to overlay, or "" if none is needed.\n` +
       `Scenes:\n${list}\n\nRespond ONLY with JSON: {"scenes":[{"visual":"","onScreenText":""}]} with exactly ${input.scenes.length} items in order.`,
     maxTokens: 3000,

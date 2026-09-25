@@ -20,6 +20,7 @@ import { Tabs } from "@/src/components/ui/Tabs";
 import { EmptyState } from "@/src/components/ui/states";
 import { LoadingState } from "@/src/components/ui/feedback";
 import { useMedia } from "@/src/components/media/MediaProvider";
+import { useProductionContext } from "@/src/components/projects/useProductionContext";
 
 const TAB_IDS = ["library", "scenes", "voice", "image", "audio", "uploads", "style", "queue"] as const;
 type TabId = (typeof TAB_IDS)[number];
@@ -40,7 +41,7 @@ function Studio() {
   const params = useSearchParams();
   const { ready: projectsReady, projects, channelName } = useProjects();
   const { ready: intelReady, dnaFor } = useIntel();
-  const { ready: scriptsReady, scriptFor, scenesFor } = useScripts();
+  const { ready: scriptsReady, scriptFor, scenesFor, updateScene } = useScripts();
   const { ready: mediaReady } = useMedia();
   const [selectedId, setSelectedId] = useState<string | null>(params.get("project"));
   const urlProject = params.get("project");
@@ -72,6 +73,7 @@ function Studio() {
   const script = project ? scriptFor(project.id) : null;
   const scenes = project ? scenesFor(project.id) : [];
   const dna = project ? dnaFor(project.channelId) : null;
+  const production = useProductionContext(project?.id);
 
   function registerRerun(assetId: string, fn: () => void) {
     reruns.current.set(assetId, fn);
@@ -187,10 +189,12 @@ function Studio() {
           dnaTone={dna?.tone ?? ""}
           dnaPositioning={dna?.positioning ?? ""}
           dnaAvoid={dna?.avoidWords ?? ""}
-          visualStyle=""
+          visualStyle={dna?.visualIdentity ?? ""}
           colorDirection=""
           platform={project.platform}
           registerRerun={registerRerun}
+          context={production}
+          onSceneVisual={(sceneId, visual) => updateScene(project.id, sceneId, { visual })}
         />
       ),
     },

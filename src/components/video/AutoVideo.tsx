@@ -1,5 +1,6 @@
 "use client";
 
+import { useProductionContext } from "@/src/components/projects/useProductionContext";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Clapperboard, Loader2, TriangleAlert, X } from "lucide-react";
@@ -77,6 +78,7 @@ export function GenerateVideoDialog({
 }) {
   const router = useRouter();
   const { putScenes } = useScripts();
+  const production = useProductionContext(project.id);
   const media = useMedia();
   const video = useVideo();
   const [steps, setSteps] = useState<Step[]>(INITIAL);
@@ -113,9 +115,10 @@ export function GenerateVideoDialog({
       set("scenes", { state: "running" });
       const scenes: Scene[] = scenesFromSections(writable, wpm).map((s) => ({ ...s, narration: s.scriptText }));
       const planned = await retryBusy(() => api.post<{ visuals: { visual: string; onScreenText: string }[] }>("/api/v1/ai/scene-visuals", {
-        topic: project.topic || project.name,
+        topic: production?.topic || project.topic || project.name,
         aspect,
-        style: "",
+        style: production?.visualStyle ?? "",
+        brief: production?.brief ?? "",
         scenes: scenes.map((s) => ({ title: s.title, text: s.scriptText })),
       }));
       scenes.forEach((s, i) => {

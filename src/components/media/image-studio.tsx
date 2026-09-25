@@ -9,7 +9,9 @@ import type { PosterAspect } from "@/src/lib/media/svg";
 import { buildVisualPrompt, PROMPT_METHOD, type PromptSection } from "@/src/lib/media/prompts";
 import { useMedia, runLocalJob, MediaStorageNote } from "@/src/components/media/MediaProvider";
 import { DraftImage } from "@/src/components/media/players";
-import { generateProviderImage } from "@/src/lib/ai-client";
+import { generateProviderImage, retryBusy } from "@/src/lib/ai-client";
+import { api } from "@/src/lib/api";
+import type { ProductionContext } from "@/src/lib/projects/production-context";
 import { MethodologyNote } from "@/src/components/intelligence/output";
 import { Select, Input, Textarea } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
@@ -44,6 +46,8 @@ export function ImageStudio({
   platform,
   registerRerun,
   initialSceneId,
+  context,
+  onSceneVisual,
 }: {
   projectId: string;
   scenes: SceneRef[];
@@ -55,14 +59,18 @@ export function ImageStudio({
   platform: string;
   registerRerun: (assetId: string, fn: () => void) => void;
   initialSceneId?: string;
+  /** Shared production brief: topic, audience, tone, visual identity. */
+  context?: ProductionContext | null;
+  /** Save a planned shot back to the storyboard so every tool shares it. */
+  onSceneVisual?: (sceneId: string, visual: string) => void;
 }) {
-  const { addAsset, updateAsset, setApproval, assignScenes } = useMedia();
+  const { addAsset, updateAsset, setApproval, assignScenes, assetsFor } = useMedia();
   const [provider, setProvider] = useState("ai-provider");
   const [sceneId, setSceneId] = useState(initialSceneId || scenes[0]?.id || "");
   const [title, setTitle] = useState("");
   const [styleId, setStyleId] = useState(POSTER_STYLES[0].id);
-  const [aspect, setAspect] = useState<PosterAspect>("16:9");
-  const [variations, setVariations] = useState(2);
+  const [aspect, setAspect] = useState<PosterAspect>(context?.aspect ?? "16:9");
+  const [variations, setVariations] = useState(1);
   const [seed, setSeed] = useState<number | null>(null);
   const [instruction, setInstruction] = useState("");
   const [running, setRunning] = useState(false);
@@ -90,8 +98,113 @@ export function ImageStudio({
   const block = capabilityBlock(provider, "image");
   const effectiveSeed = seed ?? seedFromText(`${title}|${sceneId}|${styleId}`);
 
+  /** Style line shared by every image in the project, so the video looks consistent. */
+  const styleLine = [context?.visualStyle || visualStyle, colorDirection && `colours: ${colorDirection}`, context?.tone && `mood: ${context.tone}`]
+    .filter(Boolean)
+    .join("; ");
+
+  /** A natural image prompt for one scene, grounded in the production brief. */
+  function scenePrompt(shot: string): string {
+    return [
+      shot.trim(),
+      context?.topic && `This image is for a YouTube video about ${context.topic}${context.audience ? `, made for ${context.audience}` : ""}.`,
+      styleLine && `Style: ${styleLine}.`,
+      instruction.trim(),
+      (context?.avoid || dnaAvoid) && `Avoid: ${context?.avoid || dnaAvoid}.`,
+      "Photographic, high detail. No text, letters, captions, logos or watermarks.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
   function finalPrompt(): string {
-    return promptSections.map((s) => `${s.label}: ${promptEdits[s.label] ?? s.text}`).join("\n");
+    const edited = Object.keys(promptEdits).length > 0;
+    if (edited) return scenePrompt(promptSections.map((s) => promptEdits[s.label] ?? s.text).join(". "));
+    const shot = scene?.visual?.trim() || [scene?.title ?? title, scene?.scriptText.slice(0, 300)].filter(Boolean).join(": ");
+    return scenePrompt(shot || title || "A scene for this video");
+  }
+
+  // ---- All scenes at once -------------------------------------------------
+  const [allRun, setAllRun] = useState<{ done: number; total: number; failed: number; step: string } | null>(null);
+  const [skipDone, setSkipDone] = useState(true);
+  const hasImage = (id: string) =>
+    assetsFor(projectId).some((a) => a.kind === "image" && a.status === "ready" && a.sceneIds.includes(id) && a.source === "provider-output");
+
+  /**
+   * Plan a consistent shot for every scene from the script + production brief
+   * (saved back to the storyboard), then generate one image per scene and
+   * attach it to that scene.
+   */
+  async function generateAllScenes() {
+    const todo = scenes.filter((s) => !(skipDone && hasImage(s.id)));
+    if (todo.length === 0) return;
+    cancelRef.current = { cancelled: false };
+    const flag = cancelRef.current;
+    setRunning(true);
+    setGenError(null);
+    setRunIds([]);
+    setAllRun({ done: 0, total: todo.length, failed: 0, step: "Planning shots from the script…" });
+    let shots: string[] = todo.map((s) => s.visual || `${s.title}: ${s.scriptText.slice(0, 300)}`);
+    try {
+      const planned = await retryBusy(() =>
+        api.post<{ visuals: { visual: string }[] }>("/api/v1/ai/scene-visuals", {
+          topic: context?.topic || title || "this video",
+          aspect: aspect === "9:16" ? "9:16" : "16:9",
+          style: styleLine,
+          brief: context?.brief ?? "",
+          scenes: todo.map((s) => ({ title: s.title, text: s.scriptText, direction: s.visual || undefined })),
+        }),
+      );
+      shots = todo.map((s, i) => planned.visuals[i]?.visual || shots[i]);
+      todo.forEach((s, i) => {
+        if (!s.visual?.trim() && shots[i]) onSceneVisual?.(s.id, shots[i]);
+      });
+    } catch {
+      // Planning failed: fall back to each scene's own storyboard direction and script.
+    }
+    let done = 0;
+    let failed = 0;
+    const created: string[] = [];
+    let next = 0;
+    const worker = async () => {
+      while (next < todo.length && !flag.cancelled) {
+        const i = next++;
+        const s = todo[i];
+        setAllRun({ done, total: todo.length, failed, step: `Scene ${s.number}: ${s.title}` });
+        const asset = addAsset({
+          projectId,
+          sceneIds: [s.id],
+          kind: "image",
+          source: "provider-output",
+          status: "generating",
+          title: `Scene ${s.number}: ${s.title}`.slice(0, 80),
+          payload: "",
+          mime: "image/png",
+          width: POSTER_DIMS[aspect].width,
+          height: POSTER_DIMS[aspect].height,
+          tags: ["generated", aspect, "scene"],
+          approval: "draft",
+        });
+        const prompt = scenePrompt(shots[i]);
+        registerRerun(asset.id, () => void generateProviderImage(prompt, aspect).then((o) => updateAsset(asset.id, o.ok ? { status: "ready", payload: o.data.url } : { status: "failed", error: o.message })));
+        const outcome = await generateProviderImage(prompt, aspect);
+        if (outcome.ok) {
+          updateAsset(asset.id, { status: "ready", payload: outcome.data.url });
+          created.push(asset.id);
+          done++;
+        } else {
+          updateAsset(asset.id, { status: "failed", error: outcome.message });
+          setGenError(outcome.message);
+          failed++;
+        }
+        setRunIds([...created]);
+        setAllRun({ done, total: todo.length, failed, step: "" });
+        setProgress(Math.round(((done + failed) / todo.length) * 100));
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    setAllRun({ done, total: todo.length, failed, step: "" });
+    setRunning(false);
   }
 
   /** Gemini path: real images, one request per variation, stored server-side. */
@@ -110,7 +223,7 @@ export function ImageStudio({
       if (flag.cancelled) break;
       const asset = addAsset({
         projectId,
-        sceneIds: [],
+        sceneIds: sceneId ? [sceneId] : [],
         kind: "image",
         source: "provider-output",
         status: "generating",
@@ -296,7 +409,7 @@ export function ImageStudio({
 
         {running ? (
           <div className="space-y-2">
-            <Progress value={progress} label={isGemini ? "Generating with Gemini" : "Generating drafts on-device"} />
+            <Progress value={progress} label={allRun ? `Scene images ${allRun.done + allRun.failed}/${allRun.total}${allRun.step ? ` — ${allRun.step}` : ""}` : isGemini ? "Generating images" : "Generating drafts on-device"} />
             <Button variant="outline" size="sm" onClick={() => { cancelRef.current.cancelled = true; }}>
               Cancel
             </Button>
@@ -308,6 +421,24 @@ export function ImageStudio({
               ? `Generate ${variations} image${variations === 1 ? "" : "s"}`
               : `Generate ${variations} draft${variations === 1 ? "" : "s"} — free, on-device`}
           </Button>
+        )}
+        {isGemini && scenes.length > 0 && !running && (
+          <div className="space-y-2 rounded-lg border border-border p-3">
+            <Button variant="outline" onClick={() => void generateAllScenes()} disabled={Boolean(block)}>
+              <ImagePlus className="size-4" aria-hidden="true" />
+              Images for all {skipDone ? scenes.filter((s) => !hasImage(s.id)).length : scenes.length} scenes
+            </Button>
+            <label className="flex items-center gap-2 text-xs text-muted-text">
+              <input type="checkbox" checked={skipDone} onChange={(e) => setSkipDone(e.target.checked)} className="size-4" />
+              Skip scenes that already have an image
+            </label>
+            <p className="text-xs text-muted-text">Plans one shot per scene from the script and your project brief, keeps one look across the video, and attaches each image to its scene.</p>
+          </div>
+        )}
+        {allRun && !running && (
+          <p className="text-xs text-muted-text" role="status">
+            {allRun.done} of {allRun.total} scene images made{allRun.failed ? `; ${allRun.failed} failed — use Retry on those in the Library` : ""}.
+          </p>
         )}
         {genError && (
           <Alert tone="warn" title="Images could not be generated">
