@@ -1,6 +1,7 @@
 "use client";
 
 import { sceneSpeech } from "@/src/lib/script/engine";
+import { synthesizeProviderSpeech } from "@/src/lib/ai-client";
 import { BLUR_BACKGROUND } from "@/src/lib/video/compositor";
 import { isChunked } from "@/src/lib/media/chunked";
 import { sanitizeSvg } from "@/src/lib/security/svg";
@@ -142,6 +143,8 @@ function Studio() {
   );
   // The playhead never goes past the end of the video.
   const playhead = Math.min(rawPlayhead, duration);
+
+
   const issues = useMemo(
     () => (comp && project ? validateComposition(comp, scenes, assets) : []),
     [comp, project, scenes, assets],
@@ -203,6 +206,63 @@ function Studio() {
     return () => document.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id]);
+
+  // ---- Voice-over repair: takes made before the fixes can be missing parts
+  // of the script (cut-off narration, or a voice engine that stopped early).
+  // Detect them and re-voice the full text once, then swap it in and line the
+  // pictures up with it — so every existing project gets fixed on open.
+  const [repair, setRepair] = useState<{ state: "working" | "done" | "failed"; message: string } | null>(null);
+  const repairTried = useRef(new Set<string>());
+  const [repairRun, setRepairRun] = useState(0);
+  useEffect(() => {
+    if (!project || !ready) return;
+    const voiceClips = (comp?.clips ?? []).filter((c) => c.kind === "voice" && c.assetId);
+    for (const clip of voiceClips) {
+      const asset = assets.find((a) => a.id === clip.assetId);
+      if (!asset || asset.status !== "ready" || asset.source !== "provider-output" || !asset.sceneIds.length || repairTried.current.has(asset.id)) continue;
+      const text = scenes
+        .filter((sc) => asset.sceneIds.includes(sc.id))
+        .map((sc) => sceneSpeech(sc))
+        .filter(Boolean)
+        .join("\n\n");
+      const words = text.split(/\s+/).filter(Boolean).length;
+      const needSec = (words / 175) * 60;
+      const hasSec = asset.durationSec ?? clip.durationSec;
+      if (needSec < 10 || hasSec >= needSec * 0.6 || text.length > 14_000) continue;
+      repairTried.current.add(asset.id);
+      const voiceName = asset.tags.find((t) => t !== "take" && t !== "generated");
+      setRepair({ state: "working", message: `This voice-over is missing part of your script (${fmtTimecode(hasSec, 30, false)} of about ${fmtTimecode(needSec, 30, false)}). Re-voicing the full script…` });
+      void (async () => {
+        const out = await synthesizeProviderSpeech(text, voiceName);
+        if (!out.ok) {
+          setRepair({ state: "failed", message: `Couldn't re-voice the full script: ${out.message}` });
+          return;
+        }
+        const fixed = mediaApi.addAsset({
+          projectId: project.id,
+          sceneIds: asset.sceneIds,
+          kind: "voice",
+          source: "provider-output",
+          status: "ready",
+          title: asset.title,
+          payload: out.data.url,
+          mime: out.data.mimeType,
+          durationSec: out.data.durationSec,
+          tags: asset.tags,
+          approval: asset.approval,
+        });
+        const newDur = out.data.durationSec ?? needSec;
+        const swapped = latest.current.clips.map((c) =>
+          c.id === clip.id ? { ...c, assetId: fixed.id, durationSec: Math.round(newDur * 100) / 100, inSec: 0 } : c,
+        );
+        const voiceEnd = swapped.filter((c) => c.kind === "voice").reduce((n, c) => Math.max(n, c.startSec + c.durationSec), 0);
+        commit(fitVisualsTo(swapped, voiceEnd));
+        setRepair({ state: "done", message: `Voice-over fixed: now ${fmtTimecode(newDur, 30, false)} and the pictures are lined up with it. Re-run captions if you use them.` });
+      })();
+      break; // one at a time
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the timeline/assets change; each take is tried once.
+  }, [project, ready, comp, assets, scenes, repairRun]);
 
   if (!ready) {
     return (
@@ -342,6 +402,8 @@ function Studio() {
   function addTrack(kind: TimelineClip["kind"]) {
     video.setTracks(pid, [...tracks, newTrack(kind, tracks)]);
   }
+
+
 
   function commit(next: TimelineClip[]) {
     video.commitClips(pid, latest.current.clips, next);
@@ -790,7 +852,29 @@ function Studio() {
         // Drop onto empty timeline space appends to a fitting track.
         if (e.dataTransfer.getData("application/x-tuberack-asset")) onDropAsset(e);
       }} onDragOver={(e) => e.preventDefault()}>
-        {mismatch && (
+        {repair && (
+          <div className={cx("flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-xs", repair.state === "failed" ? "border-destructive/40 bg-destructive/10" : repair.state === "done" ? "border-success/40 bg-success/10" : "border-primary/40 bg-primary/10")}>
+            {repair.state === "working" && <span className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />}
+            <span className="min-w-0 flex-1" role="status">{repair.message}</span>
+            {repair.state === "failed" && (
+              <button
+                type="button"
+                onClick={() => {
+                  repairTried.current.clear();
+                  setRepair(null);
+                  setRepairRun((n) => n + 1);
+                }}
+                className="rounded-md bg-foreground px-2.5 py-1 font-semibold text-background hover:opacity-90"
+              >
+                Try again
+              </button>
+            )}
+            {repair.state !== "working" && (
+              <button type="button" onClick={() => setRepair(null)} className="rounded px-2 py-0.5 hover:bg-muted" aria-label="Dismiss">×</button>
+            )}
+          </div>
+        )}
+        {mismatch && !repair && (
           <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-warning/40 bg-warning/10 px-3 py-1.5 text-xs">
             <span className="min-w-0 flex-1">
               {pictureEnd < voiceEnd
