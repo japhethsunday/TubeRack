@@ -163,9 +163,14 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
   const pack = usePackaging();
   const seo = pack.seoFor(source.projectId);
   const primary = pack.primaryTitleFor(source.projectId);
-  // Approved thumbnail first, else the newest variant that has its artwork embedded.
-  const approved = pack.approvedVariantFor(source.projectId);
-  const variant = (approved?.baseSvg ? approved : null) ?? pack.variantsFor(source.projectId).filter((v) => v.baseSvg).slice(-1)[0] ?? null;
+  // Thumbnails with artwork, newest edit first. The newest is used unless the
+  // creator picks another (an older "approved" one must never win silently).
+  const thumbOptions = pack
+    .variantsFor(source.projectId)
+    .filter((v) => v.baseSvg)
+    .sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+  const [thumbId, setThumbId] = useState<string | null>(null);
+  const variant = thumbOptions.find((v) => v.id === thumbId) ?? thumbOptions[0] ?? null;
   const hiddenTracks = useMemo(() => new Set(source.comp.tracks.filter((t) => t.hidden).map((t) => t.id)), [source.comp.tracks]);
   const vtt = useMemo(() => buildVtt(source.comp.clips.filter((c) => !hiddenTracks.has(c.trackId))), [source.comp.clips, hiddenTracks]);
   const cueCount = vtt ? (vtt.match(/-->/g) ?? []).length : 0;
@@ -543,6 +548,24 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
               ) : (
                 <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-dashed border-border text-center text-xs text-muted-text">
                   {variant ? "Thumbnail off" : "No thumbnail yet — add one in Thumbnail Studio"}
+                </div>
+              )}
+              {thumbOptions.length > 1 && includeThumb && (
+                <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Choose thumbnail">
+                  {thumbOptions.slice(0, 8).map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={v.id === variant?.id}
+                      title={v.name}
+                      onClick={() => setThumbId(v.id)}
+                      className={cx("w-[46px] overflow-hidden rounded border-2", v.id === variant?.id ? "border-primary" : "border-transparent opacity-70 hover:opacity-100")}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- composed SVG thumbnail. */}
+                      <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(composeThumbnail(v.baseSvg ?? "", v.overlays))}`} alt={v.name} className="aspect-video w-full object-cover" />
+                    </button>
+                  ))}
                 </div>
               )}
               {variant && (

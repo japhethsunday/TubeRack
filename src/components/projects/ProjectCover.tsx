@@ -6,17 +6,15 @@ import { useMedia } from "@/src/components/media/MediaProvider";
 import { composeThumbnail } from "@/src/lib/package/thumbnails";
 
 /**
- * Project card cover: the approved thumbnail, else the latest thumbnail
- * design, else the first generated scene image, else the project's initial.
+ * Project card cover: the newest thumbnail design (what gets published),
+ * else the first generated scene image, else the project's initial.
  */
 export function ProjectCover({ projectId, name }: { projectId: string; name: string }) {
   const packaging = usePackaging();
   const media = useMedia();
 
   const thumbSrc = useMemo(() => {
-    const approved = packaging.approvedVariantFor(projectId);
-    const latest = [...packaging.variantsFor(projectId)].filter((v) => v.baseSvg).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
-    const pick = approved?.baseSvg ? approved : latest;
+    const pick = [...packaging.variantsFor(projectId)].filter((v) => v.baseSvg).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
     if (!pick?.baseSvg) return null;
     const svg = composeThumbnail(pick.baseSvg, pick.overlays);
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
