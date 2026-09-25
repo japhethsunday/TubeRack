@@ -14,3 +14,15 @@ export async function notifyWorkspace(workspaceId: string, n: { type: string; ti
     console.error("notify failed:", error instanceof Error ? error.message : String(error));
   }
 }
+
+/** Verified emails of everyone in a workspace (owners first). */
+export async function workspaceEmails(workspaceId: string): Promise<string[]> {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db`
+    SELECT u.email FROM memberships m JOIN users u ON u.id = m.user_id
+    WHERE m.workspace_id = ${workspaceId} AND u.status = 'active' AND u.email_verified_at IS NOT NULL
+    ORDER BY (m.role = 'owner') DESC LIMIT 10
+  `;
+  return rows.map((r) => String(r.email));
+}

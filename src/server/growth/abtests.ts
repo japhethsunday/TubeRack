@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto";
+import { getServerEnv } from "@/src/lib/env";
+import { sendEmail } from "@/src/server/email";
+import { renderEmail } from "@/src/server/email-templates";
 import { getDb } from "@/src/server/db";
 import { storageGet, storagePut } from "@/src/server/storage";
 import { setThumbnail, videoWindowStats } from "@/src/server/google/channel";
 import { getConnection, NotConnectedError } from "@/src/server/google/oauth";
 import { abOutcome, type AbOutcome, type WindowStat } from "@/src/lib/growth/abtest";
-import { notifyWorkspace } from "@/src/server/growth/notify";
+import { notifyWorkspace, workspaceEmails } from "@/src/server/growth/notify";
 import { notFound, validationError } from "@/src/server/errors";
 
 export interface Variant {
@@ -136,6 +139,7 @@ export async function rotateTest(workspaceId: string, test: AbTest): Promise<AbT
       body: winner ? `“${winner.label}” won and is now live. ${results.note}` : results.note,
       metadata: { testId: test.id },
     });
+    await emailTestResult(workspaceId, test, winner?.label ?? null, results.note).catch(() => undefined);
     return save(test, { status: "completed", windows, results, next_rotate_at: null });
   }
   const nextIndex = (test.current_index + 1) % test.variants.length;
@@ -195,4 +199,26 @@ export async function rotateDueTests(): Promise<{ rotated: number; failed: numbe
     }
   }
   return { rotated, failed };
+}
+
+/** "Your thumbnail test finished" email to the workspace (best-effort). */
+async function emailTestResult(workspaceId: string, test: AbTest, winner: string | null, note: string): Promise<void> {
+  const app = getServerEnv().APP_URL.replace(/\/$/, "");
+  const mail = renderEmail({
+    preheader: winner ? `“${winner}” won and is now live on “${test.video_title}”.` : `Results are in for “${test.video_title}”.`,
+    eyebrow: "Thumbnail test",
+    heading: winner ? `We have a winner: “${winner}”` : "Your thumbnail test finished",
+    intro: `The A/B test on “${test.video_title}” is complete.${winner ? " The winning thumbnail is now live on YouTube." : ""}`,
+    blocks: [
+      { type: "stats", items: [{ label: "Variants tested", value: String(test.variants.length) }, { label: "Winner", value: winner ?? "No clear winner", tone: winner ? "good" : undefined }] },
+      { type: "text", text: note },
+      { type: "callout", title: "Next step", text: "Use what won — the colours, face, or wording — as the starting point for your next thumbnail.", action: { label: "Plan the next test", url: `${app}/studio/abtest` } },
+    ],
+    cta: { label: "See full results", url: `${app}/studio/abtest` },
+    reason: "You get this because you ran a thumbnail test in TubeRack.",
+    appUrl: app,
+  });
+  for (const to of await workspaceEmails(workspaceId)) {
+    await sendEmail({ to, subject: winner ? `Thumbnail test: “${winner}” won` : "Thumbnail test finished", text: mail.text, html: mail.html, kind: "alert" });
+  }
 }

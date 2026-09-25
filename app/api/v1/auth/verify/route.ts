@@ -9,6 +9,7 @@ import { parseBody } from "@/src/server/validate";
 import { limiterFor, clientKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
+import { sendWelcomeEmail } from "@/src/server/email";
 
 const tokenSchema = z.object({ token: z.string().min(10, "Invalid token.") });
 
@@ -29,7 +30,9 @@ export async function POST(request: Request) {
       throw validationError("This verification link is invalid or expired. Request a new one.");
     }
     await db`UPDATE auth_tokens SET consumed_at = now() WHERE id = ${row.id}`;
-    await db`UPDATE users SET email_verified_at = now(), updated_at = now() WHERE id = ${row.user_id}`;
+    const verified = await db`UPDATE users SET email_verified_at = now(), updated_at = now() WHERE id = ${row.user_id} AND email_verified_at IS NULL RETURNING email, name`;
+    // First verification only: a welcome with the first steps (best-effort).
+    if (verified[0]?.email) await sendWelcomeEmail(request, String(verified[0].email), String(verified[0].name ?? "") || undefined).catch(() => undefined);
     await audit({ userId: row.user_id, action: "auth.verified", resourceType: "user", resourceId: row.user_id });
     // The link proves control of the inbox: sign the user in on this device.
     const session = await createSession(row.user_id, { userAgent: request.headers.get("user-agent") ?? undefined });

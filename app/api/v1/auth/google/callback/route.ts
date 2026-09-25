@@ -4,7 +4,7 @@ import { getServerEnv } from "@/src/lib/env";
 import { getDb } from "@/src/server/db";
 import { createSession, sessionCookie } from "@/src/server/auth";
 import { hashPassword, randomToken, safeEqual } from "@/src/server/crypto";
-import { linkOrigin } from "@/src/server/email";
+import { linkOrigin, sendWelcomeEmail } from "@/src/server/email";
 import { audit } from "@/src/server/audit";
 import { sanitizeReturnTo } from "@/src/lib/auth/session";
 import { limiterFor, clientKey } from "@/src/server/rate-limit";
@@ -98,6 +98,7 @@ export async function GET(request: Request) {
         return id;
       });
       created = true;
+      await sendWelcomeEmail(request, email, name).catch(() => undefined);
     }
 
     const token = await createSession(userId, { userAgent: request.headers.get("user-agent") ?? undefined });
