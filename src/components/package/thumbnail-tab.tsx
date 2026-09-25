@@ -1,5 +1,7 @@
 "use client";
 
+import type { TextOverlay } from "@/src/lib/package/types";
+import { useProductionContext } from "@/src/components/projects/useProductionContext";
 import { useState } from "react";
 import { Plus, ImagePlus, Sparkles } from "lucide-react";
 import { generateProviderImage } from "@/src/lib/ai-client";
@@ -63,7 +65,41 @@ export function ThumbnailTab({
   const [artUrl, setArtUrl] = useState<string | null>(null);
   const [artError, setArtError] = useState<string | null>(null);
 
-  const defaultArtPrompt = `Eye-catching YouTube thumbnail background for a video titled "${primaryTitle || context.title}". Bold focal subject, high contrast, clean negative space on one side for large text, no words or letters in the image.`;
+  const production = useProductionContext(projectId);
+  const headline = (primaryTitle || context.title || "").trim();
+  // Never put the title's words in the image prompt: image models misspell text.
+  // The art is text-free; the exact title is added as editable text layers.
+  const subject = production?.topic || context.topic || context.title || "this video";
+  const defaultArtPrompt = [
+    `YouTube thumbnail background art about ${subject}${production?.audience ? `, for ${production.audience}` : ""}.`,
+    production?.visualStyle && `Style: ${production.visualStyle}.`,
+    "One bold, expressive focal subject on the right third, strong contrast, vivid but clean colours,",
+    "a plain uncluttered area on the left half for a headline.",
+    "Absolutely no text, letters, numbers, words, signs, captions or logos anywhere in the image.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  /** The exact title as up to three short, left-aligned lines. */
+  function headlineOverlays(): TextOverlay[] {
+    const words = headline.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return [];
+    const perLine = Math.max(2, Math.ceil(words.length / 3));
+    const lines: string[] = [];
+    for (let i = 0; i < words.length && lines.length < 3; i += perLine) lines.push(words.slice(i, i + perLine).join(" "));
+    if (lines.length * perLine < words.length) lines[2] = `${lines[2]} ${words.slice(3 * perLine).join(" ")}`.trim();
+    const size = lines.some((l) => l.length > 16) ? 92 : 112;
+    return lines.map((text, i) => ({
+      id: `ov_${Date.now().toString(36)}_${i}`,
+      text: text.toUpperCase(),
+      x: 6,
+      y: 22 + i * (size / 7.2),
+      size,
+      color: "#ffffff",
+      weight: 900,
+      align: "left",
+    }));
+  }
 
   async function generateArt() {
     setArtBusy(true);
@@ -81,7 +117,7 @@ export function ThumbnailTab({
         name: `Art ${variants.length + 1}`,
         baseKind: "upload",
         baseSvg: svg,
-        overlays: [],
+        overlays: headlineOverlays(),
       });
       setSelectedId(variant.id);
     } catch {
@@ -161,7 +197,7 @@ export function ThumbnailTab({
             <Sparkles className="size-4" aria-hidden="true" /> Generate art
           </Button>
         </div>
-        <p className="text-xs text-muted-text">Generates a real 16:9 image and opens it as a new variant, ready for your text overlays.</p>
+        <p className="text-xs text-muted-text">Generates text-free 16:9 art and adds your exact title on top as editable text, so the words are always spelled right.</p>
         {artError && <p role="alert" className="text-xs text-destructive">{artError}</p>}
         {artUrl && (
           <div className="ui-panel flex flex-wrap items-center gap-3">

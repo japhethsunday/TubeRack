@@ -58,25 +58,18 @@ export function BackendStatusProvider({ children }: { children: React.ReactNode 
   return <Ctx.Provider value={status}>{children}</Ctx.Provider>;
 }
 
-/** Header badge: Cloud (synced) vs Local (device-only). */
+/** Header badge: hidden when everything is connected; warns only in device-only mode. */
 export function BackendBadge() {
   const status = useBackend();
-  if (status.mode === "checking") {
-    return (
-      <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-text" aria-label="Checking backend status">
-        …
-      </span>
-    );
-  }
-  const cloud = status.mode === "cloud";
+  if (status.mode !== "local") return null;
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cloud ? "border-success/30 bg-success/10 text-success" : "border-warning/30 bg-warning/10 text-warning"}`}
-      title={cloud ? `Cloud backend connected (checked ${status.checkedAt}). Projects sync to your workspace.` : "Local mode — projects stay on this device until backend credentials are added (see .env.example)."}
-      aria-label={cloud ? "Cloud backend connected" : "Local mode, device storage only"}
+      className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning"
+      title="Can't reach your account right now — changes stay on this device until the connection is back."
+      aria-label="Offline, changes saved on this device"
     >
-      <span aria-hidden="true" className={`size-1.5 rounded-full ${cloud ? "bg-success" : "bg-warning"}`} />
-      {cloud ? "Cloud" : "Local"}
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-warning" />
+      Offline
     </span>
   );
 }

@@ -1,10 +1,10 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { CloudUpload, CloudOff } from "lucide-react";
+import { CloudOff } from "lucide-react";
 import { onSyncStatus, syncStatus } from "@/src/lib/sync";
 
-/** Header chip: visible only while changes are saving or retrying. */
+/** Header chip: visible only when changes can't be saved (offline or too large). */
 export function SyncIndicator() {
   const status = useSyncExternalStore(onSyncStatus, syncStatus, () => "idle" as const);
   if (status === "idle") return null;
@@ -15,15 +15,16 @@ export function SyncIndicator() {
       </span>
     );
   }
-  const retrying = status === "retrying";
+  // Normal saving happens quietly in the background; only problems are shown.
+  if (status !== "retrying") return null;
   return (
     <span
       role="status"
-      title={retrying ? "Couldn't reach the server — your changes are safe on this device and will keep retrying." : "Saving to your account…"}
-      className={`ui-panel hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:inline-flex ${retrying ? "bg-warning/15 text-warning" : "bg-muted text-muted-text"}`}
+      title="Couldn't reach the server — your changes are safe on this device and will keep retrying."
+      className="ui-panel hidden items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-xs font-medium text-warning sm:inline-flex"
     >
-      {retrying ? <CloudOff className="size-3.5" aria-hidden="true" /> : <CloudUpload className="size-3.5 animate-pulse" aria-hidden="true" />}
-      {retrying ? "Offline — retrying" : "Saving…"}
+      <CloudOff className="size-3.5" aria-hidden="true" />
+      Offline — retrying
     </span>
   );
 }
