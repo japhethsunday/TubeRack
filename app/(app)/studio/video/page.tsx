@@ -793,6 +793,9 @@ function Studio() {
           onToggleTrack={(trackId, field) => {
             video.setTracks(pid, tracks.map((t) => (t.id === trackId ? { ...t, [field]: !t[field] } : t)));
           }}
+          onTrackVolume={(trackId, volume) => {
+            video.setTracks(pid, tracks.map((t) => (t.id === trackId ? { ...t, volume } : t)));
+          }}
           assetFor={(assetId) => {
             const a = assets.find((x) => x.id === assetId);
             return a ? { url: mediaUrl(a), kind: a.kind, durationSec: a.durationSec, title: a.title } : null;

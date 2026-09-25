@@ -7,6 +7,7 @@ import { sceneAt } from "@/src/lib/video/build";
 import type { Composition, TimelineClip } from "@/src/lib/video/types";
 import { drawComposition, sourceTime, transitionState } from "@/src/lib/video/compositor";
 import { assetUrl, loadImage, type RenderAsset } from "@/src/lib/video/render";
+import { mixGain } from "@/src/lib/video/mix";
 import { renderMusic, renderSfx, musicRecipe, speakText, stopSpeech, type MusicMood, type SfxType } from "@/src/lib/media/audio";
 import { stopAllPlayback, claimPlayback } from "@/src/components/media/players";
 import { cx } from "@/src/components/ui/cx";
@@ -122,7 +123,8 @@ export function Preview({
   const [, setLoadTick] = useState(0);
   const spokenRef = useRef<string | null>(null);
   const voiceAudioRef = useRef<{ el: () => HTMLAudioElement | null; stop: () => void } | null>(null);
-  const musicRef = useRef<{ key: string; stop: () => void } | null>(null);
+  const musicRef = useRef<{ key: string; stop: () => void; setGain?: (g: number) => void } | null>(null);
+  const voiceClipRef = useRef<TimelineClip | null>(null);
   const sfxFired = useRef(new Set<string>());
   const state = useRef({ comp, duration, playhead, masterMuted, volume, loop, assetFor, selectedId });
   useEffect(() => {
@@ -260,7 +262,7 @@ export function Preview({
       if (voice && url) {
         const clip = voice;
         voiceAudioRef.current = playCached(url, {
-          volume: voice.volume * s.volume,
+          volume: mixGain(s.comp, voice, t) * s.volume,
           rate: voice.speed ?? 1,
           at: () => sourceTime(clip, state.current.playhead),
         });
@@ -288,12 +290,19 @@ export function Preview({
         if (url) {
           const clip = music;
           const h = playCached(url, {
-            volume: music.volume * 0.8 * s.volume,
+            volume: mixGain(s.comp, music, t) * s.volume,
             rate: music.speed ?? 1,
             loop: true,
             at: () => sourceTime(clip, state.current.playhead),
           });
-          musicRef.current = { key: musicKey!, stop: h.stop };
+          musicRef.current = {
+            key: musicKey!,
+            stop: h.stop,
+            setGain: (g) => {
+              const el = h.el();
+              if (el) el.volume = Math.min(1, Math.max(0, g));
+            },
+          };
         } else if (a) {
           try {
             const recipe = JSON.parse(a.payload) as { mood: MusicMood; seconds: number };
@@ -303,7 +312,7 @@ export function Preview({
               source.buffer = buffer;
               source.loop = true;
               const gain = context.createGain();
-              gain.gain.value = music.volume * 0.8 * s.volume;
+              gain.gain.value = mixGain(s.comp, music, t) * s.volume;
               source.connect(gain).connect(context.destination);
               source.start();
               const stop = () => {
@@ -314,7 +323,7 @@ export function Preview({
                 }
               };
               const release = claimPlayback(stop);
-              musicRef.current = { key: musicKey!, stop: () => (release(), stop()) };
+              musicRef.current = { key: musicKey!, stop: () => (release(), stop()), setGain: (g) => gain.gain.setTargetAtTime(Math.max(0, g), context.currentTime, 0.08) };
             }
           } catch {
             // Preview continues without music.
@@ -323,6 +332,12 @@ export function Preview({
       }
     }
 
+    // Live mix: volume changes and music ducking apply while playing.
+    voiceClipRef.current = voice ?? null;
+    const voiceEl = voiceAudioRef.current?.el();
+    if (voice && voiceEl) voiceEl.volume = Math.min(1, Math.max(0, mixGain(s.comp, voice, t) * s.volume));
+    if (music && musicRef.current?.setGain) musicRef.current.setGain(mixGain(s.comp, music, t) * s.volume);
+
     for (const clip of active.filter((c) => c.kind === "sfx")) {
       const key = `${clip.id}@${clip.startSec}`;
       if (sfxFired.current.has(key)) continue;
@@ -330,7 +345,7 @@ export function Preview({
       const a = s.assetFor(clip.assetId);
       const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl : null);
       if (url) {
-        playCached(url, { volume: clip.volume * s.volume, rate: 1, at: () => 0 });
+        playCached(url, { volume: mixGain(s.comp, clip, t) * s.volume, rate: 1, at: () => 0 });
       } else if (a) {
         try {
           const recipe = JSON.parse(a.payload) as { type: SfxType };
@@ -339,7 +354,7 @@ export function Preview({
             const source = context.createBufferSource();
             source.buffer = buffer;
             const gain = context.createGain();
-            gain.gain.value = clip.volume * s.volume;
+            gain.gain.value = mixGain(s.comp, clip, t) * s.volume;
             source.connect(gain).connect(context.destination);
             source.start();
           }

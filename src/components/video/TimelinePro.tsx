@@ -150,6 +150,7 @@ export function TimelinePro({
   onToggleSnap,
   onCommit,
   onToggleTrack,
+  onTrackVolume,
   assetFor,
   onDropAsset,
   onSplit,
@@ -178,6 +179,8 @@ export function TimelinePro({
   onToggleSnap: () => void;
   onCommit: (next: TimelineClip[]) => void;
   onToggleTrack: (trackId: string, field: "muted" | "hidden") => void;
+  /** Track volume (0–2). Audio tracks only. */
+  onTrackVolume?: (trackId: string, volume: number) => void;
   assetFor: (assetId: string | undefined) => TimelineAsset | null;
   onDropAsset: (assetId: string, trackId: string | null, atSec: number) => void;
   onSplit: () => void;
@@ -426,6 +429,9 @@ export function TimelinePro({
                       {track.muted ? <VolumeX className="size-3.5" aria-hidden="true" /> : <Volume2 className="size-3.5" aria-hidden="true" />}
                     </button>
                   )}
+                  {onTrackVolume && (track.kind === "voice" || track.kind === "music" || track.kind === "sfx") && (
+                    <TrackVolume label={track.label} value={track.volume ?? 1} onChange={(v) => onTrackVolume(track.id, v)} />
+                  )}
                   {(track.kind === "video" || track.kind === "image" || track.kind === "text" || track.kind === "captions") && (
                     <button type="button" onClick={() => onToggleTrack(track.id, "hidden")} aria-pressed={track.hidden} aria-label={track.hidden ? `Show ${track.label}` : `Hide ${track.label}`} className="rounded p-0.5 text-muted-text hover:bg-muted hover:text-foreground">
                       {track.hidden ? <EyeOff className="size-3.5" aria-hidden="true" /> : <Eye className="size-3.5" aria-hidden="true" />}
@@ -511,5 +517,53 @@ export function TimelinePro({
         <Plus className="hidden" aria-hidden="true" />
       </p>
     </section>
+  );
+}
+
+/** Compact track volume: shows the level, opens a slider. */
+function TrackVolume({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label={`${label} volume ${Math.round(value * 100)}%`}
+        aria-expanded={open}
+        className="rounded px-1 text-[10px] font-semibold tabular-nums text-muted-text hover:bg-muted hover:text-foreground"
+      >
+        {Math.round(value * 100)}%
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1 w-48 rounded-lg border border-border bg-elevated p-3 shadow-xl">
+          <div className="flex items-center justify-between text-[11px] font-medium">
+            <span>{label} volume</span>
+            <span className="tabular-nums">{Math.round(value * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={2}
+            step={0.05}
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="mt-2 w-full"
+            aria-label={`${label} volume`}
+          />
+          <div className="mt-1 flex justify-between text-[10px] text-muted-text">
+            <button type="button" onClick={() => onChange(0.3)} className="hover:text-foreground">30%</button>
+            <button type="button" onClick={() => onChange(1)} className="hover:text-foreground">100%</button>
+            <button type="button" onClick={() => onChange(1.5)} className="hover:text-foreground">150%</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

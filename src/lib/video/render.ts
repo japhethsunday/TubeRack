@@ -1,4 +1,5 @@
 "use client";
+import { mixGain, MUSIC_DUCK, trackVolume, voiceRanges } from "@/src/lib/video/mix";
 import { isChunked } from "@/src/lib/media/chunked";
 
 import type { Composition, TimelineClip } from "@/src/lib/video/types";
@@ -182,7 +183,7 @@ export async function renderComposition(o: RenderOptions): Promise<RenderResult>
   for (const clip of audioClips) {
     const a = assetOf(clip);
     if (!a) continue;
-    const gain = clip.kind === "music" ? clip.volume * 0.8 : clip.volume;
+    const gain = mixGain(o.comp, clip);
     try {
       let buffer: AudioBuffer | null = null;
       if (a.source === "provider-output" || a.source === "upload-session") {
@@ -268,7 +269,17 @@ export async function renderComposition(o: RenderOptions): Promise<RenderResult>
       g.gain.setValueAtTime(s.gain, Math.max(start, end - fo));
       g.gain.linearRampToValueAtTime(0, end);
     }
-    src.connect(g).connect(master);
+    if (s.clip.kind === "music") {
+      // Auto-ducking: music dips while someone is speaking, same as the preview.
+      const duck = audioCtx.createGain();
+      duck.gain.setValueAtTime(1, t0);
+      for (const [a, b] of voiceRanges(o.comp)) {
+        if (b <= from || a >= to) continue;
+        duck.gain.setTargetAtTime(MUSIC_DUCK, t0 + Math.max(0, a - from) - 0.05, 0.08);
+        duck.gain.setTargetAtTime(1, t0 + (b - from), 0.25);
+      }
+      src.connect(g).connect(duck).connect(master);
+    } else src.connect(g).connect(master);
     src.start(start, s.loop ? offset % Math.max(0.01, s.buffer.duration) : Math.min(offset, s.buffer.duration));
     src.stop(end);
   }
@@ -294,7 +305,7 @@ export async function renderComposition(o: RenderOptions): Promise<RenderResult>
         if (Math.abs(el.currentTime - want) > 0.3) el.currentTime = want;
         if (playing && el.paused) void el.play().catch(() => {});
       }
-      if (g) g.gain.value = clip.reverse ? 0 : clip.volume * fadeGain(clip, t) * transitionState(clip, t).alpha;
+      if (g) g.gain.value = clip.reverse ? 0 : clip.volume * trackVolume(o.comp, clip.trackId) * fadeGain(clip, t) * transitionState(clip, t).alpha;
     }
   };
 

@@ -272,12 +272,12 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
     }
     for (const [pid, s] of Object.entries(body.scripts)) {
       if (!owned.has(pid) || !s || typeof s !== "object") continue;
-      const created = await upsertDoc("project_scripts", pid, toScriptRow(pid, s as never));
+      const created = await upsertDoc("project_scripts", pid, toScriptRow(pid, s as never), (s as { updatedAt?: unknown }).updatedAt);
       result[created ? "inserted" : "updated"] += 1;
     }
     for (const [pid, b] of Object.entries(body.boards)) {
       if (!owned.has(pid) || !b || typeof b !== "object") continue;
-      const created = await upsertDoc("project_boards", pid, toBoardRow(pid, b as never));
+      const created = await upsertDoc("project_boards", pid, toBoardRow(pid, b as never), (b as { updatedAt?: unknown }).updatedAt);
       result[created ? "inserted" : "updated"] += 1;
     }
     for (const [pid, loops] of Object.entries(body.loops)) {
@@ -377,7 +377,7 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
         continue;
       }
       const withSnaps = { ...(doc as object), snapshots: snapsByProject.get(String(doc.projectId)) ?? [] };
-      result.inserted += (await upsertDoc("project_compositions", String(doc.projectId), toCompositionRow(String(doc.projectId), withSnaps as never))) ? 1 : 0;
+      result.inserted += (await upsertDoc("project_compositions", String(doc.projectId), toCompositionRow(String(doc.projectId), withSnaps as never), doc.updatedAt)) ? 1 : 0;
     }
     for (const r of body.requests) {
       const doc = (r ?? {}) as Record<string, unknown>;
@@ -453,7 +453,7 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
         result.skipped += 1;
         continue;
       }
-      result.inserted += (await upsertDoc("project_intel", pid, toIntelRow(pid, doc as never))) ? 1 : 0;
+      result.inserted += (await upsertDoc("project_intel", pid, toIntelRow(pid, doc as never), (doc as { updatedAt?: unknown }).updatedAt)) ? 1 : 0;
     }
     for (const o of body.opportunities ?? []) {
       const doc = (o ?? {}) as Record<string, unknown>;
@@ -679,25 +679,31 @@ function forbiddenSync(): never {
   throw forbidden("This project belongs to another workspace.");
 }
 
-async function upsertDoc(table: string, projectId: string, row: Record<string, unknown>): Promise<boolean> {
+/**
+ * Insert or update one project document. With `stamp` (the client's edit
+ * time), a copy older than the stored one is ignored: a stale tab or device
+ * can never overwrite newer work, and updated_at keeps the real edit time.
+ */
+async function upsertDoc(table: string, projectId: string, row: Record<string, unknown>, stamp?: unknown): Promise<boolean> {
   const db = getDb();
   if (!db) throw backendUnavailable("Database");
-  const cols = Object.keys(row).filter((c) => c !== "project_id");
-  const vals = cols.map((c) => {
-    const v = row[c];
-    return toParam(v);
-  });
-  const existing = await db.unsafe(`SELECT project_id FROM ${table} WHERE project_id = $1 LIMIT 1`, [projectId] as never[]);
+  const cols = Object.keys(row).filter((c) => c !== "project_id" && c !== "updated_at");
+  const vals = cols.map((c) => toParam(row[c]));
+  const at = typeof stamp === "string" && !Number.isNaN(Date.parse(stamp)) ? new Date(stamp).toISOString() : null;
+  const existing = await db.unsafe(`SELECT project_id, updated_at FROM ${table} WHERE project_id = $1 LIMIT 1`, [projectId] as never[]);
   if (existing.length > 0) {
+    const stored = (existing[0] as { updated_at?: unknown }).updated_at;
+    const storedMs = stored ? new Date(String(stored instanceof Date ? stored.toISOString() : stored)).getTime() : 0;
+    if (at && storedMs > Date.parse(at)) return false; // stale copy: keep the newer one
     await db.unsafe(
-      `UPDATE ${table} SET ${cols.map((c, i) => `${c} = $${i + 1}`).join(", ")}, updated_at = now() WHERE project_id = $${cols.length + 1}`,
-      [...vals, projectId] as never[],
+      `UPDATE ${table} SET ${cols.map((c, i) => `${c} = $${i + 1}`).join(", ")}, updated_at = ${at ? `$${cols.length + 2}::timestamptz` : "now()"} WHERE project_id = $${cols.length + 1}`,
+      (at ? [...vals, projectId, at] : [...vals, projectId]) as never[],
     );
     return false;
   }
   await db.unsafe(
-    `INSERT INTO ${table} (project_id, ${cols.join(", ")}) VALUES ($1, ${cols.map((_, i) => `$${i + 2}`).join(", ")})`,
-    [projectId, ...vals] as never[],
+    `INSERT INTO ${table} (project_id, ${cols.join(", ")}${at ? ", updated_at" : ""}) VALUES ($1, ${cols.map((_, i) => `$${i + 2}`).join(", ")}${at ? `, $${cols.length + 2}::timestamptz` : ""})`,
+    (at ? [projectId, ...vals, at] : [projectId, ...vals]) as never[],
   );
   return true;
 }

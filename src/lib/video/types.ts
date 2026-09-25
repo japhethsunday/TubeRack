@@ -15,6 +15,8 @@ export interface TimelineTrack {
   label: string;
   muted: boolean;
   hidden: boolean;
+  /** Track volume (0–2, default 1), applied on top of each clip's volume. */
+  volume?: number;
 }
 
 export interface TimelineClip {

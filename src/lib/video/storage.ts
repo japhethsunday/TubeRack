@@ -50,6 +50,7 @@ const trackSchema = z.object({
   label: z.string(),
   muted: z.boolean(),
   hidden: z.boolean(),
+  volume: z.number().optional(),
 });
 
 const compositionSchema = z.object({
