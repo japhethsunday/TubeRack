@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { transcribeAudio } from "@/src/server/ai/gemini";
+import { transcribeLongAudio, wavDurationSec } from "@/src/server/ai/gemini";
 import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } from "@/src/server/ai/guard";
 import { storageGet } from "@/src/server/storage";
 import { notFound, toErrorResponse, validationError } from "@/src/server/errors";
@@ -10,7 +10,8 @@ export const maxDuration = 300;
 
 // Only app file references; the storage key is rebuilt inside the caller's workspace.
 const FILE = /^\/api\/v1\/(generated|uploads)\/([0-9a-f-]{36}(?:-output)?\.(?:wav|mp3|ogg|webm|mp4))$/;
-const MAX_BYTES = 18 * 1024 * 1024; // Gemini inline request limit headroom
+const MAX_BYTES = 18 * 1024 * 1024; // one request's limit (compressed audio can't be split here)
+const MAX_WAV_BYTES = 400 * 1024 * 1024; // WAV takes are captioned in pieces
 
 const body = z.object({ file: z.string().regex(FILE, "Choose a stored voice take or uploaded audio file.") });
 
@@ -27,8 +28,11 @@ export async function POST(request: Request) {
     } catch {
       throw notFound("Audio file");
     }
-    if (media.bytes.byteLength > MAX_BYTES) throw validationError("Audio is over 18 MB — trim the take and try again.");
-    const result = await transcribeAudio(media.bytes, media.mime.startsWith("audio/") || media.mime.startsWith("video/") ? media.mime : "audio/wav");
+    const isWav = wavDurationSec(media.bytes) !== null;
+    if (media.bytes.byteLength > (isWav ? MAX_WAV_BYTES : MAX_BYTES)) {
+      throw validationError(isWav ? "This voice-over is too long to caption in one go. Split it into parts and caption each." : "This audio file is over 18 MB. Use the voice take made in the app, or a shorter file.");
+    }
+    const result = await transcribeLongAudio(media.bytes, media.mime.startsWith("audio/") || media.mime.startsWith("video/") ? media.mime : "audio/wav");
     await recordUsage(caller, { kind: "transcription", provider: "gemini", model: result.model, status: "completed" });
     return NextResponse.json({ data: result });
   } catch (error) {

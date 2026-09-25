@@ -827,6 +827,97 @@ export async function transcribeAudio(bytes: Uint8Array, mimeType: string): Prom
   throw providerError("transcription", lastError ?? new Error("no usable captions"));
 }
 
+/** WAV layout: where the samples are and how they're stored (null for other formats). */
+function wavLayout(bytes: Uint8Array): { header: Buffer; dataStart: number; dataLen: number; byteRate: number; blockAlign: number; bits: number } | null {
+  const b = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (b.length < 44 || b.toString("ascii", 0, 4) !== "RIFF" || b.toString("ascii", 8, 12) !== "WAVE") return null;
+  let off = 12;
+  let fmt: Buffer | null = null;
+  while (off + 8 <= b.length) {
+    const id = b.toString("ascii", off, off + 4);
+    const size = b.readUInt32LE(off + 4);
+    if (id === "fmt ") fmt = b.subarray(off, off + 8 + size);
+    if (id === "data" && fmt) {
+      const byteRate = fmt.readUInt32LE(8 + 8);
+      const blockAlign = fmt.readUInt16LE(8 + 12);
+      const bits = fmt.readUInt16LE(8 + 14);
+      return { header: fmt, dataStart: off + 8, dataLen: Math.min(size, b.length - off - 8), byteRate, blockAlign, bits };
+    }
+    off += 8 + size + (size % 2);
+  }
+  return null;
+}
+
+/**
+ * Split a long WAV into pieces of about `pieceSec`, each cut at the quietest
+ * moment near the target so words aren't chopped. Returns each piece with its
+ * start time in the original.
+ */
+export function splitWav(bytes: Uint8Array, pieceSec = 180): { bytes: Uint8Array; offsetSec: number }[] {
+  const w = wavLayout(bytes);
+  if (!w || w.byteRate <= 0 || w.blockAlign <= 0) return [{ bytes, offsetSec: 0 }];
+  const b = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const total = w.dataLen;
+  const target = Math.floor((pieceSec * w.byteRate) / w.blockAlign) * w.blockAlign;
+  if (total <= target * 1.15) return [{ bytes, offsetSec: 0 }];
+  const window = Math.floor((2 * w.byteRate) / w.blockAlign) * w.blockAlign; // look ±2 s for a pause
+  const step = Math.max(w.blockAlign, Math.floor(w.byteRate / 50 / w.blockAlign) * w.blockAlign); // 20 ms frames
+  const cuts: number[] = [0];
+  while (total - cuts[cuts.length - 1] > target * 1.15) {
+    const aim = cuts[cuts.length - 1] + target;
+    let best = aim;
+    if (w.bits === 16) {
+      let bestEnergy = Infinity;
+      for (let at = Math.max(cuts[cuts.length - 1] + step, aim - window); at < Math.min(total - step, aim + window); at += step) {
+        let e = 0;
+        for (let i = at; i < at + step; i += w.blockAlign) e += Math.abs(b.readInt16LE(w.dataStart + i));
+        if (e < bestEnergy) {
+          bestEnergy = e;
+          best = at;
+        }
+      }
+    }
+    cuts.push(best);
+  }
+  cuts.push(total);
+  const out: { bytes: Uint8Array; offsetSec: number }[] = [];
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const len = cuts[i + 1] - cuts[i];
+    const riff = Buffer.alloc(12);
+    riff.write("RIFF", 0);
+    riff.writeUInt32LE(4 + w.header.length + 8 + len, 4);
+    riff.write("WAVE", 8);
+    const dataHead = Buffer.alloc(8);
+    dataHead.write("data", 0);
+    dataHead.writeUInt32LE(len, 4);
+    const piece = Buffer.concat([riff, w.header, dataHead, b.subarray(w.dataStart + cuts[i], w.dataStart + cuts[i + 1])]);
+    out.push({ bytes: new Uint8Array(piece), offsetSec: cuts[i] / w.byteRate });
+  }
+  return out;
+}
+
+/**
+ * Captions for any length of voice-over: long WAV takes are captioned in
+ * pieces (a few at a time) and the timings joined back into one track.
+ */
+export async function transcribeLongAudio(bytes: Uint8Array, mimeType: string): Promise<{ text: string; segments: TimedSegment[]; model: string }> {
+  const pieces = splitWav(bytes);
+  if (pieces.length === 1) return transcribeAudio(bytes, mimeType);
+  const results: { text: string; segments: TimedSegment[]; model: string }[] = new Array(pieces.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < pieces.length) {
+      const i = next++;
+      results[i] = await transcribeAudio(pieces[i].bytes, "audio/wav");
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  const segments = results.flatMap((r, i) =>
+    r.segments.map((sgm) => ({ startSec: Math.round((sgm.startSec + pieces[i].offsetSec) * 100) / 100, endSec: Math.round((sgm.endSec + pieces[i].offsetSec) * 100) / 100, text: sgm.text })),
+  );
+  return { text: results.map((r) => r.text).join(" "), segments, model: results.find((r) => r.model !== "estimated")?.model ?? results[0].model };
+}
+
 async function geminiTranscribe(bytes: Uint8Array, mimeType: string): Promise<{ text: string; segments: TimedSegment[]; model: string }> {
   if (bytes.byteLength === 0) throw new Error("Transcription failed: audio is empty.");
   if (!isGeminiConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
