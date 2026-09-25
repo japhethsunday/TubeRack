@@ -1,4 +1,5 @@
 import {
+  Lightbulb,
   LayoutDashboard,
   FolderKanban,
   Compass,
@@ -133,6 +134,15 @@ export const NAV_SECTIONS: NavSection[] = [
         status: "live",
         phase: "Phase 13",
         blurb: "Build and set up a channel from a niche.",
+      },
+      {
+        slug: "content-creator",
+        label: "Content Creator",
+        href: "/content-creator",
+        icon: Lightbulb,
+        status: "live",
+        phase: "Phase 13",
+        blurb: "Video ideas from your channel and your niche's winners.",
       },
       {
         slug: "niche",
