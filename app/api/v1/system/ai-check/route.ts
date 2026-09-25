@@ -5,6 +5,8 @@ import { extractJsonObject } from "@/src/lib/ai-gateway/json";
 import { getGeminiClient, GeminiTextProvider, GeminiTtsProvider } from "@/src/server/ai/gemini";
 import { NVIDIA_TEXT_MODELS } from "@/src/server/ai/nvidia";
 import { MISTRAL_TEXT_MODELS } from "@/src/server/ai/mistral";
+import { NVIDIA_IMAGE_MODELS, nvidiaImageWith } from "@/src/server/ai/nvidia-image";
+import { GeminiImageProvider } from "@/src/server/ai/gemini";
 import { mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
 
 export const maxDuration = 300;
@@ -120,6 +122,14 @@ async function run() {
     const live = new Set(catalogs.nvidia);
     const wanted = env.NVIDIA_TEXT_MODELS?.split(",").map((m) => m.trim()).filter(Boolean) ?? NVIDIA_TEXT_MODELS;
     for (const m of wanted.filter((m) => !live.has(m))) jobs.push(async () => ({ provider: "nvidia", model: m, test: "listed", ok: false, ms: 0, error: "not in NVIDIA's live model list" }));
+    for (const m of NVIDIA_IMAGE_MODELS) {
+      jobs.push(() =>
+        timed("nvidia", m.id, "image", async () => {
+          const out = await nvidiaImageWith(m, "A bright studio desk with a camera and a laptop, photo", "16:9", env.NVIDIA_API_KEY!);
+          if (out.dataUrl.length < 5_000) throw new Error("image too small");
+        }),
+      );
+    }
     jobs.push(...textChecks({ name: "NVIDIA", baseUrl: "https://integrate.api.nvidia.com/v1", key: env.NVIDIA_API_KEY }, "nvidia", wanted.filter((m) => live.has(m))));
   }
 
@@ -135,6 +145,11 @@ async function run() {
         const out = await new GeminiTextProvider().generateText({ prompt: 'Return {"ideas":["…","…","…"]} with three video ideas about home workouts.', maxTokens: 400, json: true });
         const obj = extractJsonObject(out.text) as { ideas?: unknown } | null;
         if (!obj || !Array.isArray(obj.ideas)) throw new Error("JSON missing ideas");
+      }),
+    () =>
+      timed("app", "image chain", "scene image", async () => {
+        const out = await new GeminiImageProvider().generateImage({ prompt: "A cozy home workout corner with a yoga mat, photo", aspectRatio: "9:16" });
+        if (!out.url.startsWith("data:image/") || out.url.length < 5_000) throw new Error("no image returned");
       }),
     () =>
       timed("app", "voice chain", "voice-over", async () => {

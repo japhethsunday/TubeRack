@@ -3,6 +3,7 @@ import { normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPl
 import { stripMarkdown } from "@/src/lib/text/markdown";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
 import { isNvidiaConfigured, nvidiaGenerateText } from "@/src/server/ai/nvidia";
+import { isNvidiaImageConfigured, nvidiaGenerateImage } from "@/src/server/ai/nvidia-image";
 import { isMistralConfigured, mistralGenerateText, mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
 
 type TextRequest = { prompt: string; maxTokens?: number; json?: boolean };
@@ -275,6 +276,15 @@ export class GeminiImageProvider implements ImageProvider {
     const env = getServerEnv();
     const model = env.GEMINI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL;
     const aspect = request.aspectRatio === "9:16" || request.aspectRatio === "1:1" ? request.aspectRatio : "16:9";
+    const nvidia = isNvidiaImageConfigured(env);
+    // No Gemini key: NVIDIA's image models directly.
+    if (!env.GEMINI_API_KEY && nvidia) {
+      try {
+        return { url: (await nvidiaGenerateImage(prompt, aspect)).dataUrl, prompt: request.prompt };
+      } catch (error) {
+        throw providerError("image generation", error);
+      }
+    }
     try {
       const ai = getGeminiClient(env);
       const response = await withModelFallback(model, FALLBACK_MODELS.image, (m) =>
@@ -293,7 +303,15 @@ export class GeminiImageProvider implements ImageProvider {
       // until object-storage upload lands on the media route.
       return { url: `data:${mimeType};base64,${data}`, prompt: request.prompt };
     } catch (error) {
-      if (error instanceof ProviderNotConfiguredError) throw error;
+      if (error instanceof ProviderNotConfiguredError && !nvidia) throw error;
+      // Gemini out of image quota, busy or failing: NVIDIA's image models.
+      if (nvidia) {
+        try {
+          return { url: (await nvidiaGenerateImage(prompt, aspect)).dataUrl, prompt: request.prompt };
+        } catch (nvidiaError) {
+          console.error("[nvidia] image fallback failed:", nvidiaError instanceof Error ? nvidiaError.message.slice(0, 300) : nvidiaError);
+        }
+      }
       throw providerError("image generation", error);
     }
   }
