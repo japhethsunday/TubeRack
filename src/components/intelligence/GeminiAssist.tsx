@@ -6,6 +6,7 @@ import { Sparkles, Copy, Check } from "lucide-react";
 import { runProviderIntelligence } from "@/src/lib/ai-client";
 import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { useProductionContext } from "@/src/components/projects/useProductionContext";
+import { useScripts } from "@/src/components/script/ScriptProvider";
 import type { IntelligenceTaskType } from "@/src/lib/intelligence/tasks";
 import { Button } from "@/src/components/ui/Button";
 import { DownloadButton } from "@/src/components/ui/DownloadButton";
@@ -37,6 +38,12 @@ export function GeminiAssist({
   const intel = useIntel();
   // Every tool works from the same production brief (topic, audience, tone, look).
   const production = useProductionContext(saveAs.projectId);
+  // ...and from what the video actually says, so outputs match the script.
+  const { scriptFor } = useScripts();
+  const scriptExcerpt = (scriptFor(saveAs.projectId)?.sections ?? [])
+    .map((s) => s.text)
+    .join("\n")
+    .slice(0, 3000);
   const saved = intel.outputFor(saveAs.projectId, saveAs.key);
   const [busy, setBusy] = useState(false);
   const [fresh, setFresh] = useState("");
@@ -47,7 +54,10 @@ export function GeminiAssist({
   async function run() {
     setBusy(true);
     setError("");
-    const outcome = await runProviderIntelligence(task, production ? { productionBrief: production.brief, ...context } : context);
+    const shared: Record<string, unknown> = {};
+    if (production) shared.productionBrief = production.brief;
+    if (scriptExcerpt && !("scriptText" in context) && !("script" in context)) shared.script = scriptExcerpt;
+    const outcome = await runProviderIntelligence(task, { ...shared, ...context });
     setBusy(false);
     if (outcome.ok) {
       setFresh(outcome.data.text);
