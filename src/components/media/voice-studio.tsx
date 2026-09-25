@@ -151,28 +151,39 @@ export function VoiceStudio({
   }
 
   const sceneSources = sources.filter((s) => s.id.startsWith("scn-") && s.text.trim());
-  const [batch, setBatch] = useState<{ done: number; total: number; failed: number } | null>(null);
-
-  /** Voice every scene in one go: one take per scene, attached to that scene. */
+  /**
+   * Voice every scene as ONE take: scene narration in order, voiced in a
+   * single pass (the server splits and joins long text), attached to all
+   * scenes. Longer than one take allows? Falls back to one take per scene.
+   */
   async function voiceAllScenes() {
     if (sceneSources.length === 0) return;
     setRunning(true);
     setGenError(null);
-    let done = 0;
-    let failed = 0;
-    setBatch({ done, total: sceneSources.length, failed });
-    // A few at a time: fast for long videos without tripping rate limits.
-    let next = 0;
-    const worker = async () => {
-      while (next < sceneSources.length) {
-        const s = sceneSources[next++];
-        const ok = await generateTake(s.text.trim().slice(0, MAX_TAKE_CHARS), s.label, [s.id.slice(4)]);
-        if (ok) done++;
-        else failed++;
-        setBatch({ done, total: sceneSources.length, failed });
+    const combined = sceneSources.map((s) => s.text.trim()).join("\n\n");
+    const ids = sceneSources.map((s) => s.id.slice(4));
+    if (combined.length <= MAX_TAKE_CHARS) {
+      await generateTake(combined, `All ${sceneSources.length} scenes`, ids);
+    } else {
+      // Too long for one file: split into as few takes as possible, in order.
+      let group: typeof sceneSources = [];
+      let len = 0;
+      const flush = async () => {
+        if (!group.length) return;
+        const first = group[0].label.split(":")[0];
+        const last = group[group.length - 1].label.split(":")[0];
+        await generateTake(group.map((g) => g.text.trim()).join("\n\n"), group.length > 1 ? `${first}–${last}` : group[0].label, group.map((g) => g.id.slice(4)));
+        group = [];
+        len = 0;
+      };
+      for (const s of sceneSources) {
+        const t = s.text.trim().slice(0, MAX_TAKE_CHARS);
+        if (len + t.length + 2 > MAX_TAKE_CHARS) await flush();
+        group.push(s);
+        len += t.length + 2;
       }
-    };
-    await Promise.all([worker(), worker(), worker()]);
+      await flush();
+    }
     setRunning(false);
   }
 
@@ -332,21 +343,16 @@ export function VoiceStudio({
             </p>
             <Button onClick={saveTake} disabled={!text.trim() || running || Boolean(block)}>
               <Mic className="size-4" aria-hidden="true" />
-              {running && !batch ? "Generating voice-over…" : isGemini ? "Generate voice-over" : "Preview + save take"}
+              {running ? "Generating voice-over…" : isGemini ? "Generate voice-over" : "Preview + save take"}
             </Button>
             {isGemini && sceneSources.length > 1 && (
               <Button variant="outline" onClick={() => void voiceAllScenes()} disabled={running || Boolean(block)}>
                 <Mic className="size-4" aria-hidden="true" />
-                {batch && running ? `Voicing scenes… ${batch.done + batch.failed}/${batch.total}` : `Voice all ${sceneSources.length} scenes`}
+                {running ? "Voicing all scenes…" : `Voice all ${sceneSources.length} scenes as one take`}
               </Button>
             )}
-            {batch && !running && (
-              <p className="text-xs text-muted-text" role="status">
-                {batch.done} of {batch.total} scenes voiced{batch.failed ? `; ${batch.failed} failed — use Retry on those takes` : ""}.
-              </p>
-            )}
             {text.trim().length > MAX_TAKE_CHARS && (
-              <p className="text-xs text-warning">This text is longer than one take allows (~15 min). Voice it scene by scene instead.</p>
+              <p className="text-xs text-warning">This text is longer than one take allows (~15 min). Use “Voice all scenes” — it splits it into as few takes as possible.</p>
             )}
             {genError && (
               <Alert tone="warn" title="Voice could not be generated">
