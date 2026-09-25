@@ -270,6 +270,10 @@ function Studio() {
     const startSec = at ?? endOf(tid);
     const full = asset.durationSec && asset.durationSec > 0 ? asset.durationSec : kind === "image" ? 5 : 5;
     const seg = segments.find((s) => startSec >= s.startSec && startSec < s.startSec + s.durationSec);
+    // Background music is trimmed to the video (ending with a short fade), so
+    // a long song never makes the video longer than its content.
+    const contentEnd = Math.max(durationOf(clips.filter((c) => c.kind !== "music")), segments.reduce((n, s) => n + s.durationSec, 0));
+    const musicFit = kind === "music" && contentEnd > startSec + 1 ? Math.min(full, contentEnd - startSec) : full;
     // Never drop a clip on top of another: the main track makes room,
     // other tracks use the next free gap.
     const mainTrackId = trackFor("video");
@@ -280,10 +284,10 @@ function Studio() {
       name: asset.title,
       assetId: asset.id,
       startSec,
-      durationSec: kind === "image" ? 5 : Math.round(full * 100) / 100,
+      durationSec: kind === "image" ? 5 : Math.round(musicFit * 100) / 100,
       volume: kind === "music" ? 0.35 : 1,
       fadeInSec: 0,
-      fadeOutSec: 0,
+      fadeOutSec: kind === "music" && musicFit < full ? Math.min(3, musicFit / 4) : 0,
       muted: false,
       inSec: kind === "image" ? undefined : 0,
       speed: kind === "image" ? undefined : 1,

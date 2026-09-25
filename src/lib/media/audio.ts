@@ -95,11 +95,31 @@ export function sfxRecipe(type: SfxType): SfxRecipe {
 
 /* ---------------- Browser renderers (WebAudio, client-only) ---------------- */
 
+let shared: AudioContext | null = null;
+
+/** One shared audio engine: phones only let it play after a tap has resumed it. */
 function ensureContext(): AudioContext {
   if (typeof window === "undefined") throw new Error("Audio renders in the browser only.");
+  if (shared && shared.state !== "closed") return shared;
   const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AC) throw new Error("This browser does not support WebAudio.");
-  return new AC();
+  shared = new AC();
+  return shared;
+}
+
+/** Call inside a tap/click: wakes the shared audio engine on phones. */
+export function unlockWebAudio(): void {
+  try {
+    const ctx = ensureContext();
+    if (ctx.state === "suspended") void ctx.resume();
+    // A one-sample silent buffer completes the unlock on older iOS.
+    const src = ctx.createBufferSource();
+    src.buffer = ctx.createBuffer(1, 1, 22050);
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch {
+    // No WebAudio: file-based audio still plays.
+  }
 }
 
 /** Render a looping music bed. Returns buffer + context (caller closes). */

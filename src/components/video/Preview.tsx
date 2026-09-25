@@ -8,9 +8,13 @@ import type { Composition, TimelineClip } from "@/src/lib/video/types";
 import { drawComposition, sourceTime, transitionState } from "@/src/lib/video/compositor";
 import { assetUrl, loadImage, type RenderAsset } from "@/src/lib/video/render";
 import { mixGain } from "@/src/lib/video/mix";
-import { renderMusic, renderSfx, musicRecipe, speakText, stopSpeech, type MusicMood, type SfxType } from "@/src/lib/media/audio";
+import { renderMusic, renderSfx, musicRecipe, speakText, stopSpeech, unlockWebAudio, type MusicMood, type SfxType } from "@/src/lib/media/audio";
 import { stopAllPlayback, claimPlayback } from "@/src/components/media/players";
 import { cx } from "@/src/components/ui/cx";
+
+/** 0.1 s of silence: played inside the Play tap to unlock audio on phones. */
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRpIAAABXQVZFZm10IBAAAAABAAEAESsAABErAAABAAgAZGF0YW4AAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==";
 
 /**
  * Whole-file audio cache. Streaming a long WAV while seeking it makes the
@@ -37,7 +41,7 @@ function cachedAudio(url: string): Promise<string> {
 /** Starts a cached audio file at the playhead once its data is ready; returns a stop function. */
 function playCached(
   url: string,
-  opts: { volume: number; rate: number; loop?: boolean; at: () => number },
+  opts: { volume: number; rate: number; loop?: boolean; at: () => number; el?: HTMLAudioElement | null },
 ): { el: () => HTMLAudioElement | null; stop: () => void } {
   let stopped = false;
   let audio: HTMLAudioElement | null = null;
@@ -45,7 +49,9 @@ function playCached(
     .catch(() => url)
     .then((src) => {
       if (stopped) return;
-      const el = new Audio();
+      // A player unlocked by the Play tap (phones block audio started later).
+      const el = opts.el ?? new Audio();
+      el.pause();
       el.preload = "auto";
       el.loop = !!opts.loop;
       el.volume = Math.min(1, Math.max(0, opts.volume));
@@ -262,6 +268,7 @@ export function Preview({
       if (voice && url) {
         const clip = voice;
         voiceAudioRef.current = playCached(url, {
+          el: players.current?.voice,
           volume: mixGain(s.comp, voice, t) * s.volume,
           rate: voice.speed ?? 1,
           at: () => sourceTime(clip, state.current.playhead),
@@ -290,6 +297,7 @@ export function Preview({
         if (url) {
           const clip = music;
           const h = playCached(url, {
+            el: players.current?.music,
             volume: mixGain(s.comp, music, t) * s.volume,
             rate: music.speed ?? 1,
             loop: true,
@@ -345,7 +353,7 @@ export function Preview({
       const a = s.assetFor(clip.assetId);
       const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl : null);
       if (url) {
-        playCached(url, { volume: mixGain(s.comp, clip, t) * s.volume, rate: 1, at: () => 0 });
+        playCached(url, { volume: mixGain(s.comp, clip, t) * s.volume, rate: 1, at: () => 0, el: players.current?.sfx });
       } else if (a) {
         try {
           const recipe = JSON.parse(a.payload) as { type: SfxType };
@@ -371,6 +379,25 @@ export function Preview({
     onPlayingChange?.(next);
   }
 
+  /**
+   * Phones only allow audio that starts inside a tap. Each Play tap "unlocks"
+   * one reusable player per role (voice, music, effects) by playing a silent
+   * sound; the real audio then plays through those same players.
+   */
+  const players = useRef<{ voice: HTMLAudioElement; music: HTMLAudioElement; sfx: HTMLAudioElement } | null>(null);
+  function unlockAudio() {
+    if (typeof Audio === "undefined") return;
+    if (!players.current) players.current = { voice: new Audio(), music: new Audio(), sfx: new Audio() };
+    for (const el of Object.values(players.current)) {
+      el.muted = false;
+      if (!el.src || el.paused) {
+        el.src = SILENT_WAV;
+        void el.play().then(() => el.pause()).catch(() => {});
+      }
+    }
+    unlockWebAudio();
+  }
+
   function toggle() {
     if (playingRef.current) {
       setPlayingState(false);
@@ -379,6 +406,7 @@ export function Preview({
     } else {
       if (state.current.playhead >= state.current.duration - 0.05) onPlayhead(0);
       sfxFired.current.clear();
+      unlockAudio();
       setPlayingState(true);
     }
   }

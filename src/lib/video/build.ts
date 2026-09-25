@@ -229,8 +229,16 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
   return clips;
 }
 
+/**
+ * Timeline length: where the content ends. Background music never makes the
+ * video longer than its visuals, voice and text (a 2-hour song under a
+ * 3-minute video is a 3-minute video); music alone counts only when it's all
+ * there is.
+ */
 export function durationOf(clips: TimelineClip[]): number {
-  return clips.reduce((n, c) => Math.max(n, c.startSec + c.durationSec), 0);
+  const end = (list: TimelineClip[]) => list.reduce((n, c) => Math.max(n, c.startSec + c.durationSec), 0);
+  const content = end(clips.filter((c) => c.kind !== "music"));
+  return content > 0 ? content : end(clips);
 }
 
 export function clipsAt(clips: TimelineClip[], timeSec: number): TimelineClip[] {

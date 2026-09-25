@@ -21,3 +21,12 @@ test("voice and music have independent levels; music ducks under voice", () => {
   const muted = { tracks: tracks.map((t) => (t.id === "v" ? { ...t, muted: true } : t)), clips: [voice, music] };
   assert.equal(mixGain(muted, music, 12), 0.5 * MUSIC_BASE);
 });
+
+import { durationOf } from "@/src/lib/video/build";
+
+test("a long background song doesn't make the video longer than its content", () => {
+  const v = clip("v1", "vt", "image", 0, 180);
+  const m = clip("m1", "m", "music", 0, 7178);
+  assert.equal(durationOf([v, m]), 180);
+  assert.equal(durationOf([m]), 7178);
+});
