@@ -78,12 +78,14 @@ function playCached(
   };
 }
 
-export function fmtTimecode(sec: number, fps = 30): string {
+/** Plain time: "0:07.6" while editing, "5:49" for a length (hours when needed). */
+export function fmtTimecode(sec: number, _fps = 30, tenths = true): string {
   const s = Math.max(0, sec);
-  const m = Math.floor(s / 60);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
   const r = Math.floor(s % 60);
-  const f = Math.floor((s - Math.floor(s)) * fps);
-  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}:${String(f).padStart(2, "0")}`;
+  const base = h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
+  return tenths ? `${base}.${Math.floor((s - Math.floor(s)) * 10)}` : base;
 }
 
 /**
@@ -533,7 +535,7 @@ export function Preview({
         )}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-white/5 px-3 py-1.5">
           <span className="whitespace-nowrap font-mono text-[10px] tabular-nums text-zinc-300 sm:text-[11px]" aria-live="off">
-            {fmtTimecode(playhead, fps)} <span className="text-zinc-600">/ {fmtTimecode(duration, fps)}</span>
+            {fmtTimecode(playhead, fps)} <span className="text-zinc-600">/ {fmtTimecode(duration, fps, false)}</span>
           </span>
           <div className="flex items-center gap-0.5">
             <button type="button" onClick={() => onPlayhead(0)} aria-label="Go to start" className={iconBtn}><SkipBack className="size-4" aria-hidden="true" /></button>

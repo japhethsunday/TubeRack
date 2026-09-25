@@ -84,6 +84,11 @@ export function ExportStudio({
   const span = Math.max(0, range.to - range.from);
   const estBytes = ((estimateBitrate(width, height, settings.fps, settings.quality) + settings.audioKbps * 1000) * span) / 8;
   const blocking = issues.filter((i) => i.severity === "block");
+  // What sets the length: the clip that ends last (background music never does).
+  const longest = comp.clips
+    .filter((c) => c.kind !== "music")
+    .reduce<(typeof comp.clips)[number] | null>((m, c) => (!m || c.startSec + c.durationSec > m.startSec + m.durationSec ? c : m), null);
+  const visualEnd = comp.clips.filter((c) => c.kind === "image" || c.kind === "video").reduce((n, c) => Math.max(n, c.startSec + c.durationSec), 0);
   const set = (p: Partial<ExportSettings>) => setSettings((s) => ({ ...s, ...p }));
 
   async function start() {
@@ -165,7 +170,14 @@ export function ExportStudio({
       </div>
       <p className="text-[11px] text-muted-text">
         {width}×{height} · {settings.fps} fps · {fmtTime(span)} · ≈{fmtMb(estBytes)}. {fastExport ? "Fast export: usually quicker than the video’s length. Keep this tab open." : "Export runs in real time in this tab."}
-      </p>
+      {longest && settings.range === "all" && (
+          <span className="mt-1 block">
+            Length set by “{longest.name}” (ends at {fmtTime(longest.startSec + longest.durationSec)}).
+            {visualEnd > 0 && longest.startSec + longest.durationSec - visualEnd > 2 && (
+              <span className="text-warning"> Pictures end at {fmtTime(visualEnd)} — the rest would show a blank screen. Trim that clip or add visuals.</span>
+            )}
+          </span>
+        )}</p>
 
       {blocking.length > 0 && (
         <ul className="space-y-1 rounded-lg bg-destructive/10 p-2.5 text-xs text-destructive">
