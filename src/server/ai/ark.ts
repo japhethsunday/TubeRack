@@ -1,6 +1,7 @@
 import { getServerEnv } from "@/src/lib/env";
 import { chatGenerateText } from "@/src/server/ai/chat-compat";
 
+// Model names below come from this account's live model list (Sep 2026).
 /**
  * BytePlus ModelArk (ai.byteplus.com/ark): Seed text models, Seedream
  * images and Seedance video. Chat and images use OpenAI-style endpoints;
@@ -9,9 +10,9 @@ import { chatGenerateText } from "@/src/server/ai/chat-compat";
  */
 const DEFAULT_BASE = "https://ark.ap-southeast.bytepluses.com/api/v3";
 
-export const ARK_TEXT_MODELS = ["seed-2-0-lite-260228", "seed-2-0-pro-260328", "seed-1-6-250915", "seed-1-6-flash-250715", "deepseek-v3-1-250821", "kimi-k2-250905"];
-export const ARK_IMAGE_MODELS = ["seedream-5-0-lite-260128", "seedream-4-5-251128", "seedream-4-0-250828", "seedream-3-0-t2i-250415"];
-export const ARK_VIDEO_MODELS = ["seedance-1-0-pro-fast-251015", "seedance-1-0-lite-t2v-250428", "seedance-1-0-pro-250528"];
+export const ARK_TEXT_MODELS = ["seed-2-0-lite-260428", "dola-seed-2-1-turbo-260628", "seed-2-0-mini-260428", "seed-1-8-251228", "deepseek-v4-flash-ga-260731", "seed-1-6-flash-250715"];
+export const ARK_IMAGE_MODELS = ["dola-seedream-5-0-flash-260915", "seedream-5-0-260128", "seedream-4-5-251128", "seedream-4-0-250828"];
+export const ARK_VIDEO_MODELS = ["dreamina-seedance-2-0-fast-260128", "dreamina-seedance-2-0-mini-260615", "seedance-1-5-pro-251215", "seedance-1-0-pro-fast-251015"];
 
 const list = (v: string | undefined, fallback: string[]) => {
   const custom = v?.split(",").map((m) => m.trim()).filter(Boolean);
