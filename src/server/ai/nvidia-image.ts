@@ -8,13 +8,10 @@ import { getServerEnv } from "@/src/lib/env";
 type Aspect = "16:9" | "9:16" | "1:1";
 type Family = "flux" | "sd3" | "sdxl";
 
+// Tested live on this account: FLUX.1-dev answers (~10 s). FLUX.1-schnell
+// hung, and the Stable Diffusion models aren't enabled for the account.
 export const NVIDIA_IMAGE_MODELS: { id: string; family: Family; steps: number }[] = [
   { id: "black-forest-labs/flux.1-dev", family: "flux", steps: 30 },
-  { id: "black-forest-labs/flux.1-schnell", family: "flux", steps: 4 },
-  { id: "stabilityai/stable-diffusion-3.5-large", family: "sd3", steps: 30 },
-  { id: "stabilityai/stable-diffusion-3-medium", family: "sd3", steps: 30 },
-  { id: "stabilityai/stable-diffusion-xl", family: "sdxl", steps: 25 },
-  { id: "stabilityai/sdxl-turbo", family: "sdxl", steps: 2 },
 ];
 
 const SIZES: Record<Aspect, { width: number; height: number }> = {
