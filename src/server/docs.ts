@@ -5,7 +5,7 @@ import { requireUser } from "@/src/server/auth";
 import { authorizeResource } from "@/src/server/authz";
 import { toErrorResponse, backendUnavailable, validationError, notFound } from "@/src/server/errors";
 import { parseBody, parseId } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 
@@ -78,7 +78,7 @@ export function docHandlers(kind: DocKind) {
 
   async function GET(request: Request) {
     try {
-      const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+      const limit = limiterFor("read").take(`read:${callerKey(request)}`);
       if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
       const user = await requireUser();
       const projectId = projectIdFrom(request);
@@ -94,7 +94,7 @@ export function docHandlers(kind: DocKind) {
 
   async function PUT(request: Request) {
     try {
-      const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+      const limit = limiterFor("write").take(`write:${callerKey(request)}`);
       if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
       const user = await requireUser();
       const projectId = projectIdFrom(request);

@@ -5,7 +5,7 @@ import { requireUser } from "@/src/server/auth";
 import { requireMembership, assertCanManageBilling } from "@/src/server/authz";
 import { toErrorResponse, backendUnavailable, validationError } from "@/src/server/errors";
 import { parseBody, parseId } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 
@@ -19,7 +19,7 @@ const grantSchema = z.object({
 /** POST /api/v1/credits/grant — owner only. Balance math in a transaction. */
 export async function POST(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const body = await parseBody(request, grantSchema);

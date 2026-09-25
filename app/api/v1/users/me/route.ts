@@ -3,7 +3,7 @@ import { requireUser } from "@/src/server/auth";
 import { getDb } from "@/src/server/db";
 import { toErrorResponse, backendUnavailable, validationError } from "@/src/server/errors";
 import { parseBody, nameSchema } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 import { z } from "zod";
@@ -11,7 +11,7 @@ import { z } from "zod";
 /** GET /api/v1/users/me — never includes password hashes or tokens. */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const db = getDb();
@@ -35,7 +35,7 @@ const patchSchema = z.object({ name: nameSchema.optional() }).refine((v) => v.na
 /** PATCH /api/v1/users/me — profile name only. */
 export async function PATCH(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const body = await parseBody(request, patchSchema);

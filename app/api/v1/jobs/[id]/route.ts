@@ -3,7 +3,7 @@ import { requireUser } from "@/src/server/auth";
 import { requireMembership } from "@/src/server/authz";
 import { defaultWorkspace } from "@/src/server/sync";
 import { toErrorResponse, notFound, rateLimited } from "@/src/server/errors";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { parseId } from "@/src/server/validate";
 import { cancelJob, getJob, retryJob } from "@/src/server/jobs/store";
 
@@ -15,7 +15,7 @@ function idFrom(request: Request): string {
 /** GET /api/v1/jobs/[id] — one execution record (viewer+). */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const workspaceId = await defaultWorkspace(user);
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 /** PATCH /api/v1/jobs/[id] — cancel or re-queue (editor+). */
 export async function PATCH(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const workspaceId = await defaultWorkspace(user);

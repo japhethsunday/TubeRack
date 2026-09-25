@@ -9,7 +9,7 @@ import {
   zodToDetails,
   rateLimited,
 } from "@/src/server/errors";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { createJob, listJobs, JOB_TYPES, JOB_STATUSES } from "@/src/server/jobs/store";
 
 const listQuery = z.object({
@@ -32,7 +32,7 @@ const createBody = z.object({
 /** GET /api/v1/jobs — workspace execution records (viewer+). */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const workspaceId = await defaultWorkspace(user);
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 /** POST /api/v1/jobs — queue an execution record (editor+). */
 export async function POST(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const workspaceId = await defaultWorkspace(user);

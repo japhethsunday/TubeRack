@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/src/server/auth";
 import { syncPut, syncGet } from "@/src/server/sync";
 import { toErrorResponse, validationError } from "@/src/server/errors";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { SYNC_SCHEMAS, type SyncKind } from "@/src/lib/sync-map";
 
@@ -20,7 +20,7 @@ function kindFrom(request: Request): SyncKind {
 /** GET /api/v1/sync/:bundle — assemble server state into frontend shapes. */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const kind = kindFrom(request);
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 /** PUT /api/v1/sync/:bundle — validated merge with tombstones. */
 export async function PUT(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const kind = kindFrom(request);

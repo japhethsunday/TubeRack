@@ -4,7 +4,7 @@ import { requireUser } from "@/src/server/auth";
 import { authorizeResource, assertCanEditProject, getMembership } from "@/src/server/authz";
 import { toErrorResponse, backendUnavailable, validationError, notFound, forbidden } from "@/src/server/errors";
 import { parseId, parsePagination, pageResponse } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, clientKey, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 import { validateUpload, readHeader, UPLOAD_LIMITS } from "@/src/lib/media/validation";
@@ -19,7 +19,7 @@ function projectIdFrom(request: Request): string {
 /** GET /api/v1/assets?projectId=&kind=&status= — metadata only, never bytes. */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const projectId = projectIdFrom(request);

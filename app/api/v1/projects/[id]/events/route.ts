@@ -4,7 +4,7 @@ import { requireUser } from "@/src/server/auth";
 import { authorizeResource } from "@/src/server/authz";
 import { toErrorResponse, backendUnavailable } from "@/src/server/errors";
 import { parseId, parsePagination, pageResponse } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 
 function projectIdFrom(request: Request): string {
@@ -15,7 +15,7 @@ function projectIdFrom(request: Request): string {
 /** GET /api/v1/projects/[id]/events — project activity (viewer+). */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const projectId = projectIdFrom(request);

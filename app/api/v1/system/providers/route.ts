@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { describeProviders } from "@/src/server/ai/registry";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited, toErrorResponse } from "@/src/server/errors";
 import { requireUser } from "@/src/server/auth";
 
@@ -11,7 +11,7 @@ import { requireUser } from "@/src/server/auth";
  */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     await requireUser();
     return NextResponse.json({ data: { providers: describeProviders() } });

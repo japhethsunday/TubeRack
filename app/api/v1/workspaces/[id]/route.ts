@@ -5,7 +5,7 @@ import { requireUser } from "@/src/server/auth";
 import { requireMembership, assertCanManageWorkspace } from "@/src/server/authz";
 import { toErrorResponse, backendUnavailable, forbidden, notFound } from "@/src/server/errors";
 import { parseBody, parseId, nameSchema } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 
@@ -16,7 +16,7 @@ function idFrom(request: Request): string {
 /** GET /api/v1/workspaces/[id] */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const id = idFrom(request);
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 /** PATCH /api/v1/workspaces/[id] — rename (admin+). */
 export async function PATCH(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const id = idFrom(request);
@@ -59,7 +59,7 @@ export async function PATCH(request: Request) {
 /** DELETE /api/v1/workspaces/[id] — soft-delete (owner only). */
 export async function DELETE(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const id = idFrom(request);

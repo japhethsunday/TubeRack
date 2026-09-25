@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 /**
  * Rate-limiting foundation: token-bucket abstraction with an in-memory
  * implementation. The interface is backend-agnostic so a distributed store
@@ -81,4 +82,16 @@ export function clientKey(request: Request): string {
   const forwarded = h.get("x-vercel-forwarded-for") ?? h.get("x-real-ip") ?? h.get("x-forwarded-for");
   const ip = forwarded?.split(",")[0].trim() || "unknown";
   return `ip:${ip}`;
+}
+
+/**
+ * Key for everyday read/write limits: the signed-in session when there is one
+ * (so many users sharing one IP — mobile carriers, offices — don't throttle
+ * each other), otherwise the client IP. Sign-in and sign-up keep using the IP.
+ */
+export function callerKey(request: Request): string {
+  const cookie = request.headers.get("cookie") ?? "";
+  const m = /(?:^|;\s*)tr_session=([^;]+)/.exec(cookie);
+  if (m && m[1].length >= 16) return `sess:${createHash("sha256").update(m[1]).digest("hex").slice(0, 24)}`;
+  return clientKey(request);
 }

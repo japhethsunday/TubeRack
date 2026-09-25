@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/src/server/db";
 import { requireUser } from "@/src/server/auth";
 import { toErrorResponse, backendUnavailable } from "@/src/server/errors";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 
 /** POST /api/v1/notifications/read-all — mark own notifications read. */
 export async function POST(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const db = getDb();

@@ -5,7 +5,7 @@ import { requireUser } from "@/src/server/auth";
 import { authorizeResource } from "@/src/server/authz";
 import { toErrorResponse, backendUnavailable, notFound } from "@/src/server/errors";
 import { parseBody, parseId } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 
@@ -34,7 +34,7 @@ function channelIdFrom(request: Request): string {
 /** GET /api/v1/channels/[id]/brand — channel DNA (empty defaults when unset). */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const channelId = channelIdFrom(request);
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 /** PUT /api/v1/channels/[id]/brand — upsert DNA (editor+). */
 export async function PUT(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const channelId = channelIdFrom(request);

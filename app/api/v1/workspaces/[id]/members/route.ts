@@ -5,7 +5,7 @@ import { requireUser } from "@/src/server/auth";
 import { requireMembership, assertCanManageMembers, type Role } from "@/src/server/authz";
 import { toErrorResponse, backendUnavailable, conflict, forbidden, notFound } from "@/src/server/errors";
 import { parseBody, parseId, parsePagination, pageResponse, emailSchema } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 
@@ -20,7 +20,7 @@ function workspaceIdFrom(request: Request): string {
 /** GET /api/v1/workspaces/[id]/members — list (member+). */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const workspaceId = workspaceIdFrom(request);
@@ -52,7 +52,7 @@ const inviteSchema = z.object({
 /** POST invite by email (admin+). Owner role cannot be granted this way. */
 export async function POST(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const workspaceId = workspaceIdFrom(request);

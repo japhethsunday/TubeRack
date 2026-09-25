@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/src/server/auth";
 import { getDb } from "@/src/server/db";
 import { backendUnavailable, toErrorResponse } from "@/src/server/errors";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 
 /** Applied migration state. Authenticated users only (ops visibility). */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     await requireUser();
     const db = getDb();

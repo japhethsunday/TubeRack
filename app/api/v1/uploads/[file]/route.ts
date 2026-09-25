@@ -3,7 +3,7 @@ import { requireUser } from "@/src/server/auth";
 import { requireMembership } from "@/src/server/authz";
 import { defaultWorkspace } from "@/src/server/sync";
 import { storageSignedUrl } from "@/src/server/storage";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { notFound, rateLimited, toErrorResponse, validationError } from "@/src/server/errors";
 
 // A whole file, or one part of a multi-part upload (".partN").
@@ -12,7 +12,7 @@ const FILE = /^[0-9a-f-]{36}\.(png|jpg|gif|webp|mp4|webm|mov|mp3|m4a|wav|ogg)(\.
 /** GET /api/v1/uploads/:file — owner-only; redirects to a 1-hour signed link (supports video seeking). */
 export async function GET(request: Request, { params }: { params: Promise<{ file: string }> }) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const { file } = await params;
     if (!FILE.test(file)) throw validationError("Invalid file.");

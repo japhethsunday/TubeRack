@@ -4,7 +4,7 @@ import { requireUser } from "@/src/server/auth";
 import { authorizeResource } from "@/src/server/authz";
 import { toErrorResponse, backendUnavailable, notFound } from "@/src/server/errors";
 import { parseId } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { storageGet } from "@/src/server/storage";
 
@@ -15,7 +15,7 @@ import { storageGet } from "@/src/server/storage";
  */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const id = parseId(new URL(request.url).pathname.split("/").slice(-2)[0] ?? "", "asset");

@@ -4,7 +4,7 @@ import { getDb } from "@/src/server/db";
 import { requireUser } from "@/src/server/auth";
 import { toErrorResponse, backendUnavailable, conflict } from "@/src/server/errors";
 import { parseBody, parsePagination, pageResponse, nameSchema } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 
@@ -13,7 +13,7 @@ const createSchema = z.object({ name: nameSchema });
 /** GET /api/v1/workspaces — workspaces I belong to. POST — create + owner membership + credit account. */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const pagination = parsePagination(request.url, ["created_at", "updated_at", "name"]);
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const body = await parseBody(request, createSchema);

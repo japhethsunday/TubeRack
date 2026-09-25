@@ -4,7 +4,7 @@ import { requireUser } from "@/src/server/auth";
 import { authorizeResource, assertCanEditProject, getMembership } from "@/src/server/authz";
 import { toErrorResponse, backendUnavailable, notFound, forbidden } from "@/src/server/errors";
 import { parseId } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 
@@ -16,7 +16,7 @@ function idFrom(request: Request): string {
 /** POST /api/v1/projects/[id]/duplicate — deep copy with "(copy)" suffix. */
 export async function POST(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const id = idFrom(request);

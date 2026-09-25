@@ -5,7 +5,7 @@ import { requireUser } from "@/src/server/auth";
 import { requireMembership, assertCanManageMembers, type Role } from "@/src/server/authz";
 import { toErrorResponse, backendUnavailable, forbidden, notFound, validationError } from "@/src/server/errors";
 import { parseBody, parseId } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 
@@ -30,7 +30,7 @@ async function lastOwnerGuard(workspaceId: string, membershipId: string): Promis
 /** PATCH /api/v1/memberships/[id] — change role (admin+). */
 export async function PATCH(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const id = idFrom(request);
@@ -63,7 +63,7 @@ export async function PATCH(request: Request) {
 /** DELETE /api/v1/memberships/[id] — remove member (admin+, or self). */
 export async function DELETE(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const id = idFrom(request);

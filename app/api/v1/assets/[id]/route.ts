@@ -5,7 +5,7 @@ import { requireUser } from "@/src/server/auth";
 import { authorizeResource, assertCanEditProject, assertCanDeleteProject, getMembership } from "@/src/server/authz";
 import { toErrorResponse, backendUnavailable, notFound, validationError, forbidden } from "@/src/server/errors";
 import { parseBody, parseId } from "@/src/server/validate";
-import { limiterFor, clientKey } from "@/src/server/rate-limit";
+import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 import { storageDelete } from "@/src/server/storage";
@@ -28,7 +28,7 @@ async function loadAsset(id: string) {
 /** GET /api/v1/assets/[id] — metadata (viewer+ of the project). */
 export async function GET(request: Request) {
   try {
-    const limit = limiterFor("read").take(`read:${clientKey(request)}`);
+    const limit = limiterFor("read").take(`read:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const id = idFrom(request);
@@ -51,7 +51,7 @@ const patchSchema = z.object({
 /** PATCH — metadata only, never bytes (editor+). */
 export async function PATCH(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const id = idFrom(request);
@@ -84,7 +84,7 @@ export async function PATCH(request: Request) {
 /** DELETE — removes row + object bytes (admin+). */
 export async function DELETE(request: Request) {
   try {
-    const limit = limiterFor("write").take(`write:${clientKey(request)}`);
+    const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
     const id = idFrom(request);
