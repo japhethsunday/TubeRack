@@ -241,10 +241,10 @@ export function validateComposition(comp: Composition, scenes: Scene[], assets: 
     const hasVisual = sceneClips.some((c) => c.kind === "image" || c.kind === "video");
     if (!hasVisual) {
       issues.push({
-        severity: "block",
+        severity: "warn",
         scene: seg.title,
-        message: `Scene ${seg.number} has no visual asset.`,
-        fix: "Generate a still, upload footage, or assign a library asset to the scene.",
+        message: `Scene ${seg.number} has no visual yet — it will show the background.`,
+        fix: "Use Media → Images for all scenes, upload footage, or assign a library asset.",
       });
     }
     const scene = scenes.find((s) => s.id === seg.sceneId);

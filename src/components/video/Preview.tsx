@@ -11,6 +11,66 @@ import { renderMusic, renderSfx, musicRecipe, speakText, stopSpeech, type MusicM
 import { stopAllPlayback, claimPlayback } from "@/src/components/media/players";
 import { cx } from "@/src/components/ui/cx";
 
+/**
+ * Whole-file audio cache. Streaming a long WAV while seeking it makes the
+ * browser stutter and crackle, so each track is downloaded once into memory
+ * and played from there.
+ */
+const audioCache = new Map<string, Promise<string>>();
+function cachedAudio(url: string): Promise<string> {
+  if (url.startsWith("blob:") || url.startsWith("data:")) return Promise.resolve(url);
+  let p = audioCache.get(url);
+  if (!p) {
+    p = fetch(url)
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+      .then((b) => URL.createObjectURL(b))
+      .catch((e) => {
+        audioCache.delete(url);
+        throw e;
+      });
+    audioCache.set(url, p);
+  }
+  return p;
+}
+
+/** Starts a cached audio file at the playhead once its data is ready; returns a stop function. */
+function playCached(
+  url: string,
+  opts: { volume: number; rate: number; loop?: boolean; at: () => number },
+): { el: () => HTMLAudioElement | null; stop: () => void } {
+  let stopped = false;
+  let audio: HTMLAudioElement | null = null;
+  void cachedAudio(url)
+    .catch(() => url)
+    .then((src) => {
+      if (stopped) return;
+      const el = new Audio();
+      el.preload = "auto";
+      el.loop = !!opts.loop;
+      el.volume = Math.min(1, Math.max(0, opts.volume));
+      el.playbackRate = opts.rate;
+      el.src = src;
+      audio = el;
+      el.addEventListener(
+        "loadedmetadata",
+        () => {
+          if (stopped) return;
+          const at = opts.at();
+          el.currentTime = Number.isFinite(el.duration) && !el.loop ? Math.min(at, el.duration) : at;
+          void el.play().catch(() => {});
+        },
+        { once: true },
+      );
+    });
+  return {
+    el: () => audio,
+    stop: () => {
+      stopped = true;
+      audio?.pause();
+    },
+  };
+}
+
 export function fmtTimecode(sec: number, fps = 30): string {
   const s = Math.max(0, sec);
   const m = Math.floor(s / 60);
@@ -61,13 +121,23 @@ export function Preview({
   const videos = useRef(new Map<string, { el: HTMLVideoElement; url: string }>());
   const [, setLoadTick] = useState(0);
   const spokenRef = useRef<string | null>(null);
-  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceAudioRef = useRef<{ el: () => HTMLAudioElement | null; stop: () => void } | null>(null);
   const musicRef = useRef<{ key: string; stop: () => void } | null>(null);
   const sfxFired = useRef(new Set<string>());
   const state = useRef({ comp, duration, playhead, masterMuted, volume, loop, assetFor, selectedId });
   useEffect(() => {
     state.current = { comp, duration, playhead, masterMuted, volume, loop, assetFor, selectedId };
   });
+
+  // Download voice and music ahead of time so playback never streams mid-take.
+  useEffect(() => {
+    for (const c of comp.clips) {
+      if (c.kind !== "voice" && c.kind !== "music" && c.kind !== "sfx") continue;
+      const a = assetFor(c.assetId);
+      const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl : null);
+      if (url && !url.startsWith("{")) void cachedAudio(url).catch(() => {});
+    }
+  }, [comp.clips, assetFor]);
 
   const W = comp.canvas.width || 1920;
   const H = comp.canvas.height || 1080;
@@ -160,7 +230,7 @@ export function Preview({
 
   function stopAudio() {
     stopSpeech();
-    voiceAudioRef.current?.pause();
+    voiceAudioRef.current?.stop();
     voiceAudioRef.current = null;
     musicRef.current?.stop();
     musicRef.current = null;
@@ -183,17 +253,17 @@ export function Preview({
     if (voiceKey !== spokenRef.current) {
       stopSpeech();
       spokenRef.current = voiceKey;
-      voiceAudioRef.current?.pause();
+      voiceAudioRef.current?.stop();
       voiceAudioRef.current = null;
       const a = voice ? s.assetFor(voice.assetId) : null;
       const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl : null);
       if (voice && url) {
-        const audio = new Audio(url);
-        audio.volume = Math.min(1, Math.max(0, voice.volume * s.volume));
-        audio.playbackRate = voice.speed ?? 1;
-        audio.currentTime = sourceTime(voice, t);
-        voiceAudioRef.current = audio;
-        void audio.play().catch(() => {});
+        const clip = voice;
+        voiceAudioRef.current = playCached(url, {
+          volume: voice.volume * s.volume,
+          rate: voice.speed ?? 1,
+          at: () => sourceTime(clip, state.current.playhead),
+        });
       } else if (voice && a) {
         try {
           const params = JSON.parse(a.payload) as { text?: string; voiceName?: string; rate?: number; pitch?: number; lang?: string };
@@ -216,13 +286,14 @@ export function Preview({
         const a = s.assetFor(music.assetId);
         const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl : null);
         if (url) {
-          const audio = new Audio(url);
-          audio.loop = true;
-          audio.volume = Math.min(1, Math.max(0, music.volume * 0.8 * s.volume));
-          audio.playbackRate = music.speed ?? 1;
-          audio.currentTime = sourceTime(music, t);
-          void audio.play().catch(() => {});
-          musicRef.current = { key: musicKey!, stop: () => audio.pause() };
+          const clip = music;
+          const h = playCached(url, {
+            volume: music.volume * 0.8 * s.volume,
+            rate: music.speed ?? 1,
+            loop: true,
+            at: () => sourceTime(clip, state.current.playhead),
+          });
+          musicRef.current = { key: musicKey!, stop: h.stop };
         } else if (a) {
           try {
             const recipe = JSON.parse(a.payload) as { mood: MusicMood; seconds: number };
@@ -259,9 +330,7 @@ export function Preview({
       const a = s.assetFor(clip.assetId);
       const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl : null);
       if (url) {
-        const audio = new Audio(url);
-        audio.volume = Math.min(1, clip.volume * s.volume);
-        void audio.play().catch(() => {});
+        playCached(url, { volume: clip.volume * s.volume, rate: 1, at: () => 0 });
       } else if (a) {
         try {
           const recipe = JSON.parse(a.payload) as { type: SfxType };

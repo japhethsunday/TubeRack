@@ -137,7 +137,7 @@ describe("video build", () => {
     assert.equal(healthOf(empty), "blocked");
     // Scene-built timelines still get storyboard checks.
     const sceneBuilt = validateComposition({ ...emptyComposition("p1"), clips: [clip({ id: "v", kind: "voice", trackId: "track_voice", sceneId: "other" })] }, scenes, []);
-    assert.ok(sceneBuilt.some((i) => i.severity === "block" && i.message.includes("no visual")));
+    assert.ok(sceneBuilt.some((i) => i.severity === "warn" && i.message.includes("no visual")));
     assert.ok(sceneBuilt.some((i) => i.severity === "warn" && i.message.includes("no voice")));
     // Imported-video projects need no storyboard.
     const imported = validateComposition({ ...emptyComposition("p1"), clips: [clip({ assetId: "m1" })] }, [], [asset({ id: "m1" })]);
