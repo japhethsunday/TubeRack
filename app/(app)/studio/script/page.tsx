@@ -536,10 +536,10 @@ function Editor({
           </Button>
         </div>
       </div>
-      <p className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-text" aria-live="polite">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-text" aria-live="polite">
         <span>{totalWords} words · {formatDuration(totalSec)} estimated · {wpm} wpm (estimate, not exact)</span>
         <SaveStatus updatedAt={initial.updatedAt} savedAt={savedAt} />
-      </p>
+      </div>
       {query.trim() && matches.length > 0 && (
         <div className="flex flex-wrap gap-1.5" aria-label="Search matches">
           {matches.map((id) => {
