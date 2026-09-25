@@ -1,5 +1,6 @@
 "use client";
 
+import { fastExportSupported } from "@/src/lib/video/render-fast";
 import { useEffect, useRef, useState } from "react";
 import { Download, Film, X, RotateCcw, Check, AlertTriangle, MonitorPlay, Loader2 } from "lucide-react";
 import type { Composition, HealthState, ValidationIssue } from "@/src/lib/video/types";
@@ -69,6 +70,9 @@ export function ExportStudio({
   const [warnings, setWarnings] = useState<string[]>([]);
   const [result, setResult] = useState<FinishedExport | null>(null);
   const abort = useRef<AbortController | null>(null);
+  const [fastExport, setFastExport] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- browser capability, known only after mount.
+  useEffect(() => setFastExport(fastExportSupported()), []);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const urlRef = useRef<string | null>(null);
   useEffect(() => () => {
@@ -160,7 +164,7 @@ export function ExportStudio({
         </label>
       </div>
       <p className="text-[11px] text-muted-text">
-        {width}×{height} · {settings.fps} fps · {fmtTime(span)} · ≈{fmtMb(estBytes)}. Export runs in real time in this tab.
+        {width}×{height} · {settings.fps} fps · {fmtTime(span)} · ≈{fmtMb(estBytes)}. {fastExport ? "Fast export: usually quicker than the video’s length. Keep this tab open." : "Export runs in real time in this tab."}
       </p>
 
       {blocking.length > 0 && (

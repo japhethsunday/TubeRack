@@ -73,6 +73,7 @@ export function pickRecorderMime(): string | null {
 
 export function renderSupport(): { ok: boolean; reason?: string } {
   if (typeof window === "undefined") return { ok: false, reason: "Rendering runs in the browser." };
+  if ("VideoEncoder" in window && "AudioEncoder" in window) return { ok: true };
   if (!pickRecorderMime()) return { ok: false, reason: "This browser can't record video. Use a current Chrome, Edge, Firefox, or Safari." };
   if (!("captureStream" in HTMLCanvasElement.prototype)) return { ok: false, reason: "This browser can't capture canvas video." };
   return { ok: true };
@@ -135,9 +136,25 @@ function fadeGain(c: TimelineClip, t: number): number {
 
 /** Render the composition to a video Blob (takes about as long as the range). */
 export async function renderComposition(o: RenderOptions): Promise<RenderResult> {
+  // Fast path first: frame-by-frame hardware encoding, faster than real time.
+  try {
+    const { renderFast } = await import("@/src/lib/video/render-fast");
+    const fast = await renderFast(o);
+    if (fast) return fast;
+  } catch (error) {
+    if (o.signal?.aborted || (error instanceof RenderError && /cancel/i.test(error.message))) throw error;
+    console.error("fast export failed, recording in real time:", error instanceof Error ? error.message : error);
+  }
+  return renderRealtime(o);
+}
+
+/** Real-time fallback: plays the timeline and records it (takes about as long as the range). */
+async function renderRealtime(o: RenderOptions): Promise<RenderResult> {
   const support = renderSupport();
   if (!support.ok) throw new RenderError(support.reason);
-  const mime = pickRecorderMime()!;
+  const recorderMime = pickRecorderMime();
+  if (!recorderMime || !("captureStream" in HTMLCanvasElement.prototype)) throw new RenderError("This browser can't export video. Use a current Chrome, Edge, Firefox, or Safari.");
+  const mime = recorderMime;
   const warnings: string[] = [];
   const W = Math.round(o.width / 2) * 2;
   const H = Math.round(o.height / 2) * 2;
