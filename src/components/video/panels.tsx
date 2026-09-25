@@ -9,7 +9,7 @@ import type { SceneSegment } from "@/src/lib/video/build";
 import { durationOf } from "@/src/lib/video/build";
 import type { MediaAsset } from "@/src/lib/media/types";
 import type { TimelineClip, ValidationIssue, HealthState, RenderRequest } from "@/src/lib/video/types";
-import { PLATFORM_PRESETS, TEXT_PRESETS, TRANSITIONS, EFFECTS, MOTIONS, textPresetById, brandedTitleStyle } from "@/src/lib/video/presets";
+import { PLATFORM_PRESETS, TEXT_PRESETS, TRANSITIONS, EFFECTS, MOTIONS, MOTION_LABELS, normalizeTransition, textPresetById, brandedTitleStyle } from "@/src/lib/video/presets";
 import { formatDuration } from "@/src/lib/script/measure";
 import { Button } from "@/src/components/ui/Button";
 import { Input, Textarea, Select } from "@/src/components/ui/fields";
@@ -275,16 +275,16 @@ export function Inspector({
       {isVisual && (
         <div className="grid grid-cols-2 gap-2">
           <Select label="Motion" value={clip.motion ?? "none"} onChange={(e) => onPatch({ motion: e.target.value })}>
-            {(["none", "kenburns", "zoom-in", "zoom-out", "pan-left", "pan-right", "pan-up", "pan-down"] as const).map((m) => (
-              <option key={m} value={m}>{m}</option>
+            {MOTIONS.map((m) => (
+              <option key={m} value={m}>{MOTION_LABELS[m]}</option>
             ))}
           </Select>
-          <Select label="Transition in" value={clip.transitionIn ?? "cut"} onChange={(e) => onPatch({ transitionIn: e.target.value })}>
+          <Select label="Transition in" value={normalizeTransition(clip.transitionIn)} onChange={(e) => onPatch({ transitionIn: e.target.value })}>
             {TRANSITIONS.map((t) => (
               <option key={t.id} value={t.id}>{t.label}</option>
             ))}
           </Select>
-          <Select label="Transition out" value={clip.transitionOut ?? "cut"} onChange={(e) => onPatch({ transitionOut: e.target.value })}>
+          <Select label="Transition out" value={normalizeTransition(clip.transitionOut)} onChange={(e) => onPatch({ transitionOut: e.target.value })}>
             {TRANSITIONS.map((t) => (
               <option key={t.id} value={t.id}>{t.label}</option>
             ))}

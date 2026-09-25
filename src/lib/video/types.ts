@@ -34,7 +34,11 @@ export interface TimelineClip {
   fadeOutSec: number;
   muted: boolean;
   motion?: string;
+  /** Motion strength multiplier (0.25–2, default 1). */
+  motionAmount?: number;
   transitionIn?: string;
+  /** Length of the transition into this clip, in seconds (default 0.6). */
+  transitionSec?: number;
   transitionOut?: string;
   effectIds?: string[];
   style?: TextStyle;

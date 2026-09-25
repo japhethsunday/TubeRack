@@ -1,5 +1,6 @@
 import type { ClipFilters, Composition, TextStyle, TimelineClip } from "@/src/lib/video/types";
 import { IDENTITY_TRANSFORM, NEUTRAL_FILTERS } from "@/src/lib/video/types";
+import { normalizeTransition } from "@/src/lib/video/presets";
 
 /**
  * The frame compositor — the single source of truth for what a frame looks
@@ -40,13 +41,42 @@ export function sourceTime(c: TimelineClip, t: number, sourceDuration?: number):
   return sourceDuration ? Math.min(v, Math.max(0, sourceDuration - 0.04)) : v;
 }
 
-/** Visual clips active at t, bottom layer first. */
+const MEDIA_KINDS = new Set(["video", "image"]);
+
+/** Seconds the transition into this clip lasts (0 when it's a cut). */
+export function transitionDuration(c: TimelineClip): number {
+  if (normalizeTransition(c.transitionIn) === "cut") return 0;
+  return Math.max(0.1, Math.min(2, c.durationSec / 2, c.transitionSec ?? 0.6));
+}
+
+/** The clip playing right before this one on the same track (touching it), if any. */
+export function previousClip(comp: Composition, c: TimelineClip): TimelineClip | null {
+  let best: TimelineClip | null = null;
+  for (const o of comp.clips) {
+    if (o.id === c.id || o.trackId !== c.trackId || !MEDIA_KINDS.has(o.kind)) continue;
+    if (Math.abs(o.startSec + o.durationSec - c.startSec) < 0.05) best = o;
+  }
+  return best;
+}
+
+/**
+ * Visual clips drawn at t, bottom layer first. During a transition the clip
+ * before it stays on screen underneath (held on its last frame) so the two
+ * blend instead of dipping through black.
+ */
 export function visualStack(comp: Composition, t: number): TimelineClip[] {
   const hidden = new Set(comp.tracks.filter((tr) => tr.hidden).map((tr) => tr.id));
   const order = new Map(comp.tracks.map((tr, i) => [tr.id, tr.kind === "captions" ? 10_000 + i : i]));
-  return comp.clips
-    .filter((c) => VISUAL_KINDS.has(c.kind) && !hidden.has(c.trackId) && clipActive(c, t))
-    .sort((a, b) => (order.get(a.trackId) ?? 0) - (order.get(b.trackId) ?? 0) || a.startSec - b.startSec);
+  const active = comp.clips.filter((c) => VISUAL_KINDS.has(c.kind) && !hidden.has(c.trackId) && clipActive(c, t));
+  const tails: TimelineClip[] = [];
+  for (const c of active) {
+    if (!MEDIA_KINDS.has(c.kind)) continue;
+    const d = transitionDuration(c);
+    if (d <= 0 || t - c.startSec >= d) continue;
+    const prev = previousClip(comp, c);
+    if (prev && !clipActive(prev, t) && !tails.includes(prev)) tails.push(prev);
+  }
+  return [...tails, ...active].sort((a, b) => (order.get(a.trackId) ?? 0) - (order.get(b.trackId) ?? 0) || a.startSec - b.startSec);
 }
 
 export function filterString(f: ClipFilters | undefined, scale: number): string {
@@ -75,53 +105,182 @@ export const FILTER_PRESETS: { id: string; label: string; filters: ClipFilters }
   { id: "dramatic", label: "Dramatic", filters: { ...NEUTRAL_FILTERS, contrast: 140, saturation: 110, brightness: 92, vignette: 55 } },
 ];
 
-function motionAt(motion: string | undefined, p: number): { scale: number; dx: number; dy: number } {
-  const e = p * p * (3 - 2 * p);
+const easeInOut = (x: number) => 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, x)));
+const easeOut = (x: number) => 1 - (1 - Math.max(0, Math.min(1, x))) ** 3;
+
+/** Picture animation at progress p (0–1) through the clip; `sec` is seconds into it. */
+export function motionAt(motion: string | undefined, p: number, amount = 1, sec = 0): { scale: number; dx: number; dy: number; rot: number } {
+  const e = easeInOut(p);
+  const a = Math.max(0.25, Math.min(2, amount));
+  const still = { scale: 1, dx: 0, dy: 0, rot: 0 };
   switch (motion) {
     case "kenburns":
-      return { scale: 1 + 0.12 * e, dx: -0.03 * e, dy: -0.02 * e };
+      return { ...still, scale: 1 + 0.14 * a * e, dx: -0.035 * a * e, dy: -0.02 * a * e };
+    case "kenburns-right":
+      return { ...still, scale: 1 + 0.14 * a * e, dx: 0.035 * a * e, dy: 0.02 * a * e };
     case "zoom-in":
-      return { scale: 1 + 0.15 * e, dx: 0, dy: 0 };
+      return { ...still, scale: 1 + 0.18 * a * e };
     case "zoom-out":
-      return { scale: 1.15 - 0.15 * e, dx: 0, dy: 0 };
+      return { ...still, scale: 1 + 0.18 * a * (1 - e) };
+    case "zoom-in-fast":
+      return { ...still, scale: 1 + 0.22 * a * easeOut(sec / 0.6) + 0.04 * a * e };
     case "pan-left":
-      return { scale: 1.12, dx: 0.04 - 0.08 * e, dy: 0 };
+      return { ...still, scale: 1 + 0.14 * a, dx: 0.05 * a * (1 - 2 * e) };
     case "pan-right":
-      return { scale: 1.12, dx: -0.04 + 0.08 * e, dy: 0 };
+      return { ...still, scale: 1 + 0.14 * a, dx: -0.05 * a * (1 - 2 * e) };
     case "pan-up":
-      return { scale: 1.12, dx: 0, dy: 0.04 - 0.08 * e };
+      return { ...still, scale: 1 + 0.14 * a, dy: 0.05 * a * (1 - 2 * e) };
     case "pan-down":
-      return { scale: 1.12, dx: 0, dy: -0.04 + 0.08 * e };
+      return { ...still, scale: 1 + 0.14 * a, dy: -0.05 * a * (1 - 2 * e) };
+    case "diagonal":
+      return { ...still, scale: 1 + 0.16 * a, dx: 0.045 * a * (1 - 2 * e), dy: 0.035 * a * (1 - 2 * e) };
+    case "drift":
+      return { ...still, scale: 1 + 0.08 * a, dx: 0.022 * a * Math.sin((2 * Math.PI * sec) / 7), dy: 0.016 * a * Math.cos((2 * Math.PI * sec) / 9) };
+    case "breathe":
+      return { ...still, scale: 1 + 0.03 * a + 0.03 * a * Math.sin((2 * Math.PI * sec) / 4) };
+    case "tilt":
+      return { ...still, scale: 1 + 0.12 * a, rot: (-2.5 + 5 * e) * a };
+    case "rotate":
+      return { ...still, scale: 1 + 0.1 * a + 0.05 * a * e, rot: 5 * a * e };
+    case "shake":
+      return {
+        scale: 1 + 0.05 * a,
+        dx: 0.005 * a * (Math.sin(sec * 13.1) + Math.sin(sec * 7.3)),
+        dy: 0.005 * a * (Math.cos(sec * 11.7) + Math.sin(sec * 5.9)),
+        rot: 0.35 * a * Math.sin(sec * 4.3),
+      };
+    case "pop-in": {
+      const q = Math.max(0, Math.min(1, sec / 0.45));
+      const back = 1 + 2.2 * (q - 1) ** 3 + 1.2 * (q - 1) ** 2;
+      return { ...still, scale: 1 - 0.25 * a + 0.25 * a * back };
+    }
     default:
-      return { scale: 1, dx: 0, dy: 0 };
+      return still;
   }
 }
 
-const TRANSITION_SEC = 0.5;
+export interface TransitionFx {
+  alpha: number;
+  /** Offsets as fractions of the frame. */
+  dx: number;
+  dy: number;
+  scale: number;
+  rot: number;
+  /** Extra blur in px at 1080p. */
+  blur: number;
+  /** Frame-space reveal: a rectangle (fractions) or a circle (fraction of the half-diagonal). */
+  clip: { kind: "rect"; x0: number; y0: number; x1: number; y1: number } | { kind: "circle"; r: number } | null;
+  /** Full-frame colour drawn over everything (dip to black / flash). */
+  overlay: { color: string; alpha: number } | null;
+}
 
-/** Opacity + geometric offsets from fades and in/out transitions. */
-export function transitionState(c: TimelineClip, t: number): { alpha: number; dx: number; scale: number; wipe: number } {
+const NO_FX: TransitionFx = { alpha: 1, dx: 0, dy: 0, scale: 1, rot: 0, blur: 0, clip: null, overlay: null };
+
+/** How the incoming clip looks at progress p (0 → 1) of a transition. */
+export function incomingFx(kind: string, p: number): TransitionFx {
+  const e = easeOut(p);
+  const fx: TransitionFx = { ...NO_FX };
+  switch (kind) {
+    case "fade":
+      fx.alpha = p;
+      break;
+    case "dip-black":
+    case "dip-white":
+      fx.alpha = p < 0.5 ? 0 : 1;
+      fx.overlay = { color: kind === "dip-black" ? "#000000" : "#ffffff", alpha: 1 - Math.abs(2 * p - 1) };
+      break;
+    case "slide-left":
+    case "push-left":
+      fx.dx = 1 - e;
+      break;
+    case "slide-right":
+    case "push-right":
+      fx.dx = -(1 - e);
+      break;
+    case "slide-up":
+      fx.dy = 1 - e;
+      break;
+    case "slide-down":
+      fx.dy = -(1 - e);
+      break;
+    case "zoom-in":
+      fx.scale = 1 + 0.45 * (1 - e);
+      fx.alpha = Math.min(1, p * 1.6);
+      break;
+    case "zoom-out":
+      fx.scale = 0.5 + 0.5 * e;
+      fx.alpha = Math.min(1, p * 1.6);
+      break;
+    case "wipe-left":
+      fx.clip = { kind: "rect", x0: 1 - e, y0: 0, x1: 1, y1: 1 };
+      break;
+    case "wipe-right":
+      fx.clip = { kind: "rect", x0: 0, y0: 0, x1: e, y1: 1 };
+      break;
+    case "wipe-up":
+      fx.clip = { kind: "rect", x0: 0, y0: 1 - e, x1: 1, y1: 1 };
+      break;
+    case "wipe-down":
+      fx.clip = { kind: "rect", x0: 0, y0: 0, x1: 1, y1: e };
+      break;
+    case "circle":
+      fx.clip = { kind: "circle", r: e };
+      break;
+    case "blur":
+      fx.alpha = p;
+      fx.blur = 24 * (1 - p);
+      break;
+    case "spin":
+      fx.alpha = Math.min(1, p * 1.5);
+      fx.rot = -120 * (1 - e);
+      fx.scale = 0.35 + 0.65 * e;
+      break;
+  }
+  return fx;
+}
+
+/** How the outgoing clip (held underneath) moves while the next one comes in. */
+export function outgoingFx(kind: string, p: number): TransitionFx {
+  const e = easeOut(p);
+  if (kind === "push-left") return { ...NO_FX, dx: -e };
+  if (kind === "push-right") return { ...NO_FX, dx: e };
+  if (kind === "blur") return { ...NO_FX, blur: 24 * p };
+  if (kind === "zoom-in") return { ...NO_FX, scale: 1 + 0.25 * e };
+  return NO_FX;
+}
+
+function merge(a: TransitionFx, b: TransitionFx): TransitionFx {
+  return {
+    alpha: a.alpha * b.alpha,
+    dx: a.dx + b.dx,
+    dy: a.dy + b.dy,
+    scale: a.scale * b.scale,
+    rot: a.rot + b.rot,
+    blur: a.blur + b.blur,
+    clip: b.clip ?? a.clip,
+    overlay: b.overlay ?? a.overlay,
+  };
+}
+
+/** Fades plus the transition into and out of a clip at time t (its own window only). */
+export function transitionState(c: TimelineClip, t: number): TransitionFx {
   const local = t - c.startSec;
   const out = c.startSec + c.durationSec - t;
-  let alpha = 1;
-  let dx = 0;
-  let scale = 1;
-  let wipe = 1;
-  if (c.fadeInSec > 0) alpha = Math.min(alpha, local / c.fadeInSec);
-  if (c.fadeOutSec > 0) alpha = Math.min(alpha, out / c.fadeOutSec);
-  const tin = c.transitionIn && c.transitionIn !== "cut" ? Math.min(1, local / TRANSITION_SEC) : 1;
-  const tout = c.transitionOut && c.transitionOut !== "cut" ? Math.min(1, out / TRANSITION_SEC) : 1;
-  const ease = (x: number) => 1 - (1 - x) ** 3;
-  for (const [kind, p, dir] of [[c.transitionIn, tin, -1], [c.transitionOut, tout, 1]] as const) {
-    if (!kind || kind === "cut" || p >= 1) continue;
-    if (kind === "fade" || kind === "dissolve") alpha = Math.min(alpha, p);
-    else if (kind === "slide") dx += dir * (1 - ease(p));
-    else if (kind === "zoom") {
-      scale *= 1 + (1 - ease(p)) * 0.35;
-      alpha = Math.min(alpha, p);
-    } else if (kind === "wipe") wipe = Math.min(wipe, ease(p));
+  let fx: TransitionFx = { ...NO_FX };
+  if (c.fadeInSec > 0) fx.alpha = Math.min(fx.alpha, Math.max(0, local / c.fadeInSec));
+  if (c.fadeOutSec > 0) fx.alpha = Math.min(fx.alpha, Math.max(0, out / c.fadeOutSec));
+  const inKind = normalizeTransition(c.transitionIn);
+  const d = transitionDuration(c);
+  if (inKind !== "cut" && d > 0 && local < d) fx = merge(fx, incomingFx(inKind, Math.max(0, local / d)));
+  const outKind = normalizeTransition(c.transitionOut);
+  const dOut = Math.max(0.1, Math.min(2, c.durationSec / 2, c.transitionSec ?? 0.6));
+  if (outKind !== "cut" && out < dOut) {
+    // Leaving: play the entrance backwards (a slide leaves the way it would arrive, mirrored).
+    const o = incomingFx(outKind, Math.max(0, out / dOut));
+    fx = merge(fx, { ...o, dx: -o.dx, dy: -o.dy });
   }
-  return { alpha: Math.max(0, Math.min(1, alpha)), dx, scale, wipe };
+  fx.alpha = Math.max(0, Math.min(1, fx.alpha));
+  return fx;
 }
 
 function sourceSize(src: VisualSource): { w: number; h: number } {
@@ -148,7 +307,16 @@ function drawBlurBackdrop(ctx: CanvasRenderingContext2D, src: VisualSource, W: n
   ctx.restore();
 }
 
-function drawMedia(ctx: CanvasRenderingContext2D, src: VisualSource, clip: TimelineClip, t: number, W: number, H: number, draft: boolean) {
+function drawMedia(
+  ctx: CanvasRenderingContext2D,
+  src: VisualSource,
+  clip: TimelineClip,
+  t: number,
+  W: number,
+  H: number,
+  draft: boolean,
+  fx: TransitionFx,
+): void {
   const { w: sw, h: sh } = sourceSize(src);
   const crop = clip.crop ?? { top: 0, right: 0, bottom: 0, left: 0 };
   const cx = sw * crop.left;
@@ -164,23 +332,27 @@ function drawMedia(ctx: CanvasRenderingContext2D, src: VisualSource, clip: Timel
     dh = ch * k;
   }
   const tr = clip.transform ?? IDENTITY_TRANSFORM;
-  const p = Math.min(1, (t - clip.startSec) / Math.max(0.1, Math.min(clip.durationSec, 10)));
-  const m = clip.kind === "image" ? motionAt(clip.motion, p) : { scale: 1, dx: 0, dy: 0 };
-  const ts = transitionState(clip, t);
+  const sec = Math.max(0, t - clip.startSec);
+  const p = Math.min(1, sec / Math.max(0.1, clip.durationSec));
+  const m = motionAt(clip.motion, p, clip.motionAmount ?? 1, sec);
+  if (fx.alpha <= 0.001) return;
 
   ctx.save();
-  ctx.globalAlpha *= (clip.opacity ?? 1) * ts.alpha;
-  ctx.translate(W / 2 + (tr.x + m.dx + ts.dx) * W, H / 2 + (tr.y + m.dy) * H);
-  ctx.rotate((tr.rotation * Math.PI) / 180);
-  const s = tr.scale * m.scale * ts.scale;
-  ctx.scale(s * (tr.flipH ? -1 : 1), s * (tr.flipV ? -1 : 1));
-  if (ts.wipe < 1) {
+  ctx.globalAlpha *= (clip.opacity ?? 1) * fx.alpha;
+  if (fx.clip) {
     ctx.beginPath();
-    ctx.rect(-dw / 2, -dh / 2, dw * ts.wipe, dh);
+    if (fx.clip.kind === "rect") ctx.rect(fx.clip.x0 * W, fx.clip.y0 * H, (fx.clip.x1 - fx.clip.x0) * W, (fx.clip.y1 - fx.clip.y0) * H);
+    else ctx.arc(W / 2, H / 2, Math.max(0.5, (fx.clip.r * Math.hypot(W, H)) / 2), 0, Math.PI * 2);
     ctx.clip();
   }
+  ctx.translate(W / 2 + (tr.x + m.dx + fx.dx) * W, H / 2 + (tr.y + m.dy + fx.dy) * H);
+  ctx.rotate(((tr.rotation + m.rot + fx.rot) * Math.PI) / 180);
+  const s = tr.scale * m.scale * fx.scale;
+  ctx.scale(s * (tr.flipH ? -1 : 1), s * (tr.flipV ? -1 : 1));
   const filters = clip.filters;
-  ctx.filter = filterString(filters, W / 1920);
+  const base = filterString(filters, W / 1920);
+  const extra = fx.blur > 0.2 ? `blur(${((fx.blur * W) / 1920).toFixed(1)}px)` : "";
+  ctx.filter = extra ? (base === "none" ? extra : `${base} ${extra}`) : base;
   ctx.drawImage(src, cx, cy, cw, ch, -dw / 2, -dh / 2, dw, dh);
   ctx.filter = "none";
   if (filters?.vignette) {
@@ -272,7 +444,7 @@ function drawText(ctx: CanvasRenderingContext2D, clip: TimelineClip, t: number, 
   ctx.save();
   ctx.globalAlpha *= Math.max(0, Math.min(1, alpha));
   const ox = W / 2 + (tr.x + ts.dx) * W;
-  const oy = baseY + tr.y * H + dy;
+  const oy = baseY + (tr.y + ts.dy) * H + dy;
   ctx.translate(ox, oy);
   ctx.rotate((tr.rotation * Math.PI) / 180);
   ctx.scale(scale * tr.scale, scale * tr.scale);
@@ -332,6 +504,7 @@ export function drawComposition(ctx: CanvasRenderingContext2D, comp: Composition
   ctx.fillStyle = bg === BLUR_BACKGROUND ? "#000000" : bg || "#000000";
   ctx.fillRect(0, 0, W, H);
   let backdropDone = bg !== BLUR_BACKGROUND;
+  const overlays: { color: string; alpha: number }[] = [];
   for (const clip of visualStack(comp, t)) {
     if (clip.kind === "text") drawText(ctx, clip, t, W, H);
     else if (clip.kind === "captions") drawCaption(ctx, clip, W, H);
@@ -343,8 +516,24 @@ export function drawComposition(ctx: CanvasRenderingContext2D, comp: Composition
         drawBlurBackdrop(ctx, src, W, H);
         backdropDone = true;
       }
-      drawMedia(ctx, src, clip, t, W, H, o.isDraft?.(clip) ?? false);
+      let fx: TransitionFx;
+      if (clipActive(clip, t)) fx = transitionState(clip, t);
+      else {
+        // Held underneath the next clip while it transitions in.
+        const next = comp.clips.find((n) => n.trackId === clip.trackId && n.id !== clip.id && Math.abs(n.startSec - (clip.startSec + clip.durationSec)) < 0.05 && clipActive(n, t));
+        const d = next ? transitionDuration(next) : 0;
+        fx = next && d > 0 ? outgoingFx(normalizeTransition(next.transitionIn), (t - next.startSec) / d) : NO_FX;
+      }
+      drawMedia(ctx, src, clip, t, W, H, o.isDraft?.(clip) ?? false, fx);
+      if (fx.overlay && fx.overlay.alpha > 0) overlays.push(fx.overlay);
     }
+  }
+  for (const ov of overlays) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, ov.alpha);
+    ctx.fillStyle = ov.color;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
   }
   ctx.restore();
 }

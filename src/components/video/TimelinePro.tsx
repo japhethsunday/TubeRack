@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowLeftRight,
   Magnet,
   ZoomIn,
   ZoomOut,
@@ -28,6 +29,7 @@ import {
 import type { TimelineClip, TimelineTrack } from "@/src/lib/video/types";
 import type { SceneSegment } from "@/src/lib/video/build";
 import { sourceTime } from "@/src/lib/video/compositor";
+import { normalizeTransition, transitionById } from "@/src/lib/video/presets";
 import { maxDurationFor, hasSource } from "@/src/lib/video/ops";
 import { filmstripFor, peaksFor, PEAKS_PER_SEC, type Filmstrip } from "@/src/lib/video/media-cache";
 import { cx } from "@/src/components/ui/cx";
@@ -498,6 +500,36 @@ export function TimelinePro({
                         </div>
                       );
                     })}
+                  {/* Joins between touching picture/video clips: click to add or edit the transition. */}
+                  {(track.kind === "image" || track.kind === "video") &&
+                    !drag &&
+                    shown
+                      .filter((c) => c.trackId === track.id && (c.kind === "image" || c.kind === "video"))
+                      .filter((c) => shown.some((o) => o.id !== c.id && o.trackId === c.trackId && Math.abs(o.startSec + o.durationSec - c.startSec) < 0.05))
+                      .map((c) => {
+                        const kind = normalizeTransition(c.transitionIn);
+                        const has = kind !== "cut";
+                        return (
+                          <button
+                            key={`join-${c.id}`}
+                            type="button"
+                            title={has ? `Transition: ${transitionById(kind).label} (click to edit)` : "Add a transition here"}
+                            aria-label={has ? `Edit transition into ${c.name}` : `Add transition into ${c.name}`}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={() => {
+                              if (!has && !locked.has(c.trackId)) onCommit(clips.map((x) => (x.id === c.id ? { ...x, transitionIn: "fade", transitionSec: x.transitionSec ?? 0.6 } : x)));
+                              onSelect(c.id);
+                            }}
+                            className={cx(
+                              "absolute top-1/2 z-[3] flex size-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border shadow transition-colors",
+                              has ? "border-cyan-300 bg-cyan-500 text-white" : "border-white/40 bg-black/70 text-white/80 opacity-70 hover:opacity-100",
+                            )}
+                            style={{ left: c.startSec * pxPerSec }}
+                          >
+                            <ArrowLeftRight className="size-3" aria-hidden="true" />
+                          </button>
+                        );
+                      })}
                 </div>
               </div>
             );

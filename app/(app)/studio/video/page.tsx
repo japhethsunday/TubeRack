@@ -570,6 +570,18 @@ function Studio() {
             if (cap !== null && next.durationSec > cap) next = { ...next, durationSec: Math.round(cap * 100) / 100 };
             commit(clips.map((c) => (c.id === selectedClip.id ? next : c)));
           }}
+          onApplyToTrack={(patch) => {
+            if (!selectedClip) return;
+            const onTrack = (c: TimelineClip) => c.trackId === selectedClip.trackId && (c.kind === "image" || c.kind === "video");
+            if (patch === "vary-motion") {
+              // A varied, gentle set so a picture sequence never feels repetitive.
+              const moves = ["kenburns", "zoom-in", "pan-right", "kenburns-right", "zoom-out", "pan-left", "diagonal", "pan-up"];
+              let i = 0;
+              commit(clips.map((c) => (onTrack(c) ? { ...c, motion: moves[i++ % moves.length], motionAmount: c.motionAmount ?? 1 } : c)));
+              return;
+            }
+            commit(clips.map((c) => (onTrack(c) ? { ...c, ...patch } : c)));
+          }}
           onSplit={() => selectedClip && commit(splitClipAt(clips, selectedClip.id, playhead))}
           onDuplicate={() => selectedClip && commit(duplicateClip(clips, selectedClip.id, selectedClip.trackId === trackFor("video")))}
           onDelete={() => {

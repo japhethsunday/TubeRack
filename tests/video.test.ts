@@ -197,7 +197,8 @@ describe("video presets", () => {
     assert.equal(PLATFORM_PRESETS.length, 6);
     assert.equal(presetById("shorts").aspect, "9:16");
     assert.equal(presetById("nope").id, "youtube");
-    assert.equal(TRANSITIONS.length, 6);
+    assert.ok(TRANSITIONS.length >= 15);
+    assert.equal(TRANSITIONS[0].id, "cut");
     assert.ok(EFFECTS.some((e) => e.id === "saturation"));
     assert.ok((MOTIONS as readonly string[]).includes("kenburns"));
     assert.equal(TEXT_PRESETS.length, 6);
@@ -264,8 +265,9 @@ describe("frame compositor", () => {
     const c = clip({ startSec: 0, durationSec: 4, fadeInSec: 1, fadeOutSec: 0, transitionOut: "slide" });
     assert.equal(transitionState(c, 0.5).alpha, 0.5);
     assert.equal(transitionState(c, 2).alpha, 1);
-    assert.ok(transitionState(c, 3.9).dx > 0);
-    assert.ok(transitionState({ ...c, transitionIn: "wipe" }, 0.1).wipe < 1);
+    assert.ok(transitionState(c, 3.9).dx < 0); // slides out to the left
+    const w = transitionState({ ...c, transitionIn: "wipe" }, 0.1).clip;
+    assert.ok(w && w.kind === "rect" && w.x1 < 1);
   });
 
   it("stacks visible layers in track order with captions on top", () => {
@@ -286,5 +288,47 @@ describe("frame compositor", () => {
   it("builds CSS filter strings only for changed values", () => {
     assert.equal(filterString(NEUTRAL_FILTERS, 1), "none");
     assert.equal(filterString({ ...NEUTRAL_FILTERS, brightness: 120, grayscale: 100, blur: 4 }, 0.5), "brightness(120%) blur(2.0px) grayscale(100%)");
+  });
+});
+
+import { incomingFx, motionAt, outgoingFx, previousClip } from "@/src/lib/video/compositor";
+import { normalizeTransition } from "@/src/lib/video/presets";
+
+describe("animation and transitions", () => {
+  it("animates pictures over the whole clip, scaled by strength", () => {
+    assert.equal(motionAt("zoom-in", 0).scale, 1);
+    assert.ok(Math.abs(motionAt("zoom-in", 1).scale - 1.18) < 1e-9);
+    assert.ok(motionAt("zoom-in", 1, 2).scale > motionAt("zoom-in", 1, 1).scale);
+    assert.ok(motionAt("zoom-in", 0.5).scale > 1 && motionAt("zoom-in", 0.5).scale < 1.18);
+    assert.deepEqual(motionAt("none", 0.5), { scale: 1, dx: 0, dy: 0, rot: 0 });
+    assert.ok(motionAt("tilt", 1).rot > 0);
+  });
+
+  it("keeps the previous clip underneath during a transition so the two blend", () => {
+    const a = clip({ id: "a", kind: "image", trackId: "track_image", startSec: 0, durationSec: 4 });
+    const b = clip({ id: "b", kind: "image", trackId: "track_image", startSec: 4, durationSec: 4, transitionIn: "fade", transitionSec: 1 });
+    const comp = { ...emptyComposition("p"), clips: [a, b] };
+    assert.equal(previousClip(comp, b)?.id, "a");
+    assert.deepEqual(visualStack(comp, 4.5).map((c) => c.id), ["a", "b"]);
+    assert.equal(transitionState(b, 4.5).alpha, 0.5);
+    assert.deepEqual(visualStack(comp, 5.2).map((c) => c.id), ["b"]);
+    const cut = { ...comp, clips: [a, { ...b, transitionIn: "cut" }] };
+    assert.deepEqual(visualStack(cut, 4.5).map((c) => c.id), ["b"]);
+  });
+
+  it("moves both clips for a push and dips through a colour", () => {
+    assert.ok(incomingFx("push-left", 0.5).dx > 0);
+    assert.ok(outgoingFx("push-left", 0.5).dx < 0);
+    const dip = incomingFx("dip-black", 0.5);
+    assert.equal(dip.overlay?.alpha, 1);
+    assert.equal(incomingFx("dip-black", 0.25).alpha, 0);
+    assert.equal(incomingFx("circle", 1).clip?.kind, "circle");
+  });
+
+  it("maps older transition names onto the new set", () => {
+    assert.equal(normalizeTransition("dissolve"), "fade");
+    assert.equal(normalizeTransition("slide"), "slide-left");
+    assert.equal(normalizeTransition(undefined), "cut");
+    assert.equal(normalizeTransition("nonsense"), "cut");
   });
 });

@@ -6,7 +6,7 @@ import { ChevronDown, RotateCcw, FlipHorizontal2, FlipVertical2, Scissors, Copy,
 import type { ClipFilters, ClipTransform, TextStyle, TimelineClip, TimelineTrack } from "@/src/lib/video/types";
 import { IDENTITY_TRANSFORM, NEUTRAL_FILTERS } from "@/src/lib/video/types";
 import { FILTER_PRESETS } from "@/src/lib/video/compositor";
-import { TRANSITIONS, MOTIONS, textPresetById } from "@/src/lib/video/presets";
+import { TRANSITIONS, MOTIONS, MOTION_LABELS, normalizeTransition, textPresetById } from "@/src/lib/video/presets";
 import { maxDurationFor } from "@/src/lib/video/ops";
 import { Badge } from "@/src/components/ui/Badge";
 import { cx } from "@/src/components/ui/cx";
@@ -85,6 +85,7 @@ export function ClipInspector({
   onSplit,
   onDuplicate,
   onDelete,
+  onApplyToTrack,
 }: {
   clip: TimelineClip | null;
   tracks: TimelineTrack[];
@@ -93,6 +94,8 @@ export function ClipInspector({
   onSplit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  /** Apply a change to every picture/video clip on the selected clip's track ("vary" gives each a different motion). */
+  onApplyToTrack?: (patch: Partial<TimelineClip> | "vary-motion") => void;
 }) {
   if (!clip) {
     return (
@@ -225,18 +228,85 @@ export function ClipInspector({
         </Section>
       )}
 
+      {isMedia && (
+        <Section title="Animation">
+          <p className="text-[11px] text-muted-text">Brings pictures to life: the move plays across the whole clip.</p>
+          <div className="grid grid-cols-3 gap-1">
+            {MOTIONS.map((m) => {
+              const active = (clip.motion ?? "none") === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => onPatch({ motion: m })}
+                  aria-pressed={active}
+                  className={cx("rounded-md border px-1 py-1.5 text-[11px] font-medium transition-colors", active ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted")}
+                >
+                  {MOTION_LABELS[m]}
+                </button>
+              );
+            })}
+          </div>
+          {(clip.motion ?? "none") !== "none" && (
+            <Slider label="Strength" value={clip.motionAmount ?? 1} min={0.25} max={2} step={0.05} neutral={1} onReset={() => onPatch({ motionAmount: 1 })} format={(v) => `${Math.round(v * 100)}%`} onChange={(motionAmount) => onPatch({ motionAmount })} />
+          )}
+          {onApplyToTrack && (
+            <div className="flex flex-wrap gap-1.5">
+              <button type="button" onClick={() => onApplyToTrack({ motion: clip.motion ?? "none", motionAmount: clip.motionAmount ?? 1 })} className="rounded-md border border-border px-2 py-1 text-[11px] font-medium hover:bg-muted">
+                Use on all clips in this track
+              </button>
+              <button type="button" onClick={() => onApplyToTrack("vary-motion")} className="rounded-md border border-border px-2 py-1 text-[11px] font-medium hover:bg-muted">
+                Mix of moves on all clips
+              </button>
+            </div>
+          )}
+        </Section>
+      )}
+
+      {isMedia && (
+        <Section title="Transition into this clip">
+          <div className="grid grid-cols-3 gap-1">
+            {TRANSITIONS.map((tDef) => {
+              const active = normalizeTransition(clip.transitionIn) === tDef.id;
+              return (
+                <button
+                  key={tDef.id}
+                  type="button"
+                  title={tDef.blurb}
+                  onClick={() => onPatch({ transitionIn: tDef.id, ...(tDef.id !== "cut" && clip.transitionSec === undefined ? { transitionSec: tDef.defaultSec } : {}) })}
+                  aria-pressed={active}
+                  className={cx("rounded-md border px-1 py-1.5 text-[11px] font-medium transition-colors", active ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted")}
+                >
+                  {tDef.label}
+                </button>
+              );
+            })}
+          </div>
+          {normalizeTransition(clip.transitionIn) !== "cut" && (
+            <Slider label="Length" value={clip.transitionSec ?? 0.6} min={0.2} max={2} step={0.05} neutral={0.6} onReset={() => onPatch({ transitionSec: 0.6 })} format={(v) => `${v.toFixed(2)}s`} onChange={(transitionSec) => onPatch({ transitionSec })} />
+          )}
+          <p className="text-[11px] text-muted-text">Blends from the clip before it on the same track. The first clip transitions in from black.</p>
+          {onApplyToTrack && (
+            <button
+              type="button"
+              onClick={() => onApplyToTrack({ transitionIn: normalizeTransition(clip.transitionIn), transitionSec: clip.transitionSec ?? 0.6 })}
+              className="rounded-md border border-border px-2 py-1 text-[11px] font-medium hover:bg-muted"
+            >
+              Use between all clips in this track
+            </button>
+          )}
+        </Section>
+      )}
+
       {(isMedia || isText) && (
-        <Section title="Opacity & transitions" defaultOpen={false}>
+        <Section title="Opacity & fades" defaultOpen={false}>
           <Slider label="Opacity" value={clip.opacity ?? 1} min={0} max={1} step={0.01} neutral={1} onReset={() => onPatch({ opacity: 1 })} format={(v) => `${Math.round(v * 100)}%`} onChange={(opacity) => onPatch({ opacity })} />
           <div className="grid grid-cols-2 gap-2">
             <Num label="Fade in" suffix="s" value={clip.fadeInSec} onChange={(v) => onPatch({ fadeInSec: Math.min(v, clip.durationSec / 2) })} />
             <Num label="Fade out" suffix="s" value={clip.fadeOutSec} onChange={(v) => onPatch({ fadeOutSec: Math.min(v, clip.durationSec / 2) })} />
-            <Pick label="Transition in" value={clip.transitionIn ?? "cut"} options={TRANSITIONS.map((t) => [t.id, t.label] as const)} onChange={(transitionIn) => onPatch({ transitionIn })} />
-            <Pick label="Transition out" value={clip.transitionOut ?? "cut"} options={TRANSITIONS.map((t) => [t.id, t.label] as const)} onChange={(transitionOut) => onPatch({ transitionOut })} />
+            {isText && <Pick label="Transition in" value={normalizeTransition(clip.transitionIn)} options={TRANSITIONS.map((t) => [t.id, t.label] as const)} onChange={(transitionIn) => onPatch({ transitionIn })} />}
+            <Pick label="Exit (end of clip)" value={normalizeTransition(clip.transitionOut)} options={TRANSITIONS.map((t) => [t.id, t.label] as const)} onChange={(transitionOut) => onPatch({ transitionOut })} />
           </div>
-          {clip.kind === "image" && (
-            <Pick label="Motion" value={(clip.motion ?? "none") as (typeof MOTIONS)[number]} options={MOTIONS.map((m) => [m, m === "none" ? "None" : m === "kenburns" ? "Ken Burns" : m.replace("-", " ")] as const)} onChange={(motion) => onPatch({ motion })} />
-          )}
         </Section>
       )}
 
