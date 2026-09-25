@@ -2,7 +2,8 @@
 
 import type { TextOverlay } from "@/src/lib/package/types";
 import { useProductionContext } from "@/src/components/projects/useProductionContext";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { Plus, ImagePlus, Sparkles } from "lucide-react";
 import { generateProviderImage } from "@/src/lib/ai-client";
 import { GeminiAssist } from "@/src/components/intelligence/GeminiAssist";
@@ -63,23 +64,12 @@ export function ThumbnailTab({
   const [artBusy, setArtBusy] = useState(false);
   const [artError, setArtError] = useState<string | null>(null);
 
-  // The art prompt is kept per project so it is still there on return.
-  const promptKey = `tuberack:thumb-prompt:${projectId}`;
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- restore once from device storage.
-      setArtPrompt(localStorage.getItem(promptKey) ?? "");
-    } catch {
-      // Storage unavailable: start empty.
-    }
-  }, [promptKey]);
+  // The art prompt is saved to the project when used, so it is there on return.
+  const intel = useIntel();
+  const savedPrompt = intel.outputFor(projectId, "thumbnail-art-prompt")?.text ?? "";
+  const promptValue = artPrompt || savedPrompt;
   function changePrompt(value: string) {
     setArtPrompt(value);
-    try {
-      localStorage.setItem(promptKey, value);
-    } catch {
-      // Storage unavailable: the prompt still works for this visit.
-    }
   }
 
   const production = useProductionContext(projectId);
@@ -121,7 +111,8 @@ export function ThumbnailTab({
   async function generateArt() {
     setArtBusy(true);
     setArtError(null);
-    const outcome = await generateProviderImage(artPrompt.trim() || defaultArtPrompt, "16:9");
+    if (promptValue.trim()) intel.saveOutputFor(projectId, "thumbnail-art-prompt", promptValue.trim(), "Thumbnail prompt");
+    const outcome = await generateProviderImage(promptValue.trim() || defaultArtPrompt, "16:9");
     if (!outcome.ok) {
       setArtError(outcome.message);
       setArtBusy(false);
@@ -211,7 +202,7 @@ export function ThumbnailTab({
       <section aria-label="Thumbnail art" className="space-y-3 rounded-xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-end gap-2">
           <div className="min-w-0 flex-1">
-            <Input label="Thumbnail art prompt " value={artPrompt} onChange={(e) => changePrompt(e.target.value)} placeholder={defaultArtPrompt} />
+            <Input label="Thumbnail art prompt " value={promptValue} onChange={(e) => changePrompt(e.target.value)} placeholder={defaultArtPrompt} />
           </div>
           <Button loading={artBusy} onClick={() => void generateArt()}>
             <Sparkles className="size-4" aria-hidden="true" /> Generate art

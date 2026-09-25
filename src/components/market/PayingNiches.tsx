@@ -10,6 +10,7 @@ import { Button } from "@/src/components/ui/Button";
 import { Select } from "@/src/components/ui/fields";
 import { Modal } from "@/src/components/ui/overlays";
 import { cx } from "@/src/components/ui/cx";
+import { useIntel } from "@/src/components/intelligence/IntelProvider";
 
 interface Leaderboard {
   region: string;
@@ -64,7 +65,22 @@ export function PayingNiches() {
   const [sort, setSort] = useState<SortKey>("overall");
   const [query, setQuery] = useState("");
   const [board, setBoard] = useState<Leaderboard | null>(null);
-  const [custom, setCustom] = useState<NicheProfile[]>([]);
+  // Niches the user analysed themselves are saved to the account.
+  const intel = useIntel();
+  const [freshCustom, setFreshCustom] = useState<NicheProfile[] | null>(null);
+  const custom = useMemo<NicheProfile[]>(() => {
+    if (freshCustom) return freshCustom;
+    try {
+      return JSON.parse(intel.outputFor("_workspace", "paying-niches-custom")?.text ?? "[]") as NicheProfile[];
+    } catch {
+      return [];
+    }
+  }, [freshCustom, intel]);
+  const setCustom = (update: (c: NicheProfile[]) => NicheProfile[]) => {
+    const next = update(custom).slice(0, 30);
+    setFreshCustom(next);
+    intel.saveOutputFor("_workspace", "paying-niches-custom", JSON.stringify(next), "Custom niche analyses");
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState<{ done: number; total: number } | null>(null);

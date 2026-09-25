@@ -8,6 +8,7 @@ import { Button } from "@/src/components/ui/Button";
 import { Badge } from "@/src/components/ui/Badge";
 import { Alert } from "@/src/components/ui/Alert";
 import { VideoDetailsPanel } from "@/src/components/intelligence/VideoDetailsPanel";
+import { useIntel } from "@/src/components/intelligence/IntelProvider";
 
 /** YouTube returns HTML-escaped titles (&#39; &amp;); decode as text, never as markup. */
 export function decodeEntities(value: string): string {
@@ -22,6 +23,8 @@ const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFracti
  * Real titles, channels, and public view counts — nothing estimated.
  * Optional `onAdd` lets a studio pull a result in as a reference.
  */
+const SAVE_KEY = "youtube-research-last";
+
 export function YouTubeResearch({
   initialQuery = "",
   onAdd,
@@ -31,8 +34,20 @@ export function YouTubeResearch({
   onAdd?: (result: YouTubeSearchResult) => void;
   addLabel?: string;
 }) {
-  const [query, setQuery] = useState(initialQuery);
-  const [results, setResults] = useState<YouTubeSearchResult[] | null>(null);
+  // The last search is saved to the account, so it is still here on return.
+  const intel = useIntel();
+  const saved = (() => {
+    try {
+      const raw = intel.outputFor("_workspace", SAVE_KEY)?.text;
+      return raw ? (JSON.parse(raw) as { query: string; results: YouTubeSearchResult[] }) : null;
+    } catch {
+      return null;
+    }
+  })();
+  const [queryDraft, setQuery] = useState<string | null>(initialQuery || null);
+  const query = queryDraft ?? saved?.query ?? "";
+  const [freshResults, setResults] = useState<YouTubeSearchResult[] | null>(null);
+  const results = freshResults ?? (queryDraft === null || queryDraft === saved?.query ? saved?.results ?? null : null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState<Set<string>>(new Set());
@@ -45,7 +60,10 @@ export function YouTubeResearch({
     setError(null);
     const outcome = await searchYouTube(query.trim(), 12);
     setLoading(false);
-    if (outcome.ok) setResults(outcome.data.results);
+    if (outcome.ok) {
+      setResults(outcome.data.results);
+      intel.saveOutputFor("_workspace", SAVE_KEY, JSON.stringify({ query: query.trim(), results: outcome.data.results }), "YouTube research");
+    }
     else {
       setResults(null);
       setError(outcome.message);
