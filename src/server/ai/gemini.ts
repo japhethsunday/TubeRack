@@ -4,6 +4,7 @@ import { normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPl
 import { stripMarkdown } from "@/src/lib/text/markdown";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
 import { isNvidiaConfigured, nvidiaGenerateText } from "@/src/server/ai/nvidia";
+import { arkGenerateImage, isArkConfigured } from "@/src/server/ai/ark";
 import { cleanImagePrompt, isNvidiaImageConfigured, nvidiaGenerateImage } from "@/src/server/ai/nvidia-image";
 import { isMistralConfigured, mistralGenerateText, mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
 
@@ -268,6 +269,30 @@ export class GeminiTextProvider implements TextProvider {
   }
 }
 
+/** Backup image models when Gemini can't make the image: NVIDIA FLUX, then BytePlus Seedream. */
+async function backupImage(prompt: string, aspect: "16:9" | "9:16" | "1:1"): Promise<string> {
+  const env = getServerEnv();
+  let last: unknown = new Error("No backup image model is configured.");
+  if (isNvidiaImageConfigured(env)) {
+    try {
+      return (await nvidiaGenerateImage(prompt, aspect)).dataUrl;
+    } catch (error) {
+      last = error;
+      console.error("[nvidia] image fallback failed:", error instanceof Error ? error.message.slice(0, 300) : error);
+    }
+  }
+  if (isArkConfigured(env)) {
+    try {
+      return (await arkGenerateImage(cleanImagePrompt(prompt), aspect)).dataUrl;
+    } catch (error) {
+      console.error("[byteplus] image fallback failed:", error instanceof Error ? error.message.slice(0, 300) : error);
+      // Keep a "filtered" reason from NVIDIA so the user gets the plain-words hint.
+      if (!/filtered/i.test(last instanceof Error ? last.message : "")) last = error;
+    }
+  }
+  throw last;
+}
+
 export class GeminiImageProvider implements ImageProvider {
   readonly capability = "image" as const;
   readonly name = "gemini";
@@ -278,11 +303,11 @@ export class GeminiImageProvider implements ImageProvider {
     const env = getServerEnv();
     const model = env.GEMINI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL;
     const aspect = request.aspectRatio === "9:16" || request.aspectRatio === "1:1" ? request.aspectRatio : "16:9";
-    const nvidia = isNvidiaImageConfigured(env);
-    // No Gemini key: NVIDIA's image models directly.
-    if (!env.GEMINI_API_KEY && nvidia) {
+    const backups = isNvidiaImageConfigured(env) || isArkConfigured(env);
+    // No Gemini key: the backup image models directly.
+    if (!env.GEMINI_API_KEY && backups) {
       try {
-        return { url: (await nvidiaGenerateImage(prompt, aspect)).dataUrl, prompt: request.prompt };
+        return { url: await backupImage(prompt, aspect), prompt: request.prompt };
       } catch (error) {
         throw providerError("image generation", error);
       }
@@ -305,14 +330,13 @@ export class GeminiImageProvider implements ImageProvider {
       // until object-storage upload lands on the media route.
       return { url: `data:${mimeType};base64,${data}`, prompt: request.prompt };
     } catch (error) {
-      if (error instanceof ProviderNotConfiguredError && !nvidia) throw error;
-      // Gemini out of image quota, busy or failing: NVIDIA's image models.
-      if (nvidia) {
+      if (error instanceof ProviderNotConfiguredError && !backups) throw error;
+      // Gemini out of image quota, busy or failing: the backup image models.
+      if (backups) {
         try {
-          return { url: (await nvidiaGenerateImage(prompt, aspect)).dataUrl, prompt: request.prompt };
-        } catch (nvidiaError) {
-          console.error("[nvidia] image fallback failed:", nvidiaError instanceof Error ? nvidiaError.message.slice(0, 300) : nvidiaError);
-          if (/filtered/i.test(nvidiaError instanceof Error ? nvidiaError.message : "")) {
+          return { url: await backupImage(prompt, aspect), prompt: request.prompt };
+        } catch (backupError) {
+          if (/filtered/i.test(backupError instanceof Error ? backupError.message : "")) {
             throw new Error("The image service declined this prompt. Describe the scene in plain words (subject, setting, mood) and try again.");
           }
         }
