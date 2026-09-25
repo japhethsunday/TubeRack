@@ -169,7 +169,7 @@ How to think:
 Respond ONLY with JSON:
 {"ideas":[{"title":"under 70 chars, keyword near the front","hook":"the first 5 seconds, spoken","angle":"what makes this different","format":"Long-form|Short","pillar":"content pillar","whyItWorks":"1-2 sentences tied to the evidence","evidence":["C1: ...","N3: ..."],"thumbnail":"one-line visual concept, max 4 words of text","searchPhrase":"what viewers type into YouTube","confidence":"High|Medium|Test"}]}`;
 
-  const { text, model } = await new GeminiTextProvider().generateText({ prompt, maxTokens: Math.min(8192, 700 * input.count), json: true });
+  const { text, model } = await new GeminiTextProvider().generateText({ prompt, maxTokens: Math.min(8192, 700 * input.count), json: true, skills: ["youtube", "content", "marketing", "influencer"] });
   const obj = extractJsonObject(text) as { ideas?: unknown[] } | null;
   const ideas = (Array.isArray(obj?.ideas) ? obj!.ideas : [])
     .map((raw) => {

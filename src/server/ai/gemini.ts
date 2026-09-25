@@ -1,3 +1,4 @@
+import { skillsFor, skillsForTask, type SkillId } from "@/src/server/ai/skills";
 import { GoogleGenAI } from "@google/genai";
 import { normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPlan } from "@/src/lib/channel/plan";
 import { stripMarkdown } from "@/src/lib/text/markdown";
@@ -6,7 +7,7 @@ import { isNvidiaConfigured, nvidiaGenerateText } from "@/src/server/ai/nvidia";
 import { cleanImagePrompt, isNvidiaImageConfigured, nvidiaGenerateImage } from "@/src/server/ai/nvidia-image";
 import { isMistralConfigured, mistralGenerateText, mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
 
-type TextRequest = { prompt: string; maxTokens?: number; json?: boolean };
+type TextRequest = { prompt: string; maxTokens?: number; json?: boolean; skills?: SkillId[] };
 
 /** Backup text providers, in order, that have keys set. */
 function backupTextProviders(env = getServerEnv()): { name: string; run: (r: TextRequest) => Promise<{ text: string; model: string }> }[] {
@@ -205,9 +206,10 @@ export class GeminiTextProvider implements TextProvider {
   readonly capability = "text" as const;
   readonly name = "gemini";
 
-  async generateText(request: { prompt: string; maxTokens?: number; json?: boolean }): Promise<{ text: string; model: string }> {
-    const prompt = request.prompt.trim();
-    if (!prompt) throw new Error("Text generation failed: prompt cannot be empty.");
+  async generateText(request: { prompt: string; maxTokens?: number; json?: boolean; skills?: SkillId[] }): Promise<{ text: string; model: string }> {
+    if (!request.prompt.trim()) throw new Error("Text generation failed: prompt cannot be empty.");
+    // Expert skills go first, so every model (and every backup) works to the same standard.
+    const prompt = `${skillsFor(request.skills)}${request.prompt.trim()}`;
     const env = getServerEnv();
     const hasBackup = backupTextProviders(env).length > 0;
     // No Gemini key: use the other providers directly.
@@ -511,6 +513,7 @@ export async function runIntelligenceTask(request: IntelligenceRequest): Promise
   const context = JSON.stringify(request.context ?? {}).slice(0, 8000);
   const provider = new GeminiTextProvider();
   const { text, model } = await provider.generateText({
+    skills: skillsForTask(request.task),
     prompt: `You are TubeRack's YouTube strategy analyst. ${label}\nContext (JSON):\n${context}\n\nRules: respond in plain text with concrete, actionable reasoning. Never invent views, rankings, metrics, or channel data — reason only from the context given.`,
     maxTokens: 4096,
   });
@@ -573,6 +576,7 @@ export async function writeScriptSections(req: ScriptWriteRequest): Promise<{ te
     `Respond ONLY with JSON: {"sections": ["text for section 1", ...]} containing exactly ${req.sections.length} strings.`,
   ].join("\n\n");
   const { text, model } = await new GeminiTextProvider().generateText({
+    skills: ["content", "youtube", "copy"],
     prompt,
     maxTokens: Math.min(8192, Math.round(req.targetWords * 2.5) + 1024),
     json: true,
@@ -621,6 +625,7 @@ export async function writePackaging(
     (context.format === "Short" ? " This is a YouTube Short: keep it punchy and mobile-first." : "");
   if (kind === "titles") {
     const { text, model } = await new GeminiTextProvider().generateText({
+    skills: ["youtube", "copy", "marketing"],
       prompt: `You are a YouTube growth strategist who writes titles that earn clicks from the right viewers. Write 8 distinct title options for this video, one per category: Curiosity, Benefit, Story, Question, Specific outcome, Contrarian, Educational, Search. Each: under 60 characters where possible (70 max), the main searchable keyword near the front, a clear payoff or open loop, and it must match the video's real hook and promise. The Search option is what someone would type into YouTube.\n${rules}\nVideo (JSON): ${brief}\nRespond ONLY with JSON: {"titles":[{"text":"...","category":"..."}]}`,
       maxTokens: 1500,
       json: true,
@@ -635,6 +640,7 @@ export async function writePackaging(
     return { titles, model };
   }
   const { text, model } = await new GeminiTextProvider().generateText({
+    skills: ["youtube", "copy", "marketing"],
     prompt: `You are a YouTube growth strategist. Write the upload copy that helps this video get discovered and watched. Description (150-300 words): the first two lines (shown in search and above "more") must hook the viewer and contain the main keyword naturally; then 2-3 short lines on what they'll learn or feel, using the words people search for; then the chapters exactly as given (if any); then a call to action that names the channel (subscribe / watch next). Also give 12-15 tags ordered from exact topic phrases to broader related searches (no channel-spam, no misleading tags), and 3 relevant hashtags.\n${rules}\nVideo (JSON): ${brief}\nRespond ONLY with JSON: {"description":"...","tags":["..."],"hashtags":["#..."]}`,
     maxTokens: 2000,
     json: true,
@@ -660,6 +666,7 @@ export async function rewriteSection(input: {
 }): Promise<{ text: string; model: string }> {
   if (!isTextConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   const { text, model } = await new GeminiTextProvider().generateText({
+    skills: ["content", "copy"],
     prompt: [
       "You are an expert YouTube scriptwriter. Rewrite the script section below as spoken narration.",
       `Video topic: ${input.topic || "(not given)"}`,
@@ -814,6 +821,7 @@ export interface NicheCandidate {
 export async function expandNiches(input: { seed: string; audience: string; count: number }): Promise<{ niches: NicheCandidate[]; model: string }> {
   const provider = new GeminiTextProvider();
   const { text, model } = await provider.generateText({
+    skills: ["youtube", "marketing", "influencer"],
     prompt:
       `You are a YouTube niche researcher. Seed interest: "${input.seed.slice(0, 200)}".` +
       (input.audience ? ` Target audience: "${input.audience.slice(0, 200)}".` : "") +
@@ -852,6 +860,7 @@ export async function writeNicheReport(input: {
 }): Promise<{ report: NicheReport; model: string }> {
   const provider = new GeminiTextProvider();
   const { text, model } = await provider.generateText({
+    skills: ["youtube", "marketing", "product"],
     prompt:
       `You are a YouTube strategist. Build a launch plan for the niche "${input.name}" (search phrase "${input.query}"; angle: ${input.angle || "—"}).\n` +
       `Measured from live YouTube data (last 180 days, top videos by views): ${JSON.stringify(input.metrics)}\nScores (0-100): ${JSON.stringify(input.scores)}\n` +
@@ -937,6 +946,7 @@ export async function planCalendar(input: { topic: string; audience: string; wee
   const provider = new GeminiTextProvider();
   const total = input.weeks * input.perWeek;
   const { text, model } = await provider.generateText({
+    skills: ["youtube", "content", "influencer"],
     prompt:
       `Plan a YouTube content calendar for the niche/topic "${input.topic.slice(0, 200)}"` +
       (input.audience ? ` for ${input.audience.slice(0, 150)}` : "") +
@@ -1000,7 +1010,8 @@ export async function writeChannelPlan(input: ChannelInputs, evidence: ChannelEv
     `"thumbnail":{"style":"","rules":[""]},"publishing":{"cadence":"","days":[""],"time":"","first90Days":[""]},` +
     `"monetisation":[{"stage":"","actions":[""]}] (3 stages from launch to established),` +
     `"competitors":[{"name":"","strength":"","gap":""}],"seoKeywords":[""] (20),"channelKeywords":[""] (12),"launchChecklist":[""] (10-12)}`;
-  const { text, model } = await provider.generateText({ prompt, maxTokens: 8192, json: true });
+  const { text, model } = await provider.generateText({
+    skills: ["youtube", "marketing", "influencer", "product"], prompt, maxTokens: 8192, json: true });
   const plan = normalisePlan(parseJsonObject(text, "channel plan"));
   if (plan.names.length === 0 || plan.ideas.length < 10) throw new Error("Received an incomplete channel plan. Try again.");
   return { plan, model };
@@ -1018,6 +1029,7 @@ export async function planSceneVisuals(input: { topic: string; aspect: "16:9" | 
     .map((s, i) => `${i + 1}. [${s.title}] ${s.text.slice(0, 600)}${s.direction ? ` (storyboard direction: ${s.direction.slice(0, 200)})` : ""}`)
     .join("\n");
   const { text, model } = await provider.generateText({
+    skills: ["content"],
     prompt:
       `You are the art director for a YouTube video about "${input.topic.slice(0, 200)}". Frame: ${input.aspect}.` +
       (input.style ? ` Visual style: ${input.style.slice(0, 200)}.` : "") +
