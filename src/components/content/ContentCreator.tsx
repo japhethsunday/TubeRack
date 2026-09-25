@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, Check, Clapperboard, Copy, Lightbulb, Loader2, Sparkles, TrendingUp, PlaySquare as Youtube } from "lucide-react";
+import { BarChart3, Check, Clapperboard, Copy, History, Lightbulb, Loader2, Plus, Sparkles, Trash2, TrendingUp, PlaySquare as Youtube } from "lucide-react";
 import { api, ApiError } from "@/src/lib/api";
 import { retryBusy } from "@/src/lib/ai-client";
 import { useProjects } from "@/src/components/projects/ProjectsProvider";
 import { useIntel } from "@/src/components/intelligence/IntelProvider";
-import { emptyStrategyBrief } from "@/src/lib/intelligence/profiles";
+import { emptyAudienceProfile, emptyStrategyBrief } from "@/src/lib/intelligence/profiles";
+import { usePackaging } from "@/src/components/package/PackagingProvider";
 import { Button } from "@/src/components/ui/Button";
 import { Input, Select } from "@/src/components/ui/fields";
 import { Alert } from "@/src/components/ui/Alert";
@@ -15,6 +16,10 @@ import { cx } from "@/src/components/ui/cx";
 import type { ContentIdea, IdeasResult, StudiedVideo } from "@/src/server/content/ideas";
 
 const SAVE_KEY = "content-creator-last";
+const HISTORY_KEY = "content-creator-history";
+const MAX_HISTORY = 10;
+
+type SavedSet = IdeasResult & { audience?: string };
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 
 function VideoRow({ v, label }: { v: StudiedVideo; label: string }) {
@@ -54,19 +59,25 @@ export function ContentCreator() {
   const [useChannel, setUseChannel] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fresh, setFresh] = useState<IdeasResult | null>(null);
+  const [fresh, setFresh] = useState<SavedSet | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
 
-  // The last study is saved to the account, so it is here on return.
-  const saved = (() => {
+  const pack = usePackaging();
+  // Every idea set is saved to the account (latest 10), like Channel Creator plans.
+  const history: SavedSet[] = (() => {
     try {
-      const raw = intel.outputFor("_workspace", SAVE_KEY)?.text;
-      return raw ? (JSON.parse(raw) as IdeasResult) : null;
+      const raw = intel.outputFor("_workspace", HISTORY_KEY)?.text;
+      if (raw) return JSON.parse(raw) as SavedSet[];
+      const last = intel.outputFor("_workspace", SAVE_KEY)?.text;
+      return last ? [JSON.parse(last) as SavedSet] : [];
     } catch {
-      return null;
+      return [];
     }
   })();
-  const result = fresh ?? saved;
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const result: SavedSet | null = fresh ?? history.find((h) => h.generatedAt === openId) ?? (showForm ? null : history[0] ?? null);
+  const saveHistory = (list: SavedSet[]) => intel.saveOutputFor("_workspace", HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY)), "Content ideas");
 
   useEffect(() => {
     api
@@ -87,8 +98,11 @@ export function ContentCreator() {
       const data = await retryBusy(() =>
         api.post<IdeasResult>("/api/v1/content-ideas", { niche, audience, count: Number(count), format, useChannel: Boolean(connected) && useChannel }),
       );
-      setFresh(data);
-      intel.saveOutputFor("_workspace", SAVE_KEY, JSON.stringify(data), "Content ideas");
+      const saved: SavedSet = { ...data, audience };
+      setFresh(saved);
+      setOpenId(saved.generatedAt);
+      setShowForm(false);
+      saveHistory([saved, ...history.filter((h) => h.generatedAt !== saved.generatedAt)]);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't create ideas right now. Please try again.");
     } finally {
@@ -115,21 +129,100 @@ export function ContentCreator() {
       description: [`Hook: ${idea.hook}`, `Angle: ${idea.angle}`, idea.pillar && `Pillar: ${idea.pillar}`, `Why it works: ${idea.whyItWorks}`].filter(Boolean).join("\n"),
       goal: idea.whyItWorks.slice(0, 280),
     });
+    const now = new Date().toISOString();
+    // Hand the whole idea to every tool: strategy (script), audience, SEO, thumbnail.
     intel.saveStrategyFor(project.id, {
-      ...emptyStrategyBrief(new Date().toISOString()),
+      ...emptyStrategyBrief(now),
       topic: idea.title,
       angle: idea.angle,
+      positioning: idea.pillar,
       promise: idea.hook,
-      takeaway: idea.angle,
+      takeaway: idea.whyItWorks,
       hook: idea.hook,
+      points: idea.evidence.join("\n"),
     });
+    if (result.audience) intel.saveAudienceFor(project.id, { ...emptyAudienceProfile(now), primary: result.audience, intent: idea.searchPhrase ? `Searches “${idea.searchPhrase}”` : "" });
+    intel.saveOutputFor(
+      project.id,
+      "content-idea",
+      [`${idea.title}`, `Hook: ${idea.hook}`, `Angle: ${idea.angle}`, `Why it works: ${idea.whyItWorks}`, ...idea.evidence.map((e) => `Evidence: ${e}`), `Thumbnail: ${idea.thumbnail}`, `Search phrase: ${idea.searchPhrase}`].join("\n"),
+      "Content idea",
+    );
+    if (idea.thumbnail) intel.saveOutputFor(project.id, "thumbnail-concepts", `Concept from Content Creator: ${idea.thumbnail}`, "Thumbnail concepts");
+    if (idea.searchPhrase) {
+      const seo = pack.seoFor(project.id);
+      pack.saveSeo({ ...seo, topic: idea.searchPhrase, keywords: [...new Set([idea.searchPhrase, ...seo.keywords])], audience: result.audience || seo.audience });
+    }
     router.push(`/studio/script?project=${project.id}`);
   }
 
   const labelFor = (tag: string, i: number) => `${tag}${i + 1}`;
 
+  const sidebar = (
+    <aside className="space-y-2 lg:sticky lg:top-20 lg:self-start">
+      <Button
+        className="w-full"
+        variant={result ? "outline" : "primary"}
+        onClick={() => {
+          setFresh(null);
+          setOpenId(null);
+          setShowForm(true);
+        }}
+      >
+        <Plus className="size-4" aria-hidden="true" /> New ideas
+      </Button>
+      {history.length > 0 && (
+        <div className="rounded-xl border border-border bg-surface p-2">
+          <p className="flex items-center gap-1.5 px-2 py-1 text-xs font-semibold text-muted-text">
+            <History className="size-3.5" aria-hidden="true" /> Saved idea sets
+          </p>
+          <ul className="space-y-0.5">
+            {history.map((h) => (
+              <li key={h.generatedAt} className="group flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFresh(null);
+                    setShowForm(false);
+                    setOpenId(h.generatedAt);
+                  }}
+                  className={cx(
+                    "min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left",
+                    result?.generatedAt === h.generatedAt ? "bg-muted font-medium" : "hover:bg-muted",
+                  )}
+                >
+                  <span className="block truncate text-sm">{h.channel?.title || h.niche}</span>
+                  <span className="block truncate text-[11px] text-muted-text">
+                    {h.ideas.length} ideas · {new Date(h.generatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete idea set from ${new Date(h.generatedAt).toLocaleDateString()}`}
+                  onClick={() => {
+                    saveHistory(history.filter((x) => x.generatedAt !== h.generatedAt));
+                    if (result?.generatedAt === h.generatedAt) {
+                      setFresh(null);
+                      setOpenId(null);
+                    }
+                  }}
+                  className="rounded p-1 text-muted-text opacity-60 hover:bg-muted hover:text-destructive group-hover:opacity-100"
+                >
+                  <Trash2 className="size-3.5" aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </aside>
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+      {sidebar}
+      <div className="min-w-0 space-y-6">
+      {!result && (
       <form onSubmit={generate} className="space-y-4 rounded-2xl border border-border bg-surface p-5">
         {connected === undefined ? (
           <div className="h-10 animate-pulse rounded-lg bg-muted" />
@@ -175,6 +268,7 @@ export function ContentCreator() {
         </div>
         {error && <Alert tone="bad" title="Content Creator">{error}</Alert>}
       </form>
+      )}
 
       {result && (
         <>
@@ -290,6 +384,7 @@ export function ContentCreator() {
           </section>
         </>
       )}
+      </div>
     </div>
   );
 }
