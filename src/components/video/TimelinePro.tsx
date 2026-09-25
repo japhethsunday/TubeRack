@@ -361,7 +361,7 @@ export function TimelinePro({
           ))}
         </div>
         <span className="ml-auto flex items-center gap-0.5">
-          <span className="mr-1 font-mono text-xs tabular-nums text-muted-text">{fmtRuler(playhead)}.{String(Math.floor((playhead % 1) * 100)).padStart(2, "0")}</span>
+          <span className="mr-1 font-mono text-xs tabular-nums text-muted-text">{fmtRuler(playhead)}.{Math.floor((playhead % 1) * 10)}</span>
           <button type="button" onClick={onToggleSnap} aria-pressed={snap} title="Snapping" className={cx(btn, snap && "text-primary")}><Magnet className="size-4" aria-hidden="true" /></button>
           <button type="button" onClick={() => onZoom(Math.max(4, Math.round(pxPerSec / 1.4)))} aria-label="Zoom out" className={btn}><ZoomOut className="size-4" aria-hidden="true" /></button>
           <input type="range" min={4} max={400} value={pxPerSec} onChange={(e) => onZoom(Number(e.target.value))} aria-label="Timeline zoom" className="w-24 accent-cyan-400" />

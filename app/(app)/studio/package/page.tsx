@@ -116,7 +116,7 @@ function Studio() {
   const sections = script?.sections ?? [];
   const scriptText = sections.map((s) => s.text).join("\n\n");
   const segments = sceneSegments(scenes);
-  const duration = Math.max(durationOf(comp.clips), segments.reduce((n, s) => n + s.durationSec, 0), 0);
+  const duration = durationOf(comp.clips) || segments.reduce((n, s) => n + s.durationSec, 0);
 
   const primaryTitle = packaging.primaryTitleFor(pid)?.text
     || intel.titles.find((t) => t.status === "approved")?.text

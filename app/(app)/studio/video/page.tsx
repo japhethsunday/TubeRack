@@ -79,7 +79,7 @@ function Studio() {
     setSelectedId(projectId);
   }
   const step = useNextStep(selectedId ?? projectId, "video");
-  const [playhead, setPlayhead] = useState(0);
+  const [rawPlayhead, setPlayhead] = useState(0);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [pxPerSec, setPxPerSec] = useState(44);
@@ -132,13 +132,15 @@ function Studio() {
   const segments = useMemo(() => sceneSegments(scenes), [scenes]);
   const duration = useMemo(
     () => {
+      // The video ends where its last clip ends — never at the storyboard's
+      // planned length (that left a black stretch after the real content).
       const clipEnd = durationOf(comp?.clips ?? []);
-      const sceneBuilt = (comp?.clips ?? []).some((c) => c.sceneId);
-      // Imported-footage timelines end exactly where the last clip ends.
-      return sceneBuilt ? Math.max(clipEnd, segments.reduce((n, s) => n + s.durationSec, 0), 1) : Math.max(clipEnd, 1);
+      return clipEnd > 0 ? clipEnd : Math.max(segments.reduce((n, s) => n + s.durationSec, 0), 1);
     },
     [comp, segments],
   );
+  // The playhead never goes past the end of the video.
+  const playhead = Math.min(rawPlayhead, duration);
   const issues = useMemo(
     () => (comp && project ? validateComposition(comp, scenes, assets) : []),
     [comp, project, scenes, assets],
