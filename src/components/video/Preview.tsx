@@ -8,9 +8,13 @@ import type { Composition, TimelineClip } from "@/src/lib/video/types";
 import { drawComposition, sourceTime, transitionState } from "@/src/lib/video/compositor";
 import { assetUrl, loadImage, type RenderAsset } from "@/src/lib/video/render";
 import { mixGain } from "@/src/lib/video/mix";
+import { sharedBlob } from "@/src/lib/video/media-cache";
 import { renderMusic, renderSfx, musicRecipe, speakText, stopSpeech, unlockWebAudio, type MusicMood, type SfxType } from "@/src/lib/media/audio";
 import { stopAllPlayback, claimPlayback } from "@/src/components/media/players";
 import { cx } from "@/src/components/ui/cx";
+
+/** Audio longer than this streams in the preview rather than downloading whole. */
+const LONG_AUDIO_SEC = 20 * 60;
 
 /** 0.1 s of silence: played inside the Play tap to unlock audio on phones. */
 const SILENT_WAV =
@@ -26,8 +30,7 @@ function cachedAudio(url: string): Promise<string> {
   if (url.startsWith("blob:") || url.startsWith("data:")) return Promise.resolve(url);
   let p = audioCache.get(url);
   if (!p) {
-    p = fetch(url)
-      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+    p = sharedBlob(url)
       .then((b) => URL.createObjectURL(b))
       .catch((e) => {
         audioCache.delete(url);
@@ -41,11 +44,11 @@ function cachedAudio(url: string): Promise<string> {
 /** Starts a cached audio file at the playhead once its data is ready; returns a stop function. */
 function playCached(
   url: string,
-  opts: { volume: number; rate: number; loop?: boolean; at: () => number; el?: HTMLAudioElement | null },
+  opts: { volume: number; rate: number; loop?: boolean; at: () => number; el?: HTMLAudioElement | null; stream?: boolean },
 ): { el: () => HTMLAudioElement | null; stop: () => void } {
   let stopped = false;
   let audio: HTMLAudioElement | null = null;
-  void cachedAudio(url)
+  void (opts.stream ? Promise.resolve(url) : cachedAudio(url))
     .catch(() => url)
     .then((src) => {
       if (stopped) return;
@@ -145,7 +148,8 @@ export function Preview({
       if (c.kind !== "voice" && c.kind !== "music" && c.kind !== "sfx") continue;
       const a = assetFor(c.assetId);
       const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl : null);
-      if (url && !url.startsWith("{")) void cachedAudio(url).catch(() => {});
+      // Very long tracks stream instead of downloading whole.
+      if (url && !url.startsWith("{") && !((a?.durationSec ?? 0) > LONG_AUDIO_SEC)) void cachedAudio(url).catch(() => {});
     }
   }, [comp.clips, assetFor]);
 
@@ -300,6 +304,7 @@ export function Preview({
           const clip = music;
           const h = playCached(url, {
             el: players.current?.music,
+            stream: (a?.durationSec ?? 0) > LONG_AUDIO_SEC,
             volume: mixGain(s.comp, music, t) * s.volume,
             rate: music.speed ?? 1,
             loop: true,

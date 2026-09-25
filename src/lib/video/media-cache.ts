@@ -81,18 +81,35 @@ export function filmstripFor(url: string): Promise<Filmstrip | null> {
   return p;
 }
 
+/**
+ * One download per media file, shared by the waveform, the preview player and
+ * anything else that needs the bytes (they used to fetch the same file
+ * several times each visit).
+ */
+const blobs = new Map<string, Promise<Blob>>();
+const MAX_SHARED_BYTES = 80 * 1024 * 1024;
+export function sharedBlob(url: string): Promise<Blob> {
+  if (url.startsWith("blob:") || url.startsWith("data:")) return fetch(url).then((r) => r.blob());
+  let p = blobs.get(url);
+  if (!p) {
+    p = fetch(url).then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))));
+    p.then((b) => b.size > MAX_SHARED_BYTES && blobs.delete(url)).catch(() => blobs.delete(url));
+    blobs.set(url, p);
+  }
+  return p;
+}
+
 /** Peaks per second of audio (max |amplitude| per bucket), for waveforms. */
 export const PEAKS_PER_SEC = 50;
-const MAX_WAVEFORM_BYTES = 300 * 1024 * 1024;
+/** Beyond this a waveform would decode to gigabytes (a 2-hour song): skip it. */
+const MAX_WAVEFORM_BYTES = 40 * 1024 * 1024;
 
 async function buildPeaks(url: string): Promise<Float32Array | null> {
-  const head = await fetch(url, { method: "HEAD" }).catch(() => null);
-  const size = Number(head?.headers.get("content-length") ?? 0);
-  if (size > MAX_WAVEFORM_BYTES) return null; // too big to decode in memory
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const ctx = new OfflineAudioContext(1, 1, 44_100);
-  const buf = await ctx.decodeAudioData(await res.arrayBuffer());
+  const blob = await sharedBlob(url);
+  if (blob.size > MAX_WAVEFORM_BYTES) return null;
+  // Low sample rate: a waveform needs shape, not fidelity (and ~5x less memory).
+  const ctx = new OfflineAudioContext(1, 1, 8_000);
+  const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
   const bucket = Math.max(1, Math.floor(buf.sampleRate / PEAKS_PER_SEC));
   const n = Math.ceil(buf.length / bucket);
   const out = new Float32Array(n);
