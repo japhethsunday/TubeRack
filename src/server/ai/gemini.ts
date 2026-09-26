@@ -746,6 +746,20 @@ export async function writePackaging(
 }
 
 /** Rewrite one script section following a creator instruction. */
+/**
+ * The rewritten text only: prefer the <rewrite> block; otherwise drop the
+ * self-check lines some models append ("No hype words? Yes.").
+ */
+export function extractRewrite(raw: string): string {
+  const tagged = [...raw.matchAll(/<rewrite>([\s\S]*?)(?:<\/rewrite>|$)/gi)].map((m) => m[1].trim()).filter(Boolean);
+  if (tagged.length) return tagged[tagged.length - 1];
+  const kept = raw
+    .split("\n")
+    .filter((line) => !/^\s*(?:[-*•]\s*)?[^.!\n]{2,80}\?\s*(?:yes|no)\b/i.test(line))
+    .filter((line) => !/^\s*(?:\*\*)?(?:self[- ]?check|checklist|notes?|rewritten(?: section)?)(?:\*\*)?\s*:?\s*$/i.test(line));
+  return kept.join("\n").trim() || raw.trim();
+}
+
 export async function rewriteSection(input: {
   heading: string;
   text: string;
@@ -760,12 +774,13 @@ export async function rewriteSection(input: {
       `Video topic: ${input.topic || "(not given)"}`,
       `Section: ${input.heading}`,
       `Creator instruction: ${input.instruction || "Make it tighter, clearer, and more engaging while keeping the meaning."}`,
-      "Keep facts as given; never invent statistics or quotes. Return ONLY the rewritten section text, no headings or notes.",
+      "Keep facts as given; never invent statistics or quotes.",
+      "Put the rewritten section — and nothing else — between <rewrite> and </rewrite>. No headings, notes or checklists.",
       `Original:\n${input.text}`,
     ].join("\n\n"),
-    maxTokens: Math.min(4096, Math.round(input.text.split(/\s+/).length * 3) + 512),
+    maxTokens: Math.min(4096, Math.round(input.text.split(/\s+/).length * 3) + 768),
   });
-  return { text: stripMarkdown(text.replace(/^["“]|["”]$/g, "").trim()), model };
+  return { text: stripMarkdown(extractRewrite(text).replace(/^["“]|["”]$/g, "").trim()), model };
 }
 
 export interface TimedSegment {

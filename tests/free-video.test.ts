@@ -29,3 +29,10 @@ test("free video: text needs a text engine, images can use every engine", () => 
   assert.equal(isFreeVideoConfigured({}), true);
   assert.equal(isFreeVideoConfigured({ FREE_VIDEO: "off" }), false);
 });
+
+import { extractRewrite } from "@/src/server/ai/gemini";
+test("rewrite: keeps only the rewritten text", () => {
+  assert.equal(extractRewrite("thinking...\n<rewrite>Plan first. Save more.</rewrite>\nNo hype words? Yes."), "Plan first. Save more.");
+  assert.equal(extractRewrite("Plan first. Save more.\n*   No invented stats? Yes (none used).\n    *   No hype words? Yes."), "Plan first. Save more.");
+  assert.equal(extractRewrite("Is it cheap? It is."), "Is it cheap? It is.");
+});
