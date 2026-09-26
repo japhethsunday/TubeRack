@@ -76,7 +76,13 @@ export function MusicLibrary({
     try {
       const q = new URLSearchParams({ mood: nextMood, page: String(nextPage) });
       if (extra.trim()) q.set("q", extra.trim());
-      const data = await api.get<{ tracks: LibraryTrack[] }>(`/api/v1/music/search?${q}`);
+      const url = `/api/v1/music/search?${q}`;
+      // The library is occasionally briefly unavailable: one quiet retry first.
+      const data = await api.get<{ tracks: LibraryTrack[] }>(url).catch(async (e) => {
+        if (e instanceof ApiError && e.status && e.status < 500) throw e;
+        await new Promise((r) => setTimeout(r, 1200));
+        return api.get<{ tracks: LibraryTrack[] }>(url);
+      });
       setTracks(data.tracks);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "The music library couldn't be reached. Please try again.");

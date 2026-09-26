@@ -160,8 +160,9 @@ async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, 
     params.set("search", MUSIC_MOODS[mood].query.split(" ")[0]);
     params.set("order", "relevance");
   }
-  const body = (await get(`${JAMENDO}?${params}`)) as { headers?: { status?: string; error_message?: string }; results?: JamendoRaw[] };
+  const body = (await get(`${JAMENDO}?${params}`)) as { headers?: { status?: string; error_message?: string; results_count?: number }; results?: JamendoRaw[] };
   if (body.headers?.status && body.headers.status !== "success") throw new Error(`Music library: ${body.headers.error_message ?? body.headers.status}`);
+  if (!body.results?.length) console.warn(`[music] jamendo empty (${mood}${broad ? ", broad" : ""}): ${JSON.stringify(body.headers ?? {}).slice(0, 300)}`);
   const out: LibraryTrack[] = [];
   for (const r of body.results ?? []) {
     const t = jamendoTrack(r);
