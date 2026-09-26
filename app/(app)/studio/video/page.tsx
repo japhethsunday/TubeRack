@@ -7,7 +7,7 @@ import { isChunked } from "@/src/lib/media/chunked";
 import { sanitizeSvg } from "@/src/lib/security/svg";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Undo2, Redo2, Wand2, Plus, Clipboard, ClipboardPaste, ArrowLeft, ArrowRight, Download, Clapperboard, FolderOpen, Film, Music, Type, Shapes, LayoutList, SlidersHorizontal, X } from "lucide-react";
+import { Undo2, Redo2, Wand2, Plus, Clipboard, ClipboardPaste, ArrowLeft, ArrowRight, Download, Clapperboard, FolderOpen, Film, Music, Type, Shapes, LayoutList, SlidersHorizontal, X, Sparkles } from "lucide-react";
 import { useProjects, LocalStorageNote } from "@/src/components/projects/ProjectsProvider";
 import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { useScripts } from "@/src/components/script/ScriptProvider";
@@ -22,6 +22,7 @@ import { PublishButton, type Prerendered } from "@/src/components/video/PublishT
 import { ClipInspector } from "@/src/components/video/ClipInspector";
 import { MediaImporter } from "@/src/components/video/MediaImporter";
 import { StockLibrary } from "@/src/components/media/StockLibrary";
+import { AiClip } from "@/src/components/media/AiClip";
 import { MusicLibrary } from "@/src/components/media/music-library";
 import { ExportStudio, sizeFor, type FinishedExport } from "@/src/components/video/ExportStudio";
 import { ElementsPanel } from "@/src/components/video/ElementsPanel";
@@ -515,6 +516,14 @@ function Studio() {
           onAdded={(asset) => placeAsset(asset)}
         />
       )}
+      {leftTab === "ai" && (
+        <AiClip
+          projectId={pid}
+          aspect={composition.canvas.aspect === "9:16" || composition.canvas.aspect === "4:5" ? "9:16" : composition.canvas.aspect === "1:1" ? "1:1" : "16:9"}
+          urlFor={mediaUrl}
+          onAdded={(asset) => placeAsset(asset)}
+        />
+      )}
       {leftTab === "music" && <MusicLibrary projectId={pid} onAdded={(asset) => placeAsset(asset)} />}
       {leftTab === "elements" && (
         <ElementsPanel
@@ -635,6 +644,7 @@ function Studio() {
   const LEFT_TABS = [
     { id: "media", label: "Media", icon: FolderOpen },
     { id: "stock", label: "Stock", icon: Film },
+    { id: "ai", label: "AI clip", icon: Sparkles },
     { id: "music", label: "Music", icon: Music },
     { id: "text", label: "Text", icon: Type },
     { id: "elements", label: "Elements", icon: Shapes },
