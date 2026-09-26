@@ -351,11 +351,13 @@ describe("auto video: stock footage and music", () => {
   });
 });
 
-import { stockQuery } from "@/src/components/video/AutoVideo";
+import { stockMatches, stockQuery } from "@/src/components/video/AutoVideo";
 describe("auto video: stock search words", () => {
   it("keeps the subject words of a shot description", () => {
     assert.equal(stockQuery("Wide shot of a soldier walking in the desert at sunset"), "soldier walking desert");
     assert.equal(stockQuery("Close-up of hands counting money", 2), "hands counting");
+    assert.equal(stockMatches("Bitcoin, Crypto, Coins", "bitcoin coin"), true);
+    assert.equal(stockMatches("Beach, Sunset, Ocean", "stock market chart"), false);
   });
 });
 

@@ -18,6 +18,7 @@ export const MUSIC_MOODS = {
   cinematic: { label: "Cinematic", query: "cinematic instrumental", tags: "soundtrack epic" },
   lofi: { label: "Lo-fi", query: "lofi chill instrumental", tags: "lofi chillout" },
   ambient: { label: "Ambient", query: "ambient background", tags: "ambient" },
+  background: { label: "Background (calm)", query: "background underscore", tags: "ambient soundtrack calm relaxing" },
   corporate: { label: "Upbeat", query: "upbeat corporate background", tags: "corporate pop" },
 } as const;
 export type MusicMoodId = keyof typeof MUSIC_MOODS;
@@ -140,6 +141,9 @@ export function jamendoTrack(r: JamendoRaw): LibraryTrack | null {
 /** The file to store for a Jamendo track (full download when the artist allows it). */
 const jamendoFiles = new Map<string, string>();
 
+/** Titles that point to a vocal song rather than an instrumental bed. */
+const SONG_LIKE = /\b(feat\.?|ft\.|vocal|vocals|remix|radio edit|lyrics?|rap|karaoke|acapella|a cappella)\b/i;
+
 async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, extra: string, broad = false): Promise<LibraryTrack[]> {
   const params = new URLSearchParams({
     client_id: clientId,
@@ -167,6 +171,7 @@ async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, 
   for (const r of body.results ?? []) {
     const t = jamendoTrack(r);
     if (!t) continue;
+    if (SONG_LIKE.test(r.name ?? "")) continue;
     if (r.audiodownload_allowed !== false && r.audiodownload) jamendoFiles.set(t.id, r.audiodownload);
     out.push(t);
   }

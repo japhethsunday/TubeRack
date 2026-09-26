@@ -282,7 +282,7 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
       ...clipBase("track_music", "music", bed.title, 0, total),
       assetId: bed.id,
       inSec: 0,
-      volume: bed.tags.includes("auto-video") ? 0.18 : 0.35,
+      volume: bed.tags.includes("auto-video") ? 0.12 : 0.35,
       fadeInSec: 1,
       fadeOutSec: 2,
     });

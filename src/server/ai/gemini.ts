@@ -1223,6 +1223,8 @@ export async function writeChannelPlan(input: ChannelInputs, evidence: ChannelEv
 export interface SceneVisual {
   visual: string;
   onScreenText: string;
+  /** 2–3 plain English words to search stock footage for this scene. */
+  stockQuery: string;
 }
 
 /** Shot list for auto-video: one concrete image prompt + short on-screen text per scene. */
@@ -1238,8 +1240,9 @@ export async function planSceneVisuals(input: { topic: string; aspect: "16:9" | 
       (input.style ? ` Visual style: ${input.style.slice(0, 200)}.` : "") +
       (input.brief ? `\nProduction brief (every image must fit it): ${input.brief.slice(0, 1200)}` : "") +
       `\nFor each scene below write: visual — one concrete, photographic image prompt (subject, setting, composition, lighting) that shows exactly what that scene's narration is about, for this video's audience; follow the storyboard direction when given; ` +
-      `keep a consistent look across scenes; NO text, letters, logos or watermarks in the image. onScreenText — at most 6 words to overlay, or "" if none is needed.\n` +
-      `Scenes:\n${list}\n\nRespond ONLY with JSON: {"scenes":[{"visual":"","onScreenText":""}]} with exactly ${input.scenes.length} items in order.`,
+      `keep a consistent look across scenes; NO text, letters, logos or watermarks in the image. onScreenText — at most 6 words to overlay, or "" if none is needed. ` +
+      `stockQuery — 2 or 3 plain English words naming the literal, filmable subject of that scene's narration (e.g. "stock market chart", "doctor hospital", "coffee beans") to search a stock video library; concrete nouns only, no adjectives about style or camera.\n` +
+      `Scenes:\n${list}\n\nRespond ONLY with JSON: {"scenes":[{"visual":"","onScreenText":"","stockQuery":""}]} with exactly ${input.scenes.length} items in order.`,
     maxTokens: 3000,
     json: true,
   });
@@ -1248,6 +1251,7 @@ export async function planSceneVisuals(input: { topic: string; aspect: "16:9" | 
   const visuals = input.scenes.map((s, i) => ({
     visual: String(arr[i]?.visual ?? "").trim().slice(0, 800) || `${s.title} — ${input.topic}`,
     onScreenText: String(arr[i]?.onScreenText ?? "").trim().slice(0, 60),
+    stockQuery: String(arr[i]?.stockQuery ?? "").replace(/[^\p{L}\p{N} ]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 60),
   }));
   return { visuals, model };
 }

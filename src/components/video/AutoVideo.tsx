@@ -41,6 +41,16 @@ type VisualMode = "mix" | "stock" | "ai";
 const STOP = new Set("a an the of and or to in on at for with by from into over under this that these those is are was be being been as it its their his her our your my close up closeup close-up medium tight extreme over-the-shoulder wide shot shots angle view camera cinematic scene showing shows image photo realistic style lighting background foreground".split(" "));
 
 /** A short stock-library query from a shot description ("Wide shot of a soldier in the desert" → "soldier desert"). */
+/** True when a stock clip's tags share a meaningful word with the search. */
+export function stockMatches(tags: string, query: string): boolean {
+  const have = new Set(tags.toLowerCase().split(/[^\p{L}\p{N}]+/u).map((w) => w.replace(/s$/, "")));
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => w.replace(/s$/, ""))
+    .some((w) => w.length > 2 && !STOP.has(w) && have.has(w));
+}
+
 export function stockQuery(visual: string, words = 3): string {
   return visual
     .toLowerCase()
@@ -113,7 +123,7 @@ export function GenerateVideoDialog({
   const [fatal, setFatal] = useState<string | null>(null);
   const [replaceOk, setReplaceOk] = useState(false);
   const [visualMode, setVisualMode] = useState<VisualMode>("mix");
-  const [musicMood, setMusicMood] = useState<string>("cinematic");
+  const [musicMood, setMusicMood] = useState<string>("background");
   const cancelled = useRef(false);
 
   const vertical = project.platform === "YouTube Shorts" || project.contentType === "Short";
@@ -142,14 +152,16 @@ export function GenerateVideoDialog({
       // 1. Scenes + shot list.
       set("scenes", { state: "running" });
       const scenes: Scene[] = scenesFromSections(writable, wpm).map((s) => ({ ...s, narration: s.scriptText }));
-      const planned = await retryBusy(() => api.post<{ visuals: { visual: string; onScreenText: string }[] }>("/api/v1/ai/scene-visuals", {
+      const planned = await retryBusy(() => api.post<{ visuals: { visual: string; onScreenText: string; stockQuery?: string }[] }>("/api/v1/ai/scene-visuals", {
         topic: production?.topic || project.topic || project.name,
         aspect,
         style: production?.visualStyle ?? "",
         brief: production?.brief ?? "",
         scenes: scenes.map((s) => ({ title: s.title, text: s.scriptText })),
       }));
+      const stockKeywords = new Map<string, string>();
       scenes.forEach((s, i) => {
+        stockKeywords.set(s.id, planned.visuals[i]?.stockQuery ?? "");
         s.visual = planned.visuals[i]?.visual ?? s.title;
         s.onScreenText = planned.visuals[i]?.onScreenText ?? "";
       });
@@ -201,12 +213,14 @@ export function GenerateVideoDialog({
       const usedStock = new Set<string>();
       const orientation = vertical ? "vertical" : "horizontal";
       async function stockFor(scene: Scene): Promise<boolean> {
-        const queries = [stockQuery(scene.visual, 3), stockQuery(scene.visual, 2), stockQuery(production?.topic || project.topic || project.name, 2)].filter((q, i, all) => q.length >= 2 && all.indexOf(q) === i);
+        const keywords = stockKeywords.get(scene.id) ?? "";
+        const queries = [keywords, stockQuery(keywords, 2), stockQuery(scene.visual, 3), stockQuery(scene.visual, 2)].filter((q, i, all) => q.length >= 2 && all.indexOf(q) === i);
         for (const q of queries) {
           const found = await api
             .get<{ items: StockHit[] }>(`/api/v1/stock/search?${new URLSearchParams({ kind: "video", q, orientation, page: "1" })}`)
             .catch(() => ({ items: [] as StockHit[] }));
-          const pick = found.items.find((it) => !usedStock.has(it.id));
+          // Only accept clips whose tags actually mention what the scene is about.
+          const pick = found.items.find((it) => !usedStock.has(it.id) && stockMatches(it.title, q));
           if (!pick) continue;
           usedStock.add(pick.id);
           try {

@@ -19,6 +19,7 @@ export const MUSIC_MOOD_OPTIONS = [
   { id: "cinematic", label: "Cinematic" },
   { id: "lofi", label: "Lo-fi" },
   { id: "ambient", label: "Ambient" },
+  { id: "background", label: "Background (calm)" },
   { id: "corporate", label: "Upbeat" },
 ] as const;
 
