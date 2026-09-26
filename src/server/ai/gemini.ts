@@ -1,4 +1,5 @@
 import { skillsFor, skillsForTask, type SkillId } from "@/src/server/ai/skills";
+import { isPiperConfigured, PIPER_CHUNK_CHARS, piperChunk } from "@/src/server/ai/piper";
 import { CLOUD_TTS_CHUNK_CHARS, cloudTtsChunk, isCloudTtsConfigured, isVertexConfigured, vertexOptions } from "@/src/server/ai/google-cloud";
 import { GoogleGenAI } from "@google/genai";
 import { normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPlan } from "@/src/lib/channel/plan";
@@ -514,6 +515,8 @@ export class GeminiTtsProvider implements TtsProvider {
     if (isGeminiConfigured(env)) routes.push({ name: "gemini", run: async () => ({ parts: (await mapLimit(chunks, 4, (chunk) => completeSpeech(chunk, (t) => this.synthesizeChunk(t, voice, model)))).flat(), model }) });
     if (cloudTts) routes.push({ name: "cloud-tts", run: viaCloud });
     if (mistral) routes.push({ name: "voxtral", run: viaMistral });
+    // Self-hosted Piper: no quota, the voice of last resort.
+    if (isPiperConfigured(env)) routes.push({ name: "piper", run: async () => ({ parts: await mapLimit(splitForSpeech(text, PIPER_CHUNK_CHARS), 2, (chunk) => piperChunk(chunk)), model: "piper" }) });
     try {
       if (!routes.length) throw new ProviderNotConfiguredError("tts", "Voice generation is not configured.");
       let result: { parts: { pcm: Buffer; rate: number }[]; model: string } | null = null;

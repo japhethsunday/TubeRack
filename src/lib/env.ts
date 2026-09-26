@@ -80,6 +80,10 @@ const serverSchema = z.object({
   /** Cloud Text-to-Speech: an API key (or the service account above) and an optional voice name. */
   GOOGLE_TTS_API_KEY: z.string().optional(),
   GOOGLE_TTS_VOICE: z.string().optional(),
+  /** Self-hosted Piper voice server (e.g. a Hugging Face Space): base URL + bearer token. */
+  PIPER_URL: z.string().url().optional().or(z.literal("")),
+  PIPER_TOKEN: z.string().optional(),
+  PIPER_VOICE: z.string().optional(),
   /** Pixabay API key (free at pixabay.com/api/docs) for stock videos and photos. */
   PIXABAY_API_KEY: z.string().optional(),
   // Optional comma-separated override of the NVIDIA model order
