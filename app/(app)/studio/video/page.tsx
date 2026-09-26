@@ -5,6 +5,7 @@ import { synthesizeProviderSpeech } from "@/src/lib/ai-client";
 import { BLUR_BACKGROUND } from "@/src/lib/video/compositor";
 import { isChunked } from "@/src/lib/media/chunked";
 import { sanitizeSvg } from "@/src/lib/security/svg";
+import { presetForProject } from "@/src/lib/video/presets";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Undo2, Redo2, Wand2, Plus, Clipboard, ClipboardPaste, ArrowLeft, ArrowRight, Download, Clapperboard, FolderOpen, Film, Music, Type, Shapes, LayoutList, SlidersHorizontal, X, Sparkles } from "lucide-react";
@@ -209,6 +210,16 @@ function Studio() {
     return () => document.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id]);
+
+  // An empty timeline takes the project's format, so Shorts open vertical
+  // and long videos landscape. A timeline with clips keeps the user's choice.
+  useEffect(() => {
+    if (!project || !comp || !ready || comp.clips.length > 0) return;
+    const want = presetForProject(project);
+    if (comp.canvas.preset === want.id) return;
+    video.setCanvas(project.id, { ...comp.canvas, preset: want.id, aspect: want.aspect, width: want.width, height: want.height });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the project or its clip count changes.
+  }, [project?.id, ready, comp?.clips.length]);
 
   // ---- Voice-over repair: takes made before the fixes can be missing parts
   // of the script (cut-off narration, or a voice engine that stopped early).

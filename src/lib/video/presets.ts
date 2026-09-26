@@ -24,6 +24,16 @@ export function presetById(id: string): PlatformPreset {
   return PLATFORM_PRESETS.find((p) => p.id === id) ?? PLATFORM_PRESETS[0];
 }
 
+/** A project is a Short when its platform or content type says so; everything else is long-form 16:9. */
+export function projectIsShort(project: { platform?: string; contentType?: string }): boolean {
+  return /shorts|tiktok|reels/i.test(project.platform ?? "") || /^short/i.test(project.contentType ?? "");
+}
+
+/** The canvas preset a project's format calls for. */
+export function presetForProject(project: { platform?: string; contentType?: string }): PlatformPreset {
+  return presetById(projectIsShort(project) ? "shorts" : "youtube");
+}
+
 export interface TransitionDef {
   id: string;
   label: string;

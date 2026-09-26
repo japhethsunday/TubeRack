@@ -11,7 +11,7 @@ import { scenesFromSections } from "@/src/lib/script/engine";
 import type { Scene, ScriptSection } from "@/src/lib/script/types";
 import type { MediaAsset } from "@/src/lib/media/types";
 import { buildFromScenes } from "@/src/lib/video/build";
-import { presetById } from "@/src/lib/video/presets";
+import { presetById, projectIsShort } from "@/src/lib/video/presets";
 import { useScripts } from "@/src/components/script/ScriptProvider";
 import { useMedia } from "@/src/components/media/MediaProvider";
 import { useVideo } from "@/src/components/video/VideoProvider";
@@ -130,7 +130,8 @@ export function GenerateVideoDialog({
   const [musicMood, setMusicMood] = useState<string>("background");
   const cancelled = useRef(false);
 
-  const vertical = project.platform === "YouTube Shorts" || project.contentType === "Short";
+  const [format, setFormat] = useState<"long" | "short">(projectIsShort(project) ? "short" : "long");
+  const vertical = format === "short";
   const aspect: "16:9" | "9:16" = vertical ? "9:16" : "16:9";
   const writable = sections.filter((s) => s.text.trim().length > 0);
   const existingClips = video.compFor(project.id).clips.length;
@@ -384,6 +385,13 @@ export function GenerateVideoDialog({
           )}
           {!running && !finished && (
             <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-sm sm:col-span-2">
+                <span className="font-medium">Format</span>
+                <select value={format} onChange={(e) => setFormat(e.target.value as "long" | "short")} className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm">
+                  <option value="long">Long video — landscape 16:9 (1920×1080)</option>
+                  <option value="short">Short — vertical 9:16 (1080×1920)</option>
+                </select>
+              </label>
               <label className="space-y-1 text-sm">
                 <span className="font-medium">Visuals</span>
                 <select value={visualMode} onChange={(e) => setVisualMode(e.target.value as VisualMode)} className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm">

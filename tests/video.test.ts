@@ -375,3 +375,11 @@ describe("captions: short readable chunks", () => {
     assert.ok(Math.abs(end - 16) < 0.1, String(end));
   });
 });
+
+import { presetForProject, projectIsShort } from "@/src/lib/video/presets";
+it("project format picks the canvas", () => {
+  assert.equal(projectIsShort({ platform: "YouTube Shorts", contentType: "Long-form video" }), true);
+  assert.equal(projectIsShort({ platform: "YouTube", contentType: "Short" }), true);
+  assert.equal(presetForProject({ platform: "YouTube", contentType: "Long-form video" }).aspect, "16:9");
+  assert.equal(presetForProject({ platform: "YouTube", contentType: "Short" }).height, 1920);
+});
