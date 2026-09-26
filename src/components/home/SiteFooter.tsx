@@ -33,6 +33,8 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/forgot-password", label: "Reset password" },
       { href: "/settings", label: "Settings" },
       { href: "/dashboard", label: "Dashboard" },
+      { href: "/privacy", label: "Privacy Policy" },
+      { href: "/terms", label: "Terms of Service" },
     ],
   },
 ];

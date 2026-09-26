@@ -111,6 +111,9 @@ export default function SignupPage() {
           </div>
           <div className="auth-rise" style={stagger(4)}>
             <Checkbox label="I accept the Terms and Privacy Policy" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
+            <p className="mt-1 text-xs text-muted-text">
+              Read the <Link href="/terms" target="_blank" className="underline">Terms</Link> and <Link href="/privacy" target="_blank" className="underline">Privacy Policy</Link>.
+            </p>
             {errors.terms && (
               <p role="alert" className="mt-1 text-xs text-destructive">
                 {errors.terms}
