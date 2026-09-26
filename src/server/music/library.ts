@@ -182,7 +182,16 @@ export function isMusicLibraryConfigured(): boolean {
 
 export async function searchLibraryMusic(mood: MusicMoodId, page = 1, extra = ""): Promise<LibraryTrack[]> {
   const clientId = getServerEnv().JAMENDO_CLIENT_ID;
-  if (clientId) return jamendoSearch(clientId, mood, page, extra);
+  if (clientId) {
+    // Jamendo sometimes answers empty or fails; the open library is the backup.
+    const tracks = await jamendoSearch(clientId, mood, page, extra).catch((e) => {
+      console.warn("[music] jamendo failed", e instanceof Error ? e.message : e);
+      return [] as LibraryTrack[];
+    });
+    if (tracks.length) return tracks;
+    const retry = extra ? await jamendoSearch(clientId, mood, page, "").catch(() => [] as LibraryTrack[]) : [];
+    if (retry.length) return retry;
+  }
   return openverseSearch(mood, page, extra);
 }
 
