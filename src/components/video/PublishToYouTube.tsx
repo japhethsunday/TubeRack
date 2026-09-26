@@ -1,5 +1,7 @@
 "use client";
 
+import { SvgThumb } from "@/src/components/package/SvgThumb";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -562,8 +564,7 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
                       onClick={() => setThumbId(v.id)}
                       className={cx("w-[46px] overflow-hidden rounded border-2", v.id === variant?.id ? "border-primary" : "border-transparent opacity-70 hover:opacity-100")}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- composed SVG thumbnail. */}
-                      <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(composeThumbnail(v.baseSvg ?? "", v.overlays))}`} alt={v.name} className="aspect-video w-full object-cover" />
+                      <SvgThumb svg={composeThumbnail(v.baseSvg ?? "", v.overlays)} label={v.name} className="w-full" />
                     </button>
                   ))}
                 </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { SvgThumb } from "@/src/components/package/SvgThumb";
 import type { TextOverlay } from "@/src/lib/package/types";
 import { useProductionContext } from "@/src/components/projects/useProductionContext";
 import { useEffect, useState } from "react";
@@ -216,12 +217,8 @@ export function ThumbnailTab({
         {artError && <p role="alert" className="text-xs text-destructive">{artError}</p>}
         {latestArt && latestComposed && (
           <div className="ui-panel flex flex-wrap items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element -- composed SVG thumbnail. */}
-            <img
-              src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(latestComposed)}`}
-              alt={`Thumbnail: ${headline}`}
-              className="aspect-video w-72 rounded-lg border border-border object-cover"
-            />
+            {/* Drawn inline (like the editor): an SVG shown through <img> can't load its stored photo. */}
+            <SvgThumb svg={latestComposed} label={`Thumbnail: ${headline}`} className="w-72 rounded-lg border border-border" />
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="secondary"

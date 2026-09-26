@@ -1,5 +1,7 @@
 "use client";
 
+import { SvgThumb } from "@/src/components/package/SvgThumb";
+
 import { useMemo, useState } from "react";
 import { usePackaging } from "@/src/components/package/PackagingProvider";
 import { useMedia } from "@/src/components/media/MediaProvider";
@@ -16,8 +18,7 @@ export function ProjectCover({ projectId, name }: { projectId: string; name: str
   const thumbSrc = useMemo(() => {
     const pick = [...packaging.variantsFor(projectId)].filter((v) => v.baseSvg).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
     if (!pick?.baseSvg) return null;
-    const svg = composeThumbnail(pick.baseSvg, pick.overlays);
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    return composeThumbnail(pick.baseSvg, pick.overlays);
   }, [packaging, projectId]);
 
   const imageSrc = useMemo(() => {
@@ -29,8 +30,9 @@ export function ProjectCover({ projectId, name }: { projectId: string; name: str
     return media.blobUrlFor(image.id) ?? (/^(https?:|\/|data:image)/.test(image.payload) ? image.payload : null);
   }, [media, projectId, thumbSrc]);
 
-  const src = thumbSrc ?? imageSrc;
+  const src = imageSrc;
   const [failed, setFailed] = useState<string | null>(null);
+  if (thumbSrc) return <SvgThumb svg={thumbSrc} label="Project thumbnail" className="h-full w-full" />;
   if (!src || failed === src) {
     return (
       <span aria-hidden="true" className="flex h-full items-center justify-center text-2xl font-semibold text-disabled-text">

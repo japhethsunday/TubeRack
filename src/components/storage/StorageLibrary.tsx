@@ -1,5 +1,7 @@
 "use client";
 
+import { SvgThumb } from "@/src/components/package/SvgThumb";
+
 import { useEffect, useMemo, useState } from "react";
 import { Copy, FileText, Film, FolderInput, ImageIcon, Mic, Music, Search } from "lucide-react";
 import type { MediaAsset } from "@/src/lib/media/types";
@@ -201,8 +203,7 @@ export function StorageLibrary() {
               const composed = composeThumbnail(variant.baseSvg!, variant.overlays);
               return (
                 <li key={variant.id} className="rounded-xl border border-border bg-surface p-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- composed SVG thumbnail. */}
-                  <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(composed)}`} alt={variant.name} className="aspect-video w-full rounded-lg border border-border object-cover" />
+                  <SvgThumb svg={composed} label={variant.name} className="w-full rounded-lg border border-border" />
                   <p className="mt-2 truncate text-sm font-medium">{variant.name}</p>
                   <p className="truncate text-xs text-muted-text">{project.name}</p>
                   <Button size="sm" variant="outline" className="mt-2" onClick={() => void downloadPng(composed, safeFileName(`${project.name} ${variant.name}`, "png")).catch(() => {})}>
