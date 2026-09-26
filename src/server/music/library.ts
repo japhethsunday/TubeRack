@@ -223,6 +223,24 @@ export async function libraryTrack(id: string): Promise<LibraryTrack> {
   return track;
 }
 
+/** Where a track's preview audio really lives (remembered from searches, else looked up by id). */
+const previewSources = new Map<string, string>();
+export function rememberPreviews(tracks: LibraryTrack[]): void {
+  for (const t of tracks) previewSources.set(t.id, t.previewUrl);
+  if (previewSources.size > 5000) previewSources.clear();
+}
+export async function previewSource(id: string): Promise<string> {
+  return previewSources.get(id) ?? (await libraryTrack(id)).previewUrl;
+}
+
+/** Stream a track preview through our server (music sites often refuse playback embedded on other sites). */
+export async function fetchPreview(id: string, range: string | null): Promise<Response> {
+  const src = await previewSource(id);
+  const headers: Record<string, string> = { "User-Agent": UA };
+  if (range && /^bytes=\d*-\d*$/.test(range)) headers.Range = range;
+  return fetch(src, { headers, redirect: "follow", signal: AbortSignal.timeout(30_000) });
+}
+
 /** Download the track's audio (size-capped) so it can be stored with the project. */
 export async function downloadTrack(track: LibraryTrack, maxBytes = 25 * 1024 * 1024): Promise<{ bytes: Uint8Array; mime: string; ext: "mp3" | "wav" }> {
   const res = await fetch(jamendoFiles.get(track.id) ?? track.previewUrl, { headers: { "User-Agent": UA }, redirect: "follow", signal: AbortSignal.timeout(60_000) });
