@@ -772,7 +772,7 @@ function Studio() {
         </>
       ) : (
         <>
-          <main className="isolate h-[42vh] shrink-0">{PreviewBlock("viewer")}</main>
+          <main className="isolate h-[42vh] shrink-0 md:h-[50vh] [@media(max-height:500px)]:h-[52vh]">{PreviewBlock("viewer")}</main>
           <div className="isolate min-h-0 flex-1 border-t border-border">{TimelineBlock()}</div>
           <nav aria-label="Studio tools" className="grid shrink-0 grid-cols-5 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]">
             {([
@@ -792,10 +792,10 @@ function Studio() {
                   setSheet(sheet === t.id ? null : t.id);
                 }}
                 aria-pressed={sheet === t.id}
-                className={cx("flex flex-col items-center gap-1 py-2 text-[10px] font-medium", sheet === t.id ? "text-primary" : "text-muted-text")}
+                className={cx("flex flex-col items-center gap-1 py-2 text-[10px] font-medium [@media(max-height:500px)]:py-1", sheet === t.id ? "text-primary" : "text-muted-text")}
               >
                 <t.icon className="size-5" aria-hidden="true" />
-                {t.label}
+                <span className="[@media(max-height:500px)]:sr-only">{t.label}</span>
               </button>
             ))}
           </nav>

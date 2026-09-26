@@ -157,7 +157,7 @@ export function ThumbnailTab({
 
       <section aria-label="Thumbnail art" className="space-y-3 rounded-xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
             <Input label="Thumbnail art prompt " value={promptValue} onChange={(e) => changePrompt(e.target.value)} placeholder={defaultArtPrompt} />
           </div>
           <Button loading={artBusy} onClick={() => void generateArt()}>

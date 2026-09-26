@@ -345,9 +345,9 @@ export function TimelinePro({
       <div className={cx("flex items-center gap-0.5 border-b border-border px-2 py-1", fill ? "shrink-0 overflow-x-auto" : "flex-wrap py-1.5")}>
         {leading}
         {leading && <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />}
-        <button type="button" className={btn} disabled={!selected} onClick={onSplit} title="Split at playhead (S)"><Scissors className="size-4" aria-hidden="true" /> Split</button>
-        <button type="button" className={btn} disabled={!selected} onClick={onDuplicate} title="Duplicate (D)"><Copy className="size-4" aria-hidden="true" /> Duplicate</button>
-        <button type="button" className={cx(btn, "hover:text-destructive")} disabled={!selected} onClick={onDelete} title="Delete (Del)"><Trash2 className="size-4" aria-hidden="true" /> Delete</button>
+        <button type="button" className={btn} disabled={!selected} onClick={onSplit} title="Split at playhead (S)" aria-label="Split"><Scissors className="size-4" aria-hidden="true" /><span className="hidden md:inline">Split</span></button>
+        <button type="button" className={btn} disabled={!selected} onClick={onDuplicate} title="Duplicate (D)" aria-label="Duplicate"><Copy className="size-4" aria-hidden="true" /><span className="hidden md:inline">Duplicate</span></button>
+        <button type="button" className={cx(btn, "hover:text-destructive")} disabled={!selected} onClick={onDelete} title="Delete (Del)" aria-label="Delete"><Trash2 className="size-4" aria-hidden="true" /><span className="hidden md:inline">Delete</span></button>
         <label className={cx(btn, !selected || !(selected && (selected.kind === "video" || hasSource(selected))) ? "pointer-events-none opacity-40" : "")} title="Speed">
           <Gauge className="size-4" aria-hidden="true" />
           <select value={selected?.speed ?? 1} onChange={(e) => onSpeed(Number(e.target.value))} aria-label="Clip speed" className="bg-transparent text-xs font-medium focus:outline-none">
@@ -355,18 +355,18 @@ export function TimelinePro({
           </select>
         </label>
         <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
-        <div className="flex items-center rounded-md bg-muted/60 p-0.5" role="radiogroup" aria-label="Aspect ratio">
+        <div className="flex shrink-0 items-center rounded-md bg-muted/60 p-0.5" role="radiogroup" aria-label="Aspect ratio">
           {(["16:9", "9:16", "1:1", "4:5"] as const).map((a) => (
             <button key={a} type="button" role="radio" aria-checked={aspect === a} onClick={() => onAspect(a)} className={cx("rounded px-2 py-1 text-[11px] font-semibold tabular-nums transition-colors", aspect === a ? "bg-surface shadow-sm" : "text-muted-text hover:text-foreground")}>
               {a}
             </button>
           ))}
         </div>
-        <span className="ml-auto flex items-center gap-0.5">
-          <span className="mr-1 font-mono text-xs tabular-nums text-muted-text">{fmtRuler(playhead)}.{Math.floor((playhead % 1) * 10)}</span>
+        <span className="ml-auto flex shrink-0 items-center gap-0.5">
+          <span className="mr-1 hidden font-mono sm:inline text-xs tabular-nums text-muted-text">{fmtRuler(playhead)}.{Math.floor((playhead % 1) * 10)}</span>
           <button type="button" onClick={onToggleSnap} aria-pressed={snap} title="Snapping" className={cx(btn, snap && "text-primary")}><Magnet className="size-4" aria-hidden="true" /></button>
           <button type="button" onClick={() => onZoom(Math.max(4, Math.round(pxPerSec / 1.4)))} aria-label="Zoom out" className={btn}><ZoomOut className="size-4" aria-hidden="true" /></button>
-          <input type="range" min={4} max={400} value={pxPerSec} onChange={(e) => onZoom(Number(e.target.value))} aria-label="Timeline zoom" className="w-24 accent-cyan-400" />
+          <input type="range" min={4} max={400} value={pxPerSec} onChange={(e) => onZoom(Number(e.target.value))} aria-label="Timeline zoom" className="hidden w-24 accent-cyan-400 lg:block" />
           <button type="button" onClick={() => onZoom(Math.min(400, Math.round(pxPerSec * 1.4)))} aria-label="Zoom in" className={btn}><ZoomIn className="size-4" aria-hidden="true" /></button>
           <button
             type="button"
