@@ -13,8 +13,12 @@ import { renderMusic, renderSfx, musicRecipe, speakText, stopSpeech, unlockWebAu
 import { stopAllPlayback, claimPlayback } from "@/src/components/media/players";
 import { cx } from "@/src/components/ui/cx";
 
-/** Audio longer than this streams in the preview rather than downloading whole. */
-const LONG_AUDIO_SEC = 20 * 60;
+/**
+ * Audio longer than this streams in the preview rather than downloading whole:
+ * a full download of a long voice take (a WAV is ~2.9 MB a minute) competes
+ * with its own stream and keeps it silent on slower connections.
+ */
+const LONG_AUDIO_SEC = 2 * 60;
 
 /** 0.1 s of silence: played inside the Play tap to unlock audio on phones. */
 const SILENT_WAV =
@@ -299,6 +303,7 @@ export function Preview({
         const clip = voice;
         voiceAudioRef.current = playCached(url, {
           el: players.current?.voice,
+          stream: (a?.durationSec ?? 0) > LONG_AUDIO_SEC,
           volume: mixGain(s.comp, voice, t) * s.volume,
           rate: voice.speed ?? 1,
           at: () => sourceTime(clip, state.current.playhead),
