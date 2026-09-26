@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Film, ImageIcon, Loader2, Plus, Search } from "lucide-react";
+import { Check, Film, ImageIcon, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/src/lib/api";
 import { useMedia } from "@/src/components/media/MediaProvider";
 import type { MediaAsset } from "@/src/lib/media/types";
@@ -32,12 +32,15 @@ export function StockLibrary({
   projectId,
   orientation = "any",
   onAdded,
+  onRemoved,
 }: {
   projectId: string;
   orientation?: "any" | "horizontal" | "vertical";
   onAdded?: (asset: MediaAsset) => void;
+  /** Called after an item is removed from the project (e.g. to clear it from the timeline). */
+  onRemoved?: (assetId: string) => void;
 }) {
-  const { addAsset, assetsFor } = useMedia();
+  const { addAsset, assetsFor, removeAsset } = useMedia();
   const [kind, setKind] = useState<"video" | "photo">("video");
   const [query, setQuery] = useState("");
   const [shape, setShape] = useState(orientation);
@@ -212,9 +215,27 @@ export function StockLibrary({
                     {adding === it.id ? "Adding" : added ? (onAdded ? "Add again" : "Added") : "Add"}
                   </button>
                 </div>
-                <p className="truncate px-1.5 py-1 text-[11px] text-muted-text" title={it.title}>
-                  {it.title}
-                </p>
+                <div className="flex items-center gap-1 px-1.5 py-1">
+                  <p className="min-w-0 flex-1 truncate text-[11px] text-muted-text" title={it.title}>
+                    {it.title}
+                  </p>
+                  {added && (
+                    <button
+                      type="button"
+                      aria-label={`Remove ${it.title} from the project`}
+                      title="Remove from project"
+                      onClick={() => {
+                        const a = imported.get(it.id);
+                        if (!a) return;
+                        removeAsset(a.id);
+                        onRemoved?.(a.id);
+                      }}
+                      className="rounded p-0.5 text-muted-text hover:bg-muted hover:text-destructive"
+                    >
+                      <Trash2 className="size-3.5" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
               </li>
             );
           })}

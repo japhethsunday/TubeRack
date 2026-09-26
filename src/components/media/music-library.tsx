@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Library, Plus, Search } from "lucide-react";
+import { Check, Copy, Library, Plus, Search, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/src/lib/api";
 import { useMedia } from "@/src/components/media/MediaProvider";
 import { MediaPlayer } from "@/src/components/media/players";
@@ -45,8 +45,17 @@ function fmt(sec: number | null): string {
  * commercial use (fine for monetized YouTube). Adding a track copies it into
  * the project and keeps its credit line for the video description.
  */
-export function MusicLibrary({ projectId, onAdded }: { projectId: string; onAdded?: (asset: MediaAsset) => void }) {
-  const { addAsset, assetsFor } = useMedia();
+export function MusicLibrary({
+  projectId,
+  onAdded,
+  onRemoved,
+}: {
+  projectId: string;
+  onAdded?: (asset: MediaAsset) => void;
+  /** Called after a track is removed from the project (e.g. to clear it from the timeline). */
+  onRemoved?: (assetId: string) => void;
+}) {
+  const { addAsset, assetsFor, removeAsset } = useMedia();
   const [mood, setMood] = useState<string>("piano");
   const [extra, setExtra] = useState("");
   const [page, setPage] = useState(1);
@@ -157,6 +166,7 @@ export function MusicLibrary({ projectId, onAdded }: { projectId: string; onAdde
         <ul className="divide-y divide-border rounded-lg border border-border">
           {tracks.map((t) => {
             const isAdded = addedIds.has(t.id);
+            const addedAsset = added.find((a) => a.tags.includes(`track:${t.id}`));
             return (
               <li key={t.id} className="flex flex-wrap items-center gap-3 p-3">
                 <div className="min-w-0 flex-1">
@@ -167,10 +177,30 @@ export function MusicLibrary({ projectId, onAdded }: { projectId: string; onAdde
                   </p>
                 </div>
                 <MediaPlayer url={t.previewUrl} mime={t.fileType === "wav" ? "audio/wav" : "audio/mpeg"} label={`Preview ${t.title}`} />
-                <Button size="sm" variant={isAdded ? "outline" : "primary"} disabled={isAdded} loading={adding === t.id} onClick={() => void add(t)}>
-                  {isAdded ? <Check className="size-4" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}
-                  {isAdded ? "Added" : "Add to project"}
-                </Button>
+                {isAdded && addedAsset ? (
+                  <div className="flex items-center gap-1.5">
+                    {onAdded && (
+                      <Button size="sm" variant="outline" onClick={() => onAdded(addedAsset)}>
+                        <Plus className="size-4" aria-hidden="true" /> Add again
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      aria-label={`Remove ${t.title} from the project`}
+                      onClick={() => {
+                        removeAsset(addedAsset.id);
+                        onRemoved?.(addedAsset.id);
+                      }}
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" /> Remove
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="primary" loading={adding === t.id} onClick={() => void add(t)}>
+                    <Plus className="size-4" aria-hidden="true" /> Add to project
+                  </Button>
+                )}
               </li>
             );
           })}

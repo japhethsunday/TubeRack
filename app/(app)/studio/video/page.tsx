@@ -408,6 +408,12 @@ function Studio() {
 
 
 
+  /** A file removed from the project leaves the timeline too. */
+  function removeAssetClips(assetId: string) {
+    const next = latest.current.clips.filter((c) => c.assetId !== assetId);
+    if (next.length !== latest.current.clips.length) commit(next);
+  }
+
   function commit(next: TimelineClip[]) {
     video.commitClips(pid, latest.current.clips, next);
     latest.current = { ...latest.current, clips: next };
@@ -514,6 +520,7 @@ function Studio() {
           projectId={pid}
           orientation={composition.canvas.aspect === "9:16" || composition.canvas.aspect === "4:5" ? "vertical" : composition.canvas.aspect === "1:1" ? "any" : "horizontal"}
           onAdded={(asset) => placeAsset(asset)}
+          onRemoved={removeAssetClips}
         />
       )}
       {leftTab === "ai" && (
@@ -524,7 +531,7 @@ function Studio() {
           onAdded={(asset) => placeAsset(asset)}
         />
       )}
-      {leftTab === "music" && <MusicLibrary projectId={pid} onAdded={(asset) => placeAsset(asset)} />}
+      {leftTab === "music" && <MusicLibrary projectId={pid} onAdded={(asset) => placeAsset(asset)} onRemoved={removeAssetClips} />}
       {leftTab === "elements" && (
         <ElementsPanel
           background={canvas.background ?? BLUR_BACKGROUND}
