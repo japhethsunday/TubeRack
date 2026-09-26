@@ -5,7 +5,16 @@ import { NextResponse, type NextRequest } from "next/server";
  * initialiser) run only when they carry this nonce, so injected markup
  * can't execute script even if it slips past sanitisation.
  */
+/** The public address. The old vercel.app address forwards here so there is one home for the app. */
+const CANONICAL_HOST = "recktube.xyz";
+const LEGACY_HOSTS = new Set(["tube-rack.vercel.app"]);
+
 export function proxy(request: NextRequest) {
+  const host = request.headers.get("host")?.toLowerCase() ?? "";
+  if (LEGACY_HOSTS.has(host)) {
+    const url = new URL(request.nextUrl.pathname + request.nextUrl.search, `https://${CANONICAL_HOST}`);
+    return NextResponse.redirect(url, 308);
+  }
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const dev = process.env.NODE_ENV !== "production";
   // The configured storage origin (may be a custom domain), besides *.supabase.co.
