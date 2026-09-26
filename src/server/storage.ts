@@ -57,7 +57,8 @@ export async function storagePut(key: string, bytes: Uint8Array, mime: string): 
   try {
     response = await fetch(objectUrl(env, key), {
       method: "POST",
-      headers: { ...authHeaders(env), "Content-Type": type, "x-upsert": "true" },
+      // Stored files never change (unique names): let browsers keep them.
+      headers: { ...authHeaders(env), "Content-Type": type, "x-upsert": "true", "cache-control": "max-age=31536000" },
       body: new Blob([bytes as unknown as BlobPart], { type }),
     });
   } catch {
@@ -142,7 +143,23 @@ export async function storageSignedUpload(key: string): Promise<string> {
 }
 
 /** Short-lived signed download link (served after an ownership check). */
+/**
+ * Signed links are reused while they stay valid: the same URL each time lets
+ * the browser use its cached copy instead of downloading the file again.
+ */
+const signedCache = new Map<string, { url: string; until: number }>();
+
 export async function storageSignedUrl(key: string, expiresIn = 3600, downloadAs?: string): Promise<string> {
+  const cacheKey = `${key}|${downloadAs ?? ""}`;
+  const hit = signedCache.get(cacheKey);
+  if (hit && hit.until > Date.now() + 10 * 60_000) return hit.url;
+  const url = await signFresh(key, expiresIn, downloadAs);
+  if (signedCache.size > 5000) signedCache.clear();
+  signedCache.set(cacheKey, { url, until: Date.now() + expiresIn * 1000 });
+  return url;
+}
+
+async function signFresh(key: string, expiresIn: number, downloadAs?: string): Promise<string> {
   const env = getServerEnv();
   if (!isStorageConfigured(env)) throw new Error("Object storage is not configured.");
   const base = env.SUPABASE_URL!.replace(/\/$/, "");

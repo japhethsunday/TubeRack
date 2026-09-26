@@ -57,7 +57,9 @@ function playCached(
   // Play at once: the downloaded copy when it's ready, otherwise stream now
   // (and keep downloading in the background for smooth seeking next time).
   const ready = url.startsWith("blob:") || url.startsWith("data:") ? url : audioReady.get(url);
-  if (!ready && !opts.stream) void cachedAudio(url).catch(() => {});
+  // Download the full copy only after playback is under way, so it never
+  // competes with the stream the listener is waiting for.
+  if (!ready && !opts.stream) setTimeout(() => !stopped && void cachedAudio(url).catch(() => {}), 6000);
   void Promise.resolve(ready ?? url)
     .then((src) => {
       if (stopped) return;
