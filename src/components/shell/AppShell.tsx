@@ -75,7 +75,7 @@ export function AppShell({
             {!collapsed && (
               <>
                 <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white shadow-lg shadow-violet-900/30">
-                  <BrandMark className="size-4" />
+                  <BrandMark className="size-[18px]" />
                 </span>
                 <Link href="/dashboard" className="flex-1 text-sm font-semibold tracking-tight">
                   Recktube

@@ -138,8 +138,8 @@ export function SiteHeader() {
       >
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
-            <span className="flex size-9 items-center justify-center rounded-xl bg-foreground text-background">
-              <BrandMark className="size-4" />
+            <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white">
+              <BrandMark className="size-[18px]" />
             </span>
             <span className="font-semibold tracking-tight">Recktube</span>
           </Link>

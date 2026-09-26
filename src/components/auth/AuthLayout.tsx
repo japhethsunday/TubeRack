@@ -63,8 +63,8 @@ function BrandPanel() {
       <div className="auth-grid absolute inset-0" />
 
       <Link href="/" aria-label="Recktube home" className="relative flex items-center gap-2 text-white">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-white text-[#0b0714]">
-          <BrandMark className="size-4" />
+        <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white">
+          <BrandMark className="size-[18px]" />
         </span>
         <span className="text-base font-semibold tracking-tight">Recktube</span>
       </Link>
@@ -140,8 +140,8 @@ export function AuthLayout({
       <div className="relative flex items-center justify-center overflow-hidden px-4 py-12 sm:px-8">
         <div className="relative w-full max-w-md">
           <Link href="/" aria-label="Recktube home" className="auth-rise flex items-center gap-2 lg:hidden">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <BrandMark className="size-4" />
+            <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white">
+              <BrandMark className="size-[18px]" />
             </span>
             <span className="text-base font-semibold tracking-tight">Recktube</span>
           </Link>
