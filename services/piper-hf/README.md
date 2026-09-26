@@ -15,8 +15,8 @@ the cloud voices are out of quota.
 
 - `GET /health` → voices available
 - `POST /synthesize` with `Authorization: Bearer <PIPER_TOKEN>` and
-  `{"text": "...", "voice": "en_US-ryan-high"}` → `audio/wav`
+  `{"text": "...", "voice": "en_US-ryan-medium"}` → `audio/wav`
 
 Set `PIPER_TOKEN` under **Settings → Variables and secrets → New secret**.
-Voices: `en_US-ryan-high` (default, male), `en_US-amy-medium` (female),
+Voices: `en_US-ryan-medium` (default, male), `en_US-amy-medium` (female),
 `en_GB-alan-medium` (British male).

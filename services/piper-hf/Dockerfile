@@ -12,8 +12,8 @@ WORKDIR /app
 # https://huggingface.co/rhasspy/piper-voices — the .onnx and .onnx.json.
 ARG HF=https://huggingface.co/rhasspy/piper-voices/resolve/main
 RUN mkdir -p /app/voices && cd /app/voices \
-    && curl -fsSLO $HF/en/en_US/ryan/high/en_US-ryan-high.onnx \
-    && curl -fsSLO $HF/en/en_US/ryan/high/en_US-ryan-high.onnx.json \
+    && curl -fsSLO $HF/en/en_US/ryan/medium/en_US-ryan-medium.onnx \
+    && curl -fsSLO $HF/en/en_US/ryan/medium/en_US-ryan-medium.onnx.json \
     && curl -fsSLO $HF/en/en_US/amy/medium/en_US-amy-medium.onnx \
     && curl -fsSLO $HF/en/en_US/amy/medium/en_US-amy-medium.onnx.json \
     && curl -fsSLO $HF/en/en_GB/alan/medium/en_GB-alan-medium.onnx \

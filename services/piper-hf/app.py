@@ -19,7 +19,7 @@ from pathlib import Path
 
 VOICES_DIR = Path(os.environ.get("VOICES_DIR", "/app/voices"))
 TOKEN = os.environ.get("PIPER_TOKEN", "")
-DEFAULT_VOICE = os.environ.get("DEFAULT_VOICE", "en_US-ryan-high")
+DEFAULT_VOICE = os.environ.get("DEFAULT_VOICE", "en_US-ryan-medium")
 MAX_CHARS = 6000
 
 _voices = {}
