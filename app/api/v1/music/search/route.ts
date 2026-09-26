@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/src/server/auth";
 import { limiterFor } from "@/src/server/rate-limit";
 import { rateLimited, toErrorResponse, validationError, BackendError } from "@/src/server/errors";
-import { isMusicLibraryConfigured, MUSIC_MOODS, searchLibraryMusic, rememberPreviews, type MusicMoodId } from "@/src/server/music/library";
+import { isMusicLibraryConfigured, MUSIC_MOODS, searchLibraryMusic, previewPath, type MusicMoodId } from "@/src/server/music/library";
 
 /** GET /api/v1/music/search?mood=piano&page=1 — royalty-free, commercial-use instrumental tracks. */
 export async function GET(request: Request) {
@@ -17,9 +17,8 @@ export async function GET(request: Request) {
     const extra = (url.searchParams.get("q") ?? "").replace(/[^\p{L}\p{N} -]/gu, "").slice(0, 60);
     try {
       const tracks = await searchLibraryMusic(mood as MusicMoodId, page, extra);
-      rememberPreviews(tracks);
       // Previews play through our server so the browser never depends on the music site allowing it.
-      const out = tracks.map((t) => ({ ...t, previewUrl: `/api/v1/music/preview?id=${encodeURIComponent(t.id)}` }));
+      const out = tracks.map((t) => ({ ...t, previewUrl: previewPath(t) }));
       return NextResponse.json({ data: { tracks: out } });
     } catch (error) {
       console.error("[music] search failed:", error instanceof Error ? error.message : error);

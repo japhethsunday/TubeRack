@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { getServerEnv } from "@/src/lib/env";
 
 /**
@@ -223,24 +224,36 @@ export async function libraryTrack(id: string): Promise<LibraryTrack> {
   return track;
 }
 
-/** Where a track's preview audio really lives (remembered from searches, else looked up by id). */
-const previewSources = new Map<string, string>();
-export function rememberPreviews(tracks: LibraryTrack[]): void {
-  for (const t of tracks) previewSources.set(t.id, t.previewUrl);
-  if (previewSources.size > 5000) previewSources.clear();
+/** Sign a track's audio link into the preview URL, so any server instance can play it without a lookup. */
+function sign(value: string): string {
+  const secret = getServerEnv().JWT_SECRET || "tuberack-preview";
+  return createHmac("sha256", secret).update(`music-preview:${value}`).digest("base64url").slice(0, 32);
 }
-export async function previewSource(id: string): Promise<string> {
-  return previewSources.get(id) ?? (await libraryTrack(id)).previewUrl;
+export function previewPath(track: LibraryTrack): string {
+  const srcs = [track.previewUrl, jamendoFiles.get(track.id)].filter((u): u is string => Boolean(u));
+  const packed = Buffer.from(JSON.stringify(srcs)).toString("base64url");
+  return `/api/v1/music/preview?id=${encodeURIComponent(track.id)}&s=${packed}&sig=${sign(`${track.id}|${packed}`)}`;
+}
+/** The audio links for a preview request: the signed ones, or (unsigned/old links) a fresh lookup. */
+export async function previewSources(id: string, packed: string | null, sig: string | null): Promise<string[]> {
+  if (packed && sig && packed.length < 4000) {
+    const expected = sign(`${id}|${packed}`);
+    if (sig.length === expected.length && timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+      const list = JSON.parse(Buffer.from(packed, "base64url").toString("utf8")) as unknown;
+      if (Array.isArray(list)) return list.filter((u): u is string => typeof u === "string" && u.startsWith("https://"));
+    }
+  }
+  const t = await libraryTrack(id);
+  return [t.previewUrl, jamendoFiles.get(id)].filter((u): u is string => Boolean(u));
 }
 
 /** Stream a track preview through our server (music sites often refuse playback embedded on other sites). */
-export async function fetchPreview(id: string, range: string | null): Promise<Response> {
-  const primary = await previewSource(id);
-  const sources = [primary, primary, jamendoFiles.get(id)].filter((u, i, all): u is string => Boolean(u) && (i < 2 || u !== primary));
+export async function fetchPreview(sources: string[], range: string | null, id: string): Promise<Response> {
+  const tries = [sources[0], ...sources].filter(Boolean);
   const headers: Record<string, string> = { "User-Agent": UA };
   if (range && /^bytes=\d*-\d*$/.test(range)) headers.Range = range;
   let last = "no source";
-  for (const [i, src] of sources.entries()) {
+  for (const [i, src] of tries.entries()) {
     if (i > 0) await new Promise((r) => setTimeout(r, 400));
     try {
       const res = await fetch(src, { headers, redirect: "follow", signal: AbortSignal.timeout(20_000) });
