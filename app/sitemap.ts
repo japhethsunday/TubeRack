@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const BASE = "https://recktube.xyz";
+const BASE = "https://www.recktube.xyz";
 
 /** Public pages only — everything behind sign-in stays out of search. */
 export default function sitemap(): MetadataRoute.Sitemap {

@@ -33,8 +33,21 @@ export class NotConnectedError extends BackendError {
   }
 }
 
+/**
+ * The address Google sends people back to. On our own domain it is always
+ * the bare recktube.xyz (what is registered with Google), even when the
+ * visitor is on www — Vercel forwards the return trip to www with the code.
+ */
+export function oauthOrigin(origin: string): string {
+  try {
+    return new URL(origin).hostname.endsWith("recktube.xyz") ? "https://recktube.xyz" : origin;
+  } catch {
+    return origin;
+  }
+}
+
 export function redirectUri(origin: string): string {
-  return `${origin}/api/v1/youtube/oauth/callback`;
+  return `${oauthOrigin(origin)}/api/v1/youtube/oauth/callback`;
 }
 
 export function authUrl(origin: string, state: string): string {

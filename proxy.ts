@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * can't execute script even if it slips past sanitisation.
  */
 /** The public address. The old vercel.app address forwards here so there is one home for the app. */
-const CANONICAL_HOST = "recktube.xyz";
+const CANONICAL_HOST = "www.recktube.xyz";
 const LEGACY_HOSTS = new Set(["tube-rack.vercel.app"]);
 
 export function proxy(request: NextRequest) {

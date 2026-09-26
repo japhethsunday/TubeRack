@@ -1,3 +1,4 @@
+import { oauthOrigin } from "@/src/server/google/oauth";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getServerEnv } from "@/src/lib/env";
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
         code,
         client_id: env.GOOGLE_CLIENT_ID ?? "",
         client_secret: env.GOOGLE_CLIENT_SECRET ?? "",
-        redirect_uri: `${origin}/api/v1/auth/google/callback`,
+        redirect_uri: `${oauthOrigin(origin)}/api/v1/auth/google/callback`,
         grant_type: "authorization_code",
       }),
       signal: AbortSignal.timeout(15_000),

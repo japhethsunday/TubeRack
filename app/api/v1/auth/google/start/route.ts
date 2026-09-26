@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getServerEnv } from "@/src/lib/env";
-import { isOAuthConfigured } from "@/src/server/google/oauth";
+import { isOAuthConfigured, oauthOrigin } from "@/src/server/google/oauth";
 import { randomToken } from "@/src/server/crypto";
 import { linkOrigin } from "@/src/server/email";
 import { sanitizeReturnTo } from "@/src/lib/auth/session";
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   store.set("g_login_return", returnTo, { httpOnly: true, secure, sameSite: "lax", path: "/api/v1/auth/google", maxAge: 600 });
   const q = new URLSearchParams({
     client_id: getServerEnv().GOOGLE_CLIENT_ID ?? "",
-    redirect_uri: `${origin}/api/v1/auth/google/callback`,
+    redirect_uri: `${oauthOrigin(origin)}/api/v1/auth/google/callback`,
     response_type: "code",
     scope: "openid email profile",
     prompt: "select_account",
