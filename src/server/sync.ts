@@ -376,6 +376,7 @@ export async function syncPut(kind: SyncKind, user: SessionUser, data: unknown):
         result.skipped += 1;
         continue;
       }
+      await backupIfShrinking(String(doc.projectId), doc);
       const withSnaps = { ...(doc as object), snapshots: snapsByProject.get(String(doc.projectId)) ?? [] };
       result.inserted += (await upsertDoc("project_compositions", String(doc.projectId), toCompositionRow(String(doc.projectId), withSnaps as never), doc.updatedAt)) ? 1 : 0;
     }
@@ -708,6 +709,34 @@ async function upsertDoc(table: string, projectId: string, row: Record<string, u
   return true;
 }
 
+/**
+ * Safety net: when a save would remove clips from a timeline (another tab or
+ * device with an older copy, an accidental rebuild…), keep the previous
+ * version first. Backups come back as snapshots the creator can restore.
+ */
+async function backupIfShrinking(projectId: string, doc: Record<string, unknown>): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  const incoming = Array.isArray(doc.clips) ? doc.clips.length : 0;
+  const rows = await db`SELECT tracks, clips, canvas, updated_at FROM project_compositions WHERE project_id = ${projectId} LIMIT 1`;
+  const cur = rows[0] as { tracks: unknown; clips: unknown; canvas: unknown; updated_at: unknown } | undefined;
+  const stored = cur && Array.isArray(cur.clips) ? cur.clips.length : 0;
+  if (!cur || stored === 0 || incoming >= stored) return;
+  // Only well-formed versions: a malformed snapshot must never break loading.
+  const canvas = cur.canvas as Record<string, unknown> | null;
+  if (!Array.isArray(cur.tracks) || !canvas || typeof canvas.preset !== "string" || typeof canvas.width !== "number") return;
+  const at = new Date().toISOString();
+  const backup = {
+    id: `auto-${Date.now().toString(36)}`,
+    name: `Auto-backup (${stored} clips, before ${incoming})`,
+    at,
+    data: { projectId, tracks: cur.tracks, clips: cur.clips, canvas: cur.canvas, updatedAt: new Date(String(cur.updated_at)).toISOString() },
+  };
+  const prev = await db`SELECT data FROM project_extras WHERE project_id = ${projectId} AND key = 'timeline-backups' LIMIT 1`;
+  const list = Array.isArray((prev[0] as { data?: unknown } | undefined)?.data) ? ((prev[0] as { data: unknown[] }).data) : [];
+  await upsertExtra(projectId, "timeline-backups", [...list, backup].slice(-8));
+}
+
 async function upsertExtra(projectId: string, key: string, data: unknown): Promise<void> {
   const db = getDb();
   if (!db) throw backendUnavailable("Database");
@@ -860,6 +889,8 @@ export async function syncGet(kind: Parameters<typeof syncPut>[0], user: Session
       issues: row.issues, health: row.health, status: row.status, createdAt: row.created_at,
     });
     const snapshots: unknown[] = [];
+    const backups = await db`SELECT data FROM project_extras WHERE key = 'timeline-backups' AND project_id IN (SELECT id FROM projects WHERE workspace_id = ${workspaceId})`;
+    for (const b of backups as unknown as { data: unknown }[]) if (Array.isArray(b.data)) snapshots.push(...b.data);
     const compositions = (comps as unknown as Record<string, unknown>[]).map((c) => {
       if (Array.isArray(c.snapshots)) snapshots.push(...c.snapshots);
       return {

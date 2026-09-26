@@ -48,7 +48,9 @@ export function StockLibrary({
   const [adding, setAdding] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
 
-  const addedIds = new Set(assetsFor(projectId).flatMap((a) => a.tags.filter((t) => t.startsWith("stock:")).map((t) => t.slice(6))));
+  // Stock items already imported into this project (re-adding reuses the stored copy).
+  const imported = new Map<string, MediaAsset>();
+  for (const a of assetsFor(projectId)) for (const t of a.tags) if (t.startsWith("stock:")) imported.set(t.slice(6), a);
 
   async function search(next: { q?: string; kind?: "video" | "photo"; page?: number } = {}) {
     const q = (next.q ?? query).trim();
@@ -74,6 +76,11 @@ export function StockLibrary({
   }
 
   async function add(item: StockItem) {
+    const existing = imported.get(item.id);
+    if (existing) {
+      onAdded?.(existing);
+      return;
+    }
     setAdding(item.id);
     setError(null);
     try {
@@ -180,7 +187,7 @@ export function StockLibrary({
       {items && items.length > 0 && (
         <ul className="grid grid-cols-2 gap-2">
           {items.map((it) => {
-            const added = addedIds.has(it.id);
+            const added = imported.has(it.id);
             return (
               <li key={it.id} className="group overflow-hidden rounded-lg border border-border bg-background">
                 <div className="relative aspect-video bg-muted" onMouseEnter={() => setHover(it.id)} onMouseLeave={() => setHover(null)}>
@@ -194,15 +201,15 @@ export function StockLibrary({
                   <button
                     type="button"
                     onClick={() => void add(it)}
-                    disabled={added || adding !== null}
-                    aria-label={added ? `${it.title} added` : `Add ${it.title}`}
+                    disabled={adding !== null || (added && !onAdded)}
+                    aria-label={added ? (onAdded ? `Add ${it.title} to the timeline again` : `${it.title} added`) : `Add ${it.title}`}
                     className={cx(
                       "absolute left-1 top-1 flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold text-white shadow",
                       added ? "bg-success/90" : "bg-primary/90 opacity-90 hover:opacity-100",
                     )}
                   >
                     {adding === it.id ? <Loader2 className="size-3 animate-spin" aria-hidden="true" /> : added ? <Check className="size-3" aria-hidden="true" /> : <Plus className="size-3" aria-hidden="true" />}
-                    {adding === it.id ? "Adding" : added ? "Added" : "Add"}
+                    {adding === it.id ? "Adding" : added ? (onAdded ? "Add again" : "Added") : "Add"}
                   </button>
                 </div>
                 <p className="truncate px-1.5 py-1 text-[11px] text-muted-text" title={it.title}>
