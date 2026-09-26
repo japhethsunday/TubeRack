@@ -64,7 +64,7 @@ export function SiteFooter() {
                 <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white shadow-lg shadow-violet-900/30 transition-transform duration-500 group-hover:rotate-[-8deg] group-hover:scale-105">
                   <Clapperboard className="size-4" aria-hidden="true" />
                 </span>
-                <span className="font-semibold tracking-tight">TubeRack</span>
+                <span className="font-semibold tracking-tight">Recktube</span>
               </Link>
               <p className="max-w-xs text-sm leading-relaxed text-foreground/60">
                 Research, script, voice, visuals, packaging, and analytics for YouTube creators — in one workspace.
@@ -95,7 +95,7 @@ export function SiteFooter() {
         </div>
         <div className="border-t border-foreground/10">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-6 text-xs text-foreground/50 sm:px-6">
-            <p>© {new Date().getFullYear()} TubeRack. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Recktube. All rights reserved.</p>
             <p className="inline-flex items-center gap-1.5">
               <Sparkles className="size-3.5 text-violet-500 dark:text-violet-300" aria-hidden="true" />
               Built on the YouTube Data API

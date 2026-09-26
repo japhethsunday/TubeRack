@@ -8,7 +8,7 @@ import { getServerEnv } from "@/src/lib/env";
  * line its license asks for.
  */
 const API = "https://api.openverse.org/v1/audio/";
-const UA = "TubeRack/1.0 (background music search)";
+const UA = "Recktube/1.0 (background music search)";
 
 export const MUSIC_MOODS = {
   piano: { label: "Piano", query: "piano instrumental", tags: "piano" },

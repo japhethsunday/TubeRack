@@ -38,7 +38,7 @@ function ConnectCard({ configured }: { configured: boolean }) {
           <h2 className="text-lg font-semibold">Connect your YouTube channel</h2>
           <p className="max-w-prose text-sm text-muted-text">
             See your private analytics (watch time, retention, traffic sources, subscribers gained), upload and schedule videos, and run
-            thumbnail A/B tests. TubeRack asks for read-only analytics plus upload access. Tokens are encrypted, and you can disconnect anytime.
+            thumbnail A/B tests. Recktube asks for read-only analytics plus upload access. Tokens are encrypted, and you can disconnect anytime.
           </p>
           {configured ? (
             <a href="/api/v1/youtube/oauth/start" className="ui-lift inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">

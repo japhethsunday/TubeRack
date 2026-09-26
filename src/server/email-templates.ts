@@ -1,5 +1,5 @@
 /**
- * TubeRack email design system. Table-based, inline-styled HTML that renders
+ * Recktube email design system. Table-based, inline-styled HTML that renders
  * the same in Gmail, Outlook, Apple Mail and on phones, with a plain-text
  * twin for every message. All content is escaped; only https links are kept.
  */
@@ -187,7 +187,7 @@ export function renderEmail(e: EmailLayout): { html: string; text: string } {
 <table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px">
 <tr><td style="padding:0 4px 14px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td><a href="${esc(safeUrl(app))}" style="text-decoration:none"><span style="display:inline-block;width:30px;height:30px;line-height:30px;border-radius:9px;background:${INK};color:#fff;text-align:center;font-size:14px;font-weight:900;vertical-align:middle">&#9654;</span><span style="margin-left:9px;font-size:16px;font-weight:800;color:${TEXT};vertical-align:middle">TubeRack</span></a></td>
+<td><a href="${esc(safeUrl(app))}" style="text-decoration:none"><span style="display:inline-block;width:30px;height:30px;line-height:30px;border-radius:9px;background:${INK};color:#fff;text-align:center;font-size:14px;font-weight:900;vertical-align:middle">&#9654;</span><span style="margin-left:9px;font-size:16px;font-weight:800;color:${TEXT};vertical-align:middle">Recktube</span></a></td>
 ${e.eyebrow ? `<td align="right" style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:${FAINT}">${esc(e.eyebrow)}</td>` : ""}
 </tr></table></td></tr>
 <tr><td style="background:#ffffff;border:1px solid ${LINE};border-radius:20px;overflow:hidden">
@@ -200,8 +200,8 @@ ${e.cta || e.secondary ? `<div style="margin-top:22px">${e.cta ? button(e.cta.la
 </div></td></tr>
 <tr><td style="padding:22px 12px 8px;text-align:center;font-size:12px;line-height:1.6;color:${FAINT}">
 ${esc(e.reason)}<br>
-<a href="${esc(safeUrl(`${app}/settings?tab=notifications`))}" style="color:${MUTED};text-decoration:underline">Email preferences</a> &nbsp;·&nbsp; <a href="${esc(safeUrl(app))}" style="color:${MUTED};text-decoration:underline">Open TubeRack</a>
-<div style="margin-top:10px;color:#d4d4d8">TubeRack — plan, make and grow your YouTube channel.</div>
+<a href="${esc(safeUrl(`${app}/settings?tab=notifications`))}" style="color:${MUTED};text-decoration:underline">Email preferences</a> &nbsp;·&nbsp; <a href="${esc(safeUrl(app))}" style="color:${MUTED};text-decoration:underline">Open Recktube</a>
+<div style="margin-top:10px;color:#d4d4d8">Recktube — plan, make and grow your YouTube channel.</div>
 </td></tr>
 </table></td></tr></table></body></html>`;
 

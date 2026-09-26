@@ -110,7 +110,7 @@ async function run() {
     mistralJobs.push(...textChecks({ name: "Mistral", baseUrl: "https://api.mistral.ai/v1", key: env.MISTRAL_API_KEY }, "mistral", wanted.filter((m) => live.has(m))));
     mistralJobs.push(() =>
       timed("mistral", "voxtral-mini-tts-2603 + voxtral-mini-latest", "voice+captions", async () => {
-        const { pcm, rate } = await mistralSpeechChunk("This is a quick voice test for the TubeRack studio. Captions should follow.");
+        const { pcm, rate } = await mistralSpeechChunk("This is a quick voice test for the Recktube studio. Captions should follow.");
         if (pcm.length < rate) throw new Error("audio shorter than half a second");
         const header = Buffer.alloc(44);
         header.write("RIFF", 0); header.writeUInt32LE(36 + pcm.length, 4); header.write("WAVE", 8); header.write("fmt ", 12);

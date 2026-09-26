@@ -1,5 +1,5 @@
 /**
- * Expert skills for every AI in TubeRack. Each is a compact professional
+ * Expert skills for every AI in Recktube. Each is a compact professional
  * playbook added to the instructions of the requests that need it, so every
  * model (and every backup model) works to the same standard. Kept short on
  * purpose: rules that change the output, not essays.

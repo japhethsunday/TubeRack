@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const { workspaceId, user } = await requireWorkspace("viewer");
     const connection = await getConnection(workspaceId);
-    // Same channel on another TubeRack login = the owner's work is split.
+    // Same channel on another Recktube login = the owner's work is split.
     const splitAccount = connection ? await channelOnOtherAccount(connection.channelId, user.id).catch(() => false) : false;
     return NextResponse.json({ data: { configured: isOAuthConfigured(), connection, canManage: hasScope(connection, FORCE_SSL_SCOPE), splitAccount } });
   } catch (error) {

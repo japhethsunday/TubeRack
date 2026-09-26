@@ -610,7 +610,7 @@ export async function runIntelligenceTask(request: IntelligenceRequest): Promise
   const provider = new GeminiTextProvider();
   const { text, model } = await provider.generateText({
     skills: skillsForTask(request.task),
-    prompt: `You are TubeRack's YouTube strategy analyst. ${label}\nContext (JSON):\n${context}\n\nRules: respond in plain text with concrete, actionable reasoning. Never invent views, rankings, metrics, or channel data — reason only from the context given.`,
+    prompt: `You are Recktube's YouTube strategy analyst. ${label}\nContext (JSON):\n${context}\n\nRules: respond in plain text with concrete, actionable reasoning. Never invent views, rankings, metrics, or channel data — reason only from the context given.`,
     maxTokens: 4096,
   });
   return { task: request.task, text, model };

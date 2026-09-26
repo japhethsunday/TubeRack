@@ -247,7 +247,7 @@ export function AbTester() {
     return (
       <div className="rounded-xl border border-border bg-surface p-6 text-sm">
         <p className="font-medium">Connect your YouTube channel to run thumbnail tests.</p>
-        <p className="mt-1 text-muted-text">TubeRack swaps the live thumbnail on your video on a schedule and reads the results from YouTube Analytics.</p>
+        <p className="mt-1 text-muted-text">Recktube swaps the live thumbnail on your video on a schedule and reads the results from YouTube Analytics.</p>
         <Link href="/youtube" className="mt-3 inline-flex h-9 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90">Connect YouTube</Link>
       </div>
     );

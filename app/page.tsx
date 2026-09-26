@@ -47,7 +47,7 @@ const MARQUEE = [
   "Timeline", "Captions", "Title options", "SEO descriptions", "Repurposing", "Live stats",
 ];
 
-/** Public home: what TubeRack does, with real entry points. */
+/** Public home: what Recktube does, with real entry points. */
 export default function HomePage() {
   return (
     <main id="main" className="relative min-h-screen overflow-hidden bg-background text-foreground">
@@ -168,7 +168,7 @@ export default function HomePage() {
           ))}
         </div>
         <Reveal delay={150}>
-          <div className="relative mx-auto aspect-square w-full max-w-md" aria-label="Providers TubeRack connects to">
+          <div className="relative mx-auto aspect-square w-full max-w-md" aria-label="Providers Recktube connects to">
             <div className="home-orbit absolute inset-0 rounded-full border border-dashed border-foreground/15">
               {ORBIT.map((o) => (
                 <span key={o.label} className={`absolute ${o.className} rounded-full border border-foreground/15 bg-elevated px-3 py-1 text-xs text-foreground/80 shadow-lg`}>

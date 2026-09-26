@@ -105,7 +105,7 @@ function Board() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "tuberack-scripts.json";
+    a.download = "recktube-scripts.json";
     a.click();
     URL.revokeObjectURL(url);
     setNotice("Exported scripts, boards, loops, and versions.");

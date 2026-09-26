@@ -171,7 +171,7 @@ export function ContentCalendar() {
         <span className="ml-auto flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => setEditing(blank(today))}><Plus className="size-4" aria-hidden="true" /> Add item</Button>
           <Button size="sm" onClick={() => setPlanning(true)}><Sparkles className="size-4" aria-hidden="true" /> Auto-plan</Button>
-          <Button size="sm" variant="outline" disabled={!items?.length} onClick={() => downloadText(toIcs(items ?? []), `tuberack-${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}.ics`, "text/calendar")}>
+          <Button size="sm" variant="outline" disabled={!items?.length} onClick={() => downloadText(toIcs(items ?? []), `recktube-${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}.ics`, "text/calendar")}>
             <CalendarArrowDown className="size-4" aria-hidden="true" /> Export .ics
           </Button>
         </span>

@@ -61,11 +61,11 @@ function BrandPanel() {
       <div className="auth-blob absolute left-1/3 top-1/3 size-72 rounded-full bg-violet-600/40 blur-3xl" style={{ animationDelay: "-12s" }} />
       <div className="auth-grid absolute inset-0" />
 
-      <Link href="/" aria-label="TubeRack home" className="relative flex items-center gap-2 text-white">
+      <Link href="/" aria-label="Recktube home" className="relative flex items-center gap-2 text-white">
         <span className="flex size-9 items-center justify-center rounded-xl bg-white text-[#0b0714]">
           <Clapperboard className="size-4" aria-hidden="true" />
         </span>
-        <span className="text-base font-semibold tracking-tight">TubeRack</span>
+        <span className="text-base font-semibold tracking-tight">Recktube</span>
       </Link>
 
       <div className="relative h-80">
@@ -138,11 +138,11 @@ export function AuthLayout({
       <BrandPanel />
       <div className="relative flex items-center justify-center overflow-hidden px-4 py-12 sm:px-8">
         <div className="relative w-full max-w-md">
-          <Link href="/" aria-label="TubeRack home" className="auth-rise flex items-center gap-2 lg:hidden">
+          <Link href="/" aria-label="Recktube home" className="auth-rise flex items-center gap-2 lg:hidden">
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <Clapperboard className="size-4" aria-hidden="true" />
             </span>
-            <span className="text-base font-semibold tracking-tight">TubeRack</span>
+            <span className="text-base font-semibold tracking-tight">Recktube</span>
           </Link>
           <h1 className="auth-rise mt-8 text-3xl font-semibold tracking-tight lg:mt-0" style={{ animationDelay: "60ms" }}>
             {title}

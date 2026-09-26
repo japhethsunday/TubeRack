@@ -99,7 +99,7 @@ export function parseScriptBundle(data: unknown): ScriptBundle {
   const parsed = bundleSchema.safeParse(data);
   if (!parsed.success) {
     throw new Error(
-      `Import is not a TubeRack script file: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "root"} — ${i.message}`).join("; ")}`,
+      `Import is not a Recktube script file: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "root"} — ${i.message}`).join("; ")}`,
     );
   }
   return parsed.data as ScriptBundle;

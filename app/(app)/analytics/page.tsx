@@ -175,7 +175,7 @@ function Workspace() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "tuberack-analytics.csv";
+    a.download = "recktube-analytics.csv";
     a.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 5000);
     push({ title: "CSV downloaded", body: `${scoped.length} entr${scoped.length === 1 ? "y" : "ies"} exported.` });

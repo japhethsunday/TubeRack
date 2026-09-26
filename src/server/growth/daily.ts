@@ -115,7 +115,7 @@ async function competitorAlerts(): Promise<{ workspaces: number; emailed: number
       intro: "These uploads are pulling far more views than the channel normally gets — a strong signal of what your audience wants right now.",
       blocks,
       cta: { label: "Open competitor tracker", url: `${appUrl()}/intelligence/competitors` },
-      reason: "You get this because you track these channels in TubeRack.",
+      reason: "You get this because you track these channels in Recktube.",
       appUrl: appUrl(),
     });
     for (const to of await workspaceEmails(workspaceId)) {

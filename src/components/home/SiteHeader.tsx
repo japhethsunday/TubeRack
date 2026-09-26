@@ -140,7 +140,7 @@ export function SiteHeader() {
             <span className="flex size-9 items-center justify-center rounded-xl bg-foreground text-background">
               <Clapperboard className="size-4" aria-hidden="true" />
             </span>
-            <span className="font-semibold tracking-tight">TubeRack</span>
+            <span className="font-semibold tracking-tight">Recktube</span>
           </Link>
 
           <nav aria-label="Main" className="hidden items-center gap-1 text-sm lg:flex">

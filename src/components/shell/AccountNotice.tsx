@@ -9,7 +9,7 @@ const DISMISS_KEY = "tuberack.split-notice.dismissed";
 
 /**
  * Warns when this login's YouTube channel is also connected to another
- * TubeRack account. Projects belong to the account (email) you sign in
+ * Recktube account. Projects belong to the account (email) you sign in
  * with, so two logins for one channel look like "missing" projects.
  */
 export function AccountNotice() {
@@ -40,7 +40,7 @@ export function AccountNotice() {
     <div role="status" className="mb-4 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
       <Users className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="font-medium">Your YouTube channel is linked to another TubeRack account too</p>
+        <p className="font-medium">Your YouTube channel is linked to another Recktube account too</p>
         <p className="mt-0.5 text-muted-text">
           Projects belong to the email you sign in with. You&apos;re signed in as <strong className="break-all text-foreground">{session.user.email}</strong>. If projects seem missing, sign out and sign in with the email you used on your other device.
         </p>

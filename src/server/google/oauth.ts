@@ -184,7 +184,7 @@ export async function saveConnection(input: {
     const existing = await db`SELECT refresh_token_enc FROM youtube_connections WHERE workspace_id = ${input.workspaceId}`;
     refreshEnc = (existing[0] as { refresh_token_enc?: string } | undefined)?.refresh_token_enc ?? null;
   }
-  if (!refreshEnc) throw new Error("Google did not return offline access. Remove TubeRack from your Google account permissions and connect again.");
+  if (!refreshEnc) throw new Error("Google did not return offline access. Remove Recktube from your Google account permissions and connect again.");
   const thumb = ch.snippet?.thumbnails?.default?.url ?? "";
   const expires = new Date(Date.now() + (input.tokens.expires_in ?? 3600) * 1000).toISOString();
   await db`
@@ -213,7 +213,7 @@ export async function deleteConnection(workspaceId: string): Promise<void> {
 }
 
 /**
- * True when another TubeRack account has connected the same YouTube channel
+ * True when another Recktube account has connected the same YouTube channel
  * (the owner's work is then split across two logins). Reveals no identity.
  */
 export async function channelOnOtherAccount(channelId: string, userId: string): Promise<boolean> {

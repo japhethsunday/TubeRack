@@ -1,5 +1,5 @@
 /**
- * TubeRack design tokens — Phase 2 source of truth.
+ * Recktube design tokens — Phase 2 source of truth.
  * Components must consume these (via Tailwind `bg-background`-style utilities
  * mapped in globals.css, or these constants) — never hard-code colors.
  */

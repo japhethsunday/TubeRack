@@ -71,7 +71,7 @@ export function parseBundle(data: unknown): WorkspaceBundle {
   const parsed = bundleSchema.safeParse(data);
   if (!parsed.success) {
     throw new Error(
-      `Import is not a TubeRack workspace file: ${parsed.error.issues
+      `Import is not a Recktube workspace file: ${parsed.error.issues
         .slice(0, 3)
         .map((i) => `${i.path.join(".") || "root"} — ${i.message}`)
         .join("; ")}`,

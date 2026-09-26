@@ -15,7 +15,7 @@ export default function GlobalError({
           <Container className="py-14">
             <h1 className="text-2xl font-semibold tracking-tight">Something went wrong</h1>
             <p className="mt-2 max-w-prose text-sm text-muted-text">
-              TubeRack hit a problem. Your work is saved — reload the page to continue.
+              Recktube hit a problem. Your work is saved — reload the page to continue.
             </p>
             <button
               type="button"

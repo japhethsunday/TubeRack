@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
-  title: "TubeRack — AI Video Production Platform",
+  title: "Recktube — AI Video Production Platform",
   description:
     "AI video production and YouTube intelligence: research, scripts, voice, visuals, packaging, and analytics in one workspace.",
 };

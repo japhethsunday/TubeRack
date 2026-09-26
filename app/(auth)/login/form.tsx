@@ -67,7 +67,7 @@ export function LoginForm({ returnTo, expired, externalError }: { returnTo: stri
       subtitle="Sign in to pick up where you left off."
       footer={
         <>
-          New to TubeRack?{" "}
+          New to Recktube?{" "}
           <Link href="/signup" className="font-medium text-foreground underline underline-offset-4">
             Create an account
           </Link>

@@ -74,7 +74,7 @@ export default function ProjectsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "tuberack-workspace.json";
+    a.download = "recktube-workspace.json";
     a.click();
     URL.revokeObjectURL(url);
     setNotice(`Exported ${projects.length} project(s) and ${channels.length} channel(s).`);

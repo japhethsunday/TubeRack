@@ -77,7 +77,7 @@ export function AppShell({
                   <Clapperboard className="size-4" aria-hidden="true" />
                 </span>
                 <Link href="/dashboard" className="flex-1 text-sm font-semibold tracking-tight">
-                  TubeRack
+                  Recktube
                 </Link>
               </>
             )}
@@ -108,7 +108,7 @@ export function AppShell({
               className="ui-drawer-left absolute left-0 top-0 h-full w-72 bg-elevated shadow-xl"
             >
               <div className="flex h-16 items-center justify-between border-b border-border px-4">
-                <span className="text-sm font-semibold">TubeRack</span>
+                <span className="text-sm font-semibold">Recktube</span>
                 <button
                   type="button"
                   onClick={() => setNavOpen(false)}

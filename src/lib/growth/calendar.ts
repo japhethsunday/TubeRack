@@ -41,7 +41,7 @@ const icsEscape = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\;").re
 
 export function toIcs(items: CalendarItem[], stamp = new Date()): string {
   const dt = stamp.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//TubeRack//Content Calendar//EN", "CALSCALE:GREGORIAN"];
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Recktube//Content Calendar//EN", "CALSCALE:GREGORIAN"];
   for (const it of items) {
     const day = it.date.replace(/-/g, "");
     lines.push("BEGIN:VEVENT", `UID:${it.id}@tuberack`, `DTSTAMP:${dt}`);

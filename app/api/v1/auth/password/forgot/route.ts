@@ -30,7 +30,7 @@ export async function POST(request: Request) {
         INSERT INTO auth_tokens (user_id, purpose, token_hash, expires_at)
         VALUES (${row.id}, 'recovery', ${hashToken(token)}, ${new Date(Date.now() + 3600000).toISOString()})
       `;
-      __recordAttempt({ to: body.email, subject: "Reset your TubeRack password", text: "Recovery link.", kind: "recovery" });
+      __recordAttempt({ to: body.email, subject: "Reset your Recktube password", text: "Recovery link.", kind: "recovery" });
       await sendRecoveryEmail(request, body.email, token);
     }
     // Identical response whether or not the account exists.

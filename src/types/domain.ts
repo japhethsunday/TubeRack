@@ -1,5 +1,5 @@
 /**
- * TubeRack core domain types — Phase 1 foundation.
+ * Recktube core domain types — Phase 1 foundation.
  *
  * These are structural contracts only. Persistence, auth, billing,
  * and provider integrations land in later phases (backend = Phase 11).

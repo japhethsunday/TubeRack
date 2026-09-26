@@ -72,7 +72,7 @@ export function parseMediaBundle(data: unknown): MediaBundle {
   const parsed = bundleSchema.safeParse(data);
   if (!parsed.success) {
     throw new Error(
-      `Import is not a TubeRack media file: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "root"} — ${i.message}`).join("; ")}`,
+      `Import is not a Recktube media file: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "root"} — ${i.message}`).join("; ")}`,
     );
   }
   const bundle = parsed.data as MediaBundle;

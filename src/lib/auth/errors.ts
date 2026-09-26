@@ -14,7 +14,7 @@ export const AUTH_ERRORS: Record<AuthErrorCode, AuthErrorContent> = {
   },
   "account-not-found": {
     title: "No account for that email",
-    body: "There is no TubeRack account with this address yet. Create one to get started.",
+    body: "There is no Recktube account with this address yet. Create one to get started.",
     actionLabel: "Create account",
     actionHref: "/signup",
   },

@@ -93,13 +93,13 @@ export async function sendVerificationEmail(request: Request, to: string, token:
   const mail = actionEmail({
     eyebrow: "Account",
     heading: "Confirm your email",
-    preheader: "One click to activate your TubeRack account.",
+    preheader: "One click to activate your Recktube account.",
     body: "You're one step away from your studio. Confirm this address to secure your account — the link expires in 24 hours.",
     action: "Verify my email",
     url,
-    footer: "If you didn't create a TubeRack account, you can ignore this email.",
+    footer: "If you didn't create a Recktube account, you can ignore this email.",
   });
-  return sendEmail({ to, subject: "Verify your TubeRack email", kind: "verify", ...mail });
+  return sendEmail({ to, subject: "Verify your Recktube email", kind: "verify", ...mail });
 }
 
 /** Sent instead of a verification link when the address already has an account. */
@@ -107,12 +107,12 @@ export async function sendAccountExistsEmail(request: Request, to: string): Prom
   const mail = actionEmail({
     eyebrow: "Security",
     heading: "You already have an account",
-    body: "Someone (hopefully you) tried to create a TubeRack account with this email. You already have one — sign in, or reset your password if you forgot it.",
+    body: "Someone (hopefully you) tried to create a Recktube account with this email. You already have one — sign in, or reset your password if you forgot it.",
     action: "Sign in",
     url: `${linkOrigin(request)}/login`,
     footer: "If this wasn't you, no action is needed; your account was not changed.",
   });
-  return sendEmail({ to, subject: "Your TubeRack account", kind: "security", ...mail });
+  return sendEmail({ to, subject: "Your Recktube account", kind: "security", ...mail });
 }
 
 export async function sendRecoveryEmail(request: Request, to: string, token: string): Promise<EmailResult> {
@@ -121,12 +121,12 @@ export async function sendRecoveryEmail(request: Request, to: string, token: str
     eyebrow: "Security",
     heading: "Reset your password",
     preheader: "Your password reset link (valid for 60 minutes).",
-    body: "Someone asked to reset the password for this TubeRack account. The link expires in 60 minutes and works once.",
+    body: "Someone asked to reset the password for this Recktube account. The link expires in 60 minutes and works once.",
     action: "Choose a new password",
     url,
     footer: "If you did not ask for this, ignore this email — your password stays the same.",
   });
-  return sendEmail({ to, subject: "Reset your TubeRack password", kind: "recovery", ...mail });
+  return sendEmail({ to, subject: "Reset your Recktube password", kind: "recovery", ...mail });
 }
 
 /** Welcome, sent once the email is verified: what to do first. */
@@ -135,7 +135,7 @@ export async function sendWelcomeEmail(request: Request, to: string, name?: stri
   const mail = renderEmail({
     preheader: "Your studio is ready — here's the fastest path to your first video.",
     eyebrow: "Welcome",
-    heading: name ? `Welcome to TubeRack, ${name.split(" ")[0]}` : "Welcome to TubeRack",
+    heading: name ? `Welcome to Recktube, ${name.split(" ")[0]}` : "Welcome to Recktube",
     intro: "Your studio is ready. Here's the fastest path from idea to a published video:",
     blocks: [
       {
@@ -150,10 +150,10 @@ export async function sendWelcomeEmail(request: Request, to: string, name?: stri
       { type: "callout", title: "Pro tip", text: "Start with one idea from your channel plan and take it all the way to publish today. Momentum beats perfection.", action: { label: "Open Channel Creator", url: `${app}/channel-creator` } },
     ],
     cta: { label: "Open my studio", url: `${app}/dashboard` },
-    reason: "You're receiving this because you just created a TubeRack account.",
+    reason: "You're receiving this because you just created a Recktube account.",
     appUrl: app,
   });
-  return sendEmail({ to, subject: "Welcome to TubeRack — your studio is ready", kind: "welcome", ...mail });
+  return sendEmail({ to, subject: "Welcome to Recktube — your studio is ready", kind: "welcome", ...mail });
 }
 
 /** For tests: inspect recorded attempts (memory only, never persisted). */

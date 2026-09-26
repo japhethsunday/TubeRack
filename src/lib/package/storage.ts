@@ -126,7 +126,7 @@ export function parsePackageBundle(data: unknown): PackageBundle {
   const parsed = bundleSchema.safeParse(data);
   if (!parsed.success) {
     throw new Error(
-      `Import is not a TubeRack package file: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "root"} — ${i.message}`).join("; ")}`,
+      `Import is not a Recktube package file: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "root"} — ${i.message}`).join("; ")}`,
     );
   }
   return parsed.data as PackageBundle;

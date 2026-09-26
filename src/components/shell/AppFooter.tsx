@@ -14,7 +14,7 @@ export function AppFooter() {
     <footer className="mt-auto px-4 pb-6 pt-2 sm:px-6 lg:px-8">
       <div className="home-glow-border h-px w-full opacity-40 [animation:none]" aria-hidden="true" />
       <div className="flex flex-wrap items-center justify-between gap-3 pt-4 text-xs text-muted-text">
-        <p>© {new Date().getFullYear()} TubeRack</p>
+        <p>© {new Date().getFullYear()} Recktube</p>
         <nav aria-label="Footer" className="flex flex-wrap gap-x-4 gap-y-1">
           {LINKS.map((l) => (
             <Link key={l.href} href={l.href} className="group relative hover:text-foreground">

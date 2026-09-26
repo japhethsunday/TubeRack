@@ -215,7 +215,7 @@ async function emailTestResult(workspaceId: string, test: AbTest, winner: string
       { type: "callout", title: "Next step", text: "Use what won — the colours, face, or wording — as the starting point for your next thumbnail.", action: { label: "Plan the next test", url: `${app}/studio/abtest` } },
     ],
     cta: { label: "See full results", url: `${app}/studio/abtest` },
-    reason: "You get this because you ran a thumbnail test in TubeRack.",
+    reason: "You get this because you ran a thumbnail test in Recktube.",
     appUrl: app,
   });
   for (const to of await workspaceEmails(workspaceId)) {
