@@ -11,7 +11,7 @@ import { Input } from "@/src/components/ui/fields";
 import { Alert } from "@/src/components/ui/Alert";
 import { cx } from "@/src/components/ui/cx";
 
-const MOODS = [
+export const MUSIC_MOOD_OPTIONS = [
   { id: "piano", label: "Piano" },
   { id: "keyboard", label: "Keyboard" },
   { id: "motivational", label: "Motivational" },
@@ -133,7 +133,7 @@ export function MusicLibrary({
       </div>
 
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Mood">
-        {MOODS.map((m) => (
+        {MUSIC_MOOD_OPTIONS.map((m) => (
           <button
             key={m.id}
             type="button"

@@ -332,3 +332,44 @@ describe("animation and transitions", () => {
     assert.equal(normalizeTransition("nonsense"), "cut");
   });
 });
+
+describe("auto video: stock footage and music", () => {
+  it("uses a scene's stock clip (muted, repeated to fill) instead of a still, and lays library music under everything", () => {
+    const scenes = [scene({ id: "sc1", durationSec: 10 })];
+    const clips = buildFromScenes(scenes, [
+      asset({ id: "img", kind: "image", sceneIds: ["sc1"] }),
+      asset({ id: "vid", kind: "video", sceneIds: ["sc1"], source: "provider-output", durationSec: 4, title: "City" }),
+      asset({ id: "mus", kind: "music", source: "provider-output", tags: ["auto-video", "library"], title: "Song" }),
+    ]);
+    const vids = clips.filter((c) => c.kind === "video");
+    assert.equal(vids.length, 3);
+    assert.ok(vids.every((c) => c.muted && c.assetId === "vid"));
+    assert.equal(clips.filter((c) => c.kind === "image").length, 0);
+    const music = clips.find((c) => c.kind === "music");
+    assert.equal(music?.assetId, "mus");
+    assert.ok((music?.volume ?? 1) < 0.3);
+  });
+});
+
+import { stockQuery } from "@/src/components/video/AutoVideo";
+describe("auto video: stock search words", () => {
+  it("keeps the subject words of a shot description", () => {
+    assert.equal(stockQuery("Wide shot of a soldier walking in the desert at sunset"), "soldier walking desert");
+    assert.equal(stockQuery("Close-up of hands counting money", 2), "hands counting");
+  });
+});
+
+import { captionChunks } from "@/src/lib/video/build";
+describe("captions: short readable chunks", () => {
+  it("splits long sentences into ≤5-word chunks, breaking at pauses, and fills the time", () => {
+    const text = "Here is the precise mechanical adjustment that turns your foundation into an immovable, load-bearing platform.";
+    const chunks = captionChunks(text);
+    assert.ok(chunks.every((c) => c.split(" ").length <= 6 && c.length <= 38), JSON.stringify(chunks));
+    assert.equal(chunks.join(" "), text);
+    const clips = captionsFromNarration(text, 10, 6);
+    assert.equal(clips.length, chunks.length);
+    assert.equal(clips[0].startSec, 10);
+    const end = clips[clips.length - 1].startSec + clips[clips.length - 1].durationSec;
+    assert.ok(Math.abs(end - 16) < 0.1, String(end));
+  });
+});

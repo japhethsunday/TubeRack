@@ -18,10 +18,11 @@ import { useVideo } from "@/src/components/video/VideoProvider";
 import { Modal } from "@/src/components/ui/overlays";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
+import { MUSIC_MOOD_OPTIONS } from "@/src/components/media/music-library";
 
 type StepState = "pending" | "running" | "done" | "failed" | "partial";
 interface Step {
-  id: "scenes" | "voice" | "visuals" | "build";
+  id: "scenes" | "voice" | "visuals" | "music" | "build";
   label: string;
   state: StepState;
   detail: string;
@@ -30,9 +31,33 @@ interface Step {
 const INITIAL: Step[] = [
   { id: "scenes", label: "Plan scenes and shots", state: "pending", detail: "" },
   { id: "voice", label: "Record voice-over", state: "pending", detail: "" },
-  { id: "visuals", label: "Generate visuals", state: "pending", detail: "" },
+  { id: "visuals", label: "Find and generate visuals", state: "pending", detail: "" },
+  { id: "music", label: "Add background music", state: "pending", detail: "" },
   { id: "build", label: "Assemble the timeline", state: "pending", detail: "" },
 ];
+
+type VisualMode = "mix" | "stock" | "ai";
+
+const STOP = new Set("a an the of and or to in on at for with by from into over under this that these those is are was be being been as it its their his her our your my close up closeup close-up medium tight extreme over-the-shoulder wide shot shots angle view camera cinematic scene showing shows image photo realistic style lighting background foreground".split(" "));
+
+/** A short stock-library query from a shot description ("Wide shot of a soldier in the desert" → "soldier desert"). */
+export function stockQuery(visual: string, words = 3): string {
+  return visual
+    .toLowerCase()
+    .replace(/[^a-z\s-]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOP.has(w))
+    .slice(0, words)
+    .join(" ");
+}
+
+interface StockHit {
+  id: string;
+  title: string;
+  durationSec: number | null;
+  width: number;
+  height: number;
+}
 
 /** Duration of an audio URL in seconds (0 when unknown). */
 function audioDuration(url: string): Promise<number> {
@@ -87,6 +112,8 @@ export function GenerateVideoDialog({
   const [finished, setFinished] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
   const [replaceOk, setReplaceOk] = useState(false);
+  const [visualMode, setVisualMode] = useState<VisualMode>("mix");
+  const [musicMood, setMusicMood] = useState<string>("cinematic");
   const cancelled = useRef(false);
 
   const vertical = project.platform === "YouTube Shorts" || project.contentType === "Short";
@@ -167,39 +194,127 @@ export function GenerateVideoDialog({
       set("voice", { state: voiceOk === scenes.length ? "done" : voiceOk ? "partial" : "failed", detail: voiceOk === scenes.length ? `${voiceOk} takes` : `${voiceOk}/${scenes.length} — ${voiceErrors[0] ?? "failed"}` });
       putScenes(project.id, scenes); // durations now match the voice
 
-      // 3. Visuals.
+      // 3. Visuals: free stock footage per scene, AI images for the rest (or only one kind).
       set("visuals", { state: "running", detail: `0/${scenes.length}` });
       let drawn = 0;
       const imageErrors: string[] = [];
-      await pool(scenes, 2, isCancelled, async (scene) => {
+      const usedStock = new Set<string>();
+      const orientation = vertical ? "vertical" : "horizontal";
+      async function stockFor(scene: Scene): Promise<boolean> {
+        const queries = [stockQuery(scene.visual, 3), stockQuery(scene.visual, 2), stockQuery(production?.topic || project.topic || project.name, 2)].filter((q, i, all) => q.length >= 2 && all.indexOf(q) === i);
+        for (const q of queries) {
+          const found = await api
+            .get<{ items: StockHit[] }>(`/api/v1/stock/search?${new URLSearchParams({ kind: "video", q, orientation, page: "1" })}`)
+            .catch(() => ({ items: [] as StockHit[] }));
+          const pick = found.items.find((it) => !usedStock.has(it.id));
+          if (!pick) continue;
+          usedStock.add(pick.id);
+          try {
+            const file = await api.post<{ url: string; mime: string; fileSize: number }>("/api/v1/stock/import", { id: pick.id });
+            const asset = media.addAsset({
+              projectId: project.id,
+              sceneIds: [scene.id],
+              kind: "video",
+              source: "provider-output",
+              status: "ready",
+              title: pick.title || `Stock — scene ${scene.number}`,
+              payload: file.url,
+              mime: file.mime,
+              durationSec: pick.durationSec ?? undefined,
+              width: pick.width || undefined,
+              height: pick.height || undefined,
+              fileSize: file.fileSize,
+              tags: ["auto-video", "stock", `stock:${pick.id}`, "license:Pixabay Content License"],
+              approval: "approved",
+            });
+            made.push(asset);
+            return true;
+          } catch {
+            // Try the next query.
+          }
+        }
+        return false;
+      }
+      async function aiImageFor(scene: Scene): Promise<boolean> {
         const out = await generateProviderImage(scene.visual, aspect);
         if (!out.ok) {
           imageErrors.push(out.message);
-        } else {
-          const asset = media.addAsset({
-            projectId: project.id,
-            sceneIds: [scene.id],
-            kind: "image",
-            source: "provider-output",
-            status: "ready",
-            title: `Visual — scene ${scene.number}`,
-            payload: out.data.url,
-            mime: "image/png",
-            tags: ["auto-video"],
-            approval: "approved",
-          });
-          made.push(asset);
-          void keepLocal(asset, out.data.url);
+          return false;
         }
+        const asset = media.addAsset({
+          projectId: project.id,
+          sceneIds: [scene.id],
+          kind: "image",
+          source: "provider-output",
+          status: "ready",
+          title: `Visual — scene ${scene.number}`,
+          payload: out.data.url,
+          mime: "image/png",
+          tags: ["auto-video"],
+          approval: "approved",
+        });
+        made.push(asset);
+        void keepLocal(asset, out.data.url);
+        return true;
+      }
+      await pool(scenes, 2, isCancelled, async (scene) => {
+        // "Mix": footage for most scenes, a designed image for every third one.
+        const wantStock = visualMode === "stock" || (visualMode === "mix" && scene.number % 3 !== 0);
+        const ok = wantStock ? (await stockFor(scene)) || (await aiImageFor(scene)) : (await aiImageFor(scene)) || (visualMode === "mix" && (await stockFor(scene)));
+        if (!ok && !imageErrors.length) imageErrors.push("No stock clip or image could be found");
         drawn += 1;
         set("visuals", { detail: `${drawn}/${scenes.length}` });
       });
       if (isCancelled()) return;
-      const imgOk = made.filter((a) => a.kind === "image").length;
-      set("visuals", { state: imgOk === scenes.length ? "done" : imgOk ? "partial" : "failed", detail: imgOk === scenes.length ? `${imgOk} images` : `${imgOk}/${scenes.length} — ${imageErrors[0] ?? "failed"}` });
+      const clipsOk = made.filter((a) => a.kind === "video").length;
+      const imgOk = made.filter((a) => a.kind === "image").length + clipsOk;
+      set("visuals", {
+        state: imgOk === scenes.length ? "done" : imgOk ? "partial" : "failed",
+        detail: imgOk === scenes.length ? `${clipsOk} stock clips · ${imgOk - clipsOk} images` : `${imgOk}/${scenes.length} — ${imageErrors[0] ?? "failed"}`,
+      });
+
+      // 4. Background music from the free library (optional).
+      if (musicMood === "none") {
+        set("music", { state: "done", detail: "Off" });
+      } else {
+        set("music", { state: "running" });
+        let added = "";
+        try {
+          const found = await api.get<{ tracks: { id: string; title: string; creator: string; durationSec: number | null }[] }>(`/api/v1/music/search?mood=${encodeURIComponent(musicMood)}&page=1`);
+          for (const t of found.tracks.slice(0, 5)) {
+            try {
+              const file = await api.post<{ url: string; mime: string; fileSize: number }>("/api/v1/music/import", { id: t.id });
+              const track = media.addAsset({
+                projectId: project.id,
+                sceneIds: [],
+                kind: "music",
+                source: "provider-output",
+                status: "ready",
+                title: `${t.title} — ${t.creator}`,
+                payload: file.url,
+                mime: file.mime,
+                durationSec: t.durationSec ?? undefined,
+                fileSize: file.fileSize,
+                tags: ["auto-video", "library", `track:${t.id}`],
+                approval: "approved",
+              });
+              made.push(track);
+              added = t.title;
+              break;
+            } catch {
+              // Some tracks can't be used (license/size): try the next one.
+            }
+          }
+        } catch {
+          // Library busy: the video is still made, without music.
+        }
+        set("music", added ? { state: "done", detail: added } : { state: "partial", detail: "Couldn't add music — add it later from the Music tab" });
+      }
+      if (isCancelled()) return;
+
       if (voiceOk === 0 && imgOk === 0) throw new Error("Neither voice-over nor visuals could be generated, so there is nothing to assemble.");
 
-      // 4. Timeline (snapshot first if the user already had an edit).
+      // 5. Timeline (snapshot first if the user already had an edit).
       set("build", { state: "running" });
       if (existingClips > 0) video.saveSnapshot(project.id, "Before auto-generated video");
       const preset = presetById(vertical ? "shorts" : "youtube");
@@ -220,7 +335,7 @@ export function GenerateVideoDialog({
   const needsConfirm = existingClips > 0 && !replaceOk;
 
   return (
-    <Modal title="Generate video from script" description={`${writable.length} scenes · ${aspect} · voice-over, visuals and captions`} onClose={() => { cancelled.current = true; onClose(); }}>
+    <Modal title="Generate video from script" description={`${writable.length} scenes · ${aspect} · voice-over, visuals, music and captions`} onClose={() => { cancelled.current = true; onClose(); }}>
       {writable.length === 0 ? (
         <p className="text-sm text-muted-text">Write the script first — every section with text becomes a scene.</p>
       ) : (
@@ -233,6 +348,27 @@ export function GenerateVideoDialog({
                 A snapshot is saved first — restore it any time from Snapshots in the Video Studio.
               </span>
             </label>
+          )}
+          {!running && !finished && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-sm">
+                <span className="font-medium">Visuals</span>
+                <select value={visualMode} onChange={(e) => setVisualMode(e.target.value as VisualMode)} className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm">
+                  <option value="mix">Stock footage + AI images (recommended)</option>
+                  <option value="stock">Stock footage only</option>
+                  <option value="ai">AI images only</option>
+                </select>
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="font-medium">Background music</span>
+                <select value={musicMood} onChange={(e) => setMusicMood(e.target.value)} className="h-9 w-full rounded-lg border border-border bg-background px-2 text-sm">
+                  {MUSIC_MOOD_OPTIONS.map((m) => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                  <option value="none">No music</option>
+                </select>
+              </label>
+            </div>
           )}
           <ol className="space-y-2">
             {steps.map((s) => (

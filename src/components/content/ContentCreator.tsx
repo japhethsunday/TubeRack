@@ -19,7 +19,7 @@ const SAVE_KEY = "content-creator-last";
 const HISTORY_KEY = "content-creator-history";
 const MAX_HISTORY = 10;
 
-type SavedSet = IdeasResult & { audience?: string };
+type SavedSet = IdeasResult & { audience?: string; id?: string | null };
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 
 function VideoRow({ v, label }: { v: StudiedVideo; label: string }) {
@@ -63,21 +63,41 @@ export function ContentCreator() {
   const [copied, setCopied] = useState<number | null>(null);
 
   const pack = usePackaging();
-  // Every idea set is saved to the account (latest 10), like Channel Creator plans.
-  const history: SavedSet[] = (() => {
-    try {
-      const raw = intel.outputFor("_workspace", HISTORY_KEY)?.text;
-      if (raw) return JSON.parse(raw) as SavedSet[];
-      const last = intel.outputFor("_workspace", SAVE_KEY)?.text;
-      return last ? [JSON.parse(last) as SavedSet] : [];
-    } catch {
-      return [];
-    }
-  })();
+  // Every idea set is saved to the workspace on the server (like Channel Creator plans).
+  const [history, setHistory] = useState<SavedSet[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const result: SavedSet | null = fresh ?? history.find((h) => h.generatedAt === openId) ?? (showForm ? null : history[0] ?? null);
-  const saveHistory = (list: SavedSet[]) => intel.saveOutputFor("_workspace", HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY)), "Content ideas");
+
+  // Load saved sets; sets that were only kept in this browser move to the account once.
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      let local: SavedSet[] = [];
+      try {
+        const raw = intel.outputFor("_workspace", HISTORY_KEY)?.text ?? intel.outputFor("_workspace", SAVE_KEY)?.text;
+        if (raw) {
+          const parsed = JSON.parse(raw) as SavedSet | SavedSet[];
+          local = Array.isArray(parsed) ? parsed : [parsed];
+        }
+      } catch {
+        local = [];
+      }
+      if (local.length) {
+        const moved = await api.post<{ added: number }>("/api/v1/content-ideas/saved", { sets: local.slice(0, MAX_HISTORY) }).then(() => true).catch(() => false);
+        if (moved) {
+          intel.saveOutputFor("_workspace", HISTORY_KEY, "[]", "Content ideas");
+          intel.saveOutputFor("_workspace", SAVE_KEY, "", "Content ideas");
+        }
+      }
+      const saved = await api.get<SavedSet[]>("/api/v1/content-ideas").catch(() => null);
+      if (alive) setHistory(saved ?? local);
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per visit.
+  }, []);
 
   useEffect(() => {
     api
@@ -98,11 +118,12 @@ export function ContentCreator() {
       const data = await retryBusy(() =>
         api.post<IdeasResult>("/api/v1/content-ideas", { niche, audience, count: Number(count), format, useChannel: Boolean(connected) && useChannel }),
       );
+      // The server has already saved it to the account.
       const saved: SavedSet = { ...data, audience };
       setFresh(saved);
       setOpenId(saved.generatedAt);
       setShowForm(false);
-      saveHistory([saved, ...history.filter((h) => h.generatedAt !== saved.generatedAt)]);
+      setHistory((list) => [saved, ...list.filter((h) => h.generatedAt !== saved.generatedAt)]);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't create ideas right now. Please try again.");
     } finally {
@@ -200,7 +221,8 @@ export function ContentCreator() {
                   type="button"
                   aria-label={`Delete idea set from ${new Date(h.generatedAt).toLocaleDateString()}`}
                   onClick={() => {
-                    saveHistory(history.filter((x) => x.generatedAt !== h.generatedAt));
+                    if (h.id) void api.remove(`/api/v1/content-ideas/${encodeURIComponent(h.id)}`).catch(() => undefined);
+                    setHistory((list) => list.filter((x) => x.generatedAt !== h.generatedAt));
                     if (result?.generatedAt === h.generatedAt) {
                       setFresh(null);
                       setOpenId(null);

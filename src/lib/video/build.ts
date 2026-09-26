@@ -74,23 +74,55 @@ function clipBase(trackId: string, kind: ClipKind, name: string, startSec: numbe
 }
 
 /** Split narration into sentence-timed caption clips across a span. Real derivation, editable after. */
-export function captionsFromNarration(narration: string, startSec: number, totalSec: number): TimelineClip[] {
-  const sentences =
-    narration.match(/[^.!?]+[.!?]+["”)]?\s*/g)?.map((s) => s.trim()).filter(Boolean) ?? [];
-  if (sentences.length === 0 || totalSec <= 0) return [];
-  const words = sentences.map((s) => Math.max(1, s.split(/\s+/).length));
-  const totalWords = words.reduce((n, w) => n + w, 0);
-  let cursor = startSec;
-  return sentences.map((sentence, i) => {
-    const share = words[i] / totalWords;
-    const duration = Math.max(0.8, Math.round(totalSec * share * 10) / 10);
-    const clip = {
-      ...clipBase("track_captions", "captions", sentence.slice(0, 48), cursor, duration),
-      text: sentence,
-    };
-    cursor = Math.round((cursor + duration) * 10) / 10;
-    return clip;
+/**
+ * Short, readable caption chunks (like CapCut/Shorts captions): at most
+ * `maxWords` words / `maxChars` characters, breaking early at natural pauses.
+ */
+export function captionChunks(text: string, maxWords = 5, maxChars = 30): string[] {
+  const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const out: string[] = [];
+  let cur: string[] = [];
+  const flush = () => {
+    if (cur.length) out.push(cur.join(" "));
+    cur = [];
+  };
+  for (const w of words) {
+    if (cur.length && (cur.length >= maxWords || [...cur, w].join(" ").length > maxChars)) flush();
+    cur.push(w);
+    // A pause (comma, period…) ends the chunk once it has a couple of words.
+    if (/[.!?;:,—–]["”)]?$/.test(w) && cur.length >= 2) flush();
+  }
+  flush();
+  // Never leave a lone word hanging at the end.
+  if (out.length > 1 && !out[out.length - 1].includes(" ") && (out[out.length - 2] + " " + out[out.length - 1]).length <= maxChars + 8) {
+    out.splice(out.length - 2, 2, `${out[out.length - 2]} ${out[out.length - 1]}`);
+  }
+  return out;
+}
+
+/** Spread chunks over [start, start + dur] in proportion to their length. */
+function timedChunks(text: string, start: number, dur: number): { text: string; start: number; dur: number }[] {
+  const chunks = captionChunks(text);
+  const weight = (c: string) => c.length + 4;
+  const total = chunks.reduce((n, c) => n + weight(c), 0);
+  let at = start;
+  return chunks.map((c) => {
+    const d = (dur * weight(c)) / total;
+    const piece = { text: c, start: at, dur: d };
+    at += d;
+    return piece;
   });
+}
+
+export function captionsFromNarration(narration: string, startSec: number, totalSec: number): TimelineClip[] {
+  const text = narration.replace(/\s+/g, " ").trim();
+  if (!text || totalSec <= 0) return [];
+  return timedChunks(text, startSec, totalSec).map((c) => ({
+    ...clipBase("track_captions", "captions", c.text.slice(0, 48), c.start, Math.max(0.5, c.dur)),
+    startSec: Math.round(c.start * 100) / 100,
+    durationSec: Math.max(0.3, Math.round(c.dur * 100) / 100),
+    text: c.text,
+  }));
 }
 
 /**
@@ -121,10 +153,15 @@ export function captionsFromSegments(
     start = Math.round(start * 100) / 100;
     end = Math.round(end * 100) / 100;
     cursor = end;
-    out.push({
-      ...clipBase("track_captions", "captions", text.slice(0, 48), Math.round((offsetSec + start) * 100) / 100, Math.round((end - start) * 100) / 100),
-      text,
-    });
+    // Long transcription segments become short on-screen chunks.
+    for (const c of timedChunks(text, offsetSec + start, end - start)) {
+      out.push({
+        ...clipBase("track_captions", "captions", c.text.slice(0, 48), c.start, Math.max(0.3, c.dur)),
+        startSec: Math.round(c.start * 100) / 100,
+        durationSec: Math.max(0.2, Math.round(c.dur * 100) / 100),
+        text: c.text,
+      });
+    }
   }
   return out;
 }
@@ -174,7 +211,25 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
   const clips: TimelineClip[] = [];
   for (const seg of sceneSegments(scenes)) {
     const scene = scenes.find((s) => s.id === seg.sceneId);
-    const image = approvedImageFor(seg.sceneId, assets);
+    // A stock/AI video clip for the scene wins over a still; it is muted so the
+    // voice-over stays clear, and repeats when shorter than the scene.
+    const clipAsset = assets.find(
+      (a) => a.kind === "video" && a.status === "ready" && (a.approval === "approved" || a.approval === "used") && a.sceneIds.includes(seg.sceneId),
+    );
+    const image = clipAsset ? undefined : approvedImageFor(seg.sceneId, assets);
+    if (clipAsset) {
+      const len = clipAsset.durationSec && clipAsset.durationSec > 1 ? clipAsset.durationSec : seg.durationSec;
+      for (let at = 0; at < seg.durationSec - 0.2; at += len) {
+        clips.push({
+          ...clipBase("track_video", "video", clipAsset.title, seg.startSec + at, Math.min(len, seg.durationSec - at)),
+          sceneId: seg.sceneId,
+          assetId: clipAsset.id,
+          inSec: 0,
+          volume: 0,
+          muted: true,
+        });
+      }
+    }
     if (image) {
       clips.push({
         ...clipBase("track_image", "image", image.title, seg.startSec, seg.durationSec),
@@ -218,11 +273,16 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
   }
   // Project music beds span the whole timeline.
   const total = sceneSegments(scenes).reduce((n, s) => n + s.durationSec, 0);
-  const bed = assets.find((a) => a.kind === "music" && a.source === "local-draft" && a.status === "ready" && (a.approval === "approved" || a.approval === "used"));
+  // Music: a library track picked for this video, else a generated bed.
+  const bed =
+    assets.find((a) => a.kind === "music" && a.status === "ready" && a.tags.includes("auto-video")) ??
+    assets.find((a) => a.kind === "music" && a.source === "local-draft" && a.status === "ready" && (a.approval === "approved" || a.approval === "used"));
   if (bed && total > 0) {
     clips.push({
       ...clipBase("track_music", "music", bed.title, 0, total),
       assetId: bed.id,
+      inSec: 0,
+      volume: bed.tags.includes("auto-video") ? 0.18 : 0.35,
       fadeInSec: 1,
       fadeOutSec: 2,
     });

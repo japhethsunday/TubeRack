@@ -481,18 +481,29 @@ function drawCaption(ctx: CanvasRenderingContext2D, clip: TimelineClip, W: numbe
   if (!clip.text) return;
   const unit = textUnit(W, H);
   const st: Partial<TextStyle> = clip.style ?? {};
+  // Default look: big, heavy white words with an outline and soft shadow
+  // (short-form style), sitting above the bottom edge — no boxes behind lines.
+  const boxed = Boolean(st.background && st.background !== "transparent");
+  ctx.save();
+  if (!boxed) {
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = 6 * unit;
+    ctx.shadowOffsetY = 2 * unit;
+  }
   drawTextBlock(ctx, clip.text, {
-    fontPx: Math.max(10, (st.size ?? 34) / 2.4) * unit,
-    weight: st.weight ?? 600,
+    fontPx: Math.max(12, (st.size ?? 48) / 2.4) * unit,
+    weight: st.weight ?? 800,
     font: st.font ?? "",
     color: st.color ?? "#fff",
-    background: st.background ?? "rgba(0,0,0,0.72)",
+    background: boxed ? st.background! : "transparent",
     align: "center",
     x: W / 2,
-    y: H - 18 * unit,
+    y: H - (H > W ? H * 0.2 : H * 0.1),
     anchor: "bottom",
     W,
+    stroke: !boxed,
   });
+  ctx.restore();
 }
 
 /** Paint one full frame of the composition at timeline time t. */
