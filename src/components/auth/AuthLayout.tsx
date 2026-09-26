@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandMark } from "@/src/components/ui/BrandMark";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Clapperboard, Sparkles, FileText, Search, Mic, CheckCircle2 } from "lucide-react";
@@ -63,7 +64,7 @@ function BrandPanel() {
 
       <Link href="/" aria-label="Recktube home" className="relative flex items-center gap-2 text-white">
         <span className="flex size-9 items-center justify-center rounded-xl bg-white text-[#0b0714]">
-          <Clapperboard className="size-4" aria-hidden="true" />
+          <BrandMark className="size-4" />
         </span>
         <span className="text-base font-semibold tracking-tight">Recktube</span>
       </Link>
@@ -140,7 +141,7 @@ export function AuthLayout({
         <div className="relative w-full max-w-md">
           <Link href="/" aria-label="Recktube home" className="auth-rise flex items-center gap-2 lg:hidden">
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Clapperboard className="size-4" aria-hidden="true" />
+              <BrandMark className="size-4" />
             </span>
             <span className="text-base font-semibold tracking-tight">Recktube</span>
           </Link>

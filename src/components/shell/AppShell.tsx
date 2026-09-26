@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandMark } from "@/src/components/ui/BrandMark";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -74,7 +75,7 @@ export function AppShell({
             {!collapsed && (
               <>
                 <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white shadow-lg shadow-violet-900/30">
-                  <Clapperboard className="size-4" aria-hidden="true" />
+                  <BrandMark className="size-4" />
                 </span>
                 <Link href="/dashboard" className="flex-1 text-sm font-semibold tracking-tight">
                   Recktube

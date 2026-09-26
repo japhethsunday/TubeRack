@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandMark } from "@/src/components/ui/BrandMark";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -138,7 +139,7 @@ export function SiteHeader() {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
             <span className="flex size-9 items-center justify-center rounded-xl bg-foreground text-background">
-              <Clapperboard className="size-4" aria-hidden="true" />
+              <BrandMark className="size-4" />
             </span>
             <span className="font-semibold tracking-tight">Recktube</span>
           </Link>

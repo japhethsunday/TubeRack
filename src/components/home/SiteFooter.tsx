@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandMark } from "@/src/components/ui/BrandMark";
 import Link from "next/link";
 import { ArrowRight, ArrowUp, Clapperboard, Sparkles } from "lucide-react";
 import { Reveal } from "@/src/components/home/motion";
@@ -62,7 +63,7 @@ export function SiteFooter() {
             <div className="space-y-4">
               <Link href="/" className="group inline-flex items-center gap-2">
                 <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white shadow-lg shadow-violet-900/30 transition-transform duration-500 group-hover:rotate-[-8deg] group-hover:scale-105">
-                  <Clapperboard className="size-4" aria-hidden="true" />
+                  <BrandMark className="size-4" />
                 </span>
                 <span className="font-semibold tracking-tight">Recktube</span>
               </Link>
