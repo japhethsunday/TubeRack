@@ -10,7 +10,7 @@ import { generateProviderImage } from "@/src/lib/ai-client";
 import { GeminiAssist } from "@/src/components/intelligence/GeminiAssist";
 import { safeFileName } from "@/src/lib/download";
 import type { MediaAsset } from "@/src/lib/media/types";
-import { storeThumbnailImage } from "@/src/lib/package/svg-images";
+import { thumbnailArtPrompt, titleOverlays, uploadToBase } from "@/src/lib/package/auto-thumb";
 import { composeThumbnail, solidBase } from "@/src/lib/package/thumbnails";
 import { usePackaging } from "@/src/components/package/PackagingProvider";
 import { useMedia } from "@/src/components/media/MediaProvider";
@@ -19,28 +19,6 @@ import type { ThumbContext } from "@/src/components/package/thumbnails";
 import { Input, Select } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
 import { Badge } from "@/src/components/ui/Badge";
-
-/**
- * Downscale an upload into a thumbnail base. The photo goes to file storage
- * (keeps synced SVG small); without an account it is embedded instead.
- */
-async function uploadToBase(url: string): Promise<string> {
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = url;
-  await img.decode();
-  const scale = Math.min(1, 1280 / img.naturalWidth);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(img.naturalWidth * scale);
-  canvas.height = Math.round(img.naturalHeight * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas unavailable.");
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const jpeg = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
-  const stored = jpeg ? await storeThumbnailImage(jpeg) : null;
-  const dataUrl = stored ?? canvas.toDataURL("image/jpeg", 0.85);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><image href="${dataUrl}" x="0" y="0" width="1280" height="720" preserveAspectRatio="xMidYMid slice"/></svg>`;
-}
 
 /** Thumbnail tab: concepts → variants → editor with live quality + pairing. */
 export function ThumbnailTab({
@@ -78,36 +56,9 @@ export function ThumbnailTab({
   // Never put the title's words in the image prompt: image models misspell text.
   // The art is text-free; the exact title is added as editable text layers.
   const subject = production?.topic || context.topic || context.title || "this video";
-  const defaultArtPrompt = [
-    `YouTube thumbnail background art about ${subject}${production?.audience ? `, for ${production.audience}` : ""}.`,
-    production?.visualStyle && `Style: ${production.visualStyle}.`,
-    "One bold, expressive focal subject on the right third, strong contrast, vivid but clean colours,",
-    "a plain uncluttered area on the left half for a headline.",
-    "Absolutely no text, letters, numbers, words, signs, captions or logos anywhere in the image.",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const defaultArtPrompt = thumbnailArtPrompt(subject, production);
 
-  /** The exact title as up to three short, left-aligned lines. */
-  function headlineOverlays(): TextOverlay[] {
-    const words = headline.split(/\s+/).filter(Boolean);
-    if (words.length === 0) return [];
-    const perLine = Math.max(2, Math.ceil(words.length / 3));
-    const lines: string[] = [];
-    for (let i = 0; i < words.length && lines.length < 3; i += perLine) lines.push(words.slice(i, i + perLine).join(" "));
-    if (lines.length * perLine < words.length) lines[2] = `${lines[2]} ${words.slice(3 * perLine).join(" ")}`.trim();
-    const size = lines.some((l) => l.length > 16) ? 92 : 112;
-    return lines.map((text, i) => ({
-      id: `ov_${Date.now().toString(36)}_${i}`,
-      text: text.toUpperCase(),
-      x: 6,
-      y: 22 + i * (size / 7.2),
-      size,
-      color: "#ffffff",
-      weight: 900,
-      align: "left",
-    }));
-  }
+  const headlineOverlays = () => titleOverlays(headline);
 
   async function generateArt() {
     setArtBusy(true);

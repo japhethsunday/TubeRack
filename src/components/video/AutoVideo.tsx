@@ -18,11 +18,13 @@ import { useVideo } from "@/src/components/video/VideoProvider";
 import { Modal } from "@/src/components/ui/overlays";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
+import { usePackaging } from "@/src/components/package/PackagingProvider";
+import { thumbnailArtPrompt, titleOverlays, uploadToBase } from "@/src/lib/package/auto-thumb";
 import { MUSIC_MOOD_OPTIONS } from "@/src/components/media/music-library";
 
 type StepState = "pending" | "running" | "done" | "failed" | "partial";
 interface Step {
-  id: "scenes" | "voice" | "visuals" | "music" | "build";
+  id: "scenes" | "voice" | "visuals" | "music" | "build" | "thumbnail";
   label: string;
   state: StepState;
   detail: string;
@@ -34,6 +36,7 @@ const INITIAL: Step[] = [
   { id: "visuals", label: "Find and generate visuals", state: "pending", detail: "" },
   { id: "music", label: "Add background music", state: "pending", detail: "" },
   { id: "build", label: "Assemble the timeline", state: "pending", detail: "" },
+  { id: "thumbnail", label: "Design the thumbnail", state: "pending", detail: "" },
 ];
 
 type VisualMode = "mix" | "stock" | "ai";
@@ -116,6 +119,7 @@ export function GenerateVideoDialog({
   const { putScenes } = useScripts();
   const production = useProductionContext(project.id);
   const media = useMedia();
+  const packaging = usePackaging();
   const video = useVideo();
   const [steps, setSteps] = useState<Step[]>(INITIAL);
   const [running, setRunning] = useState(false);
@@ -337,6 +341,21 @@ export function GenerateVideoDialog({
       const clips = buildFromScenes(scenes, made);
       video.setClips(project.id, clips);
       set("build", { state: "done", detail: `${clips.length} clips · ${Math.round(scenes.reduce((n, s) => n + s.durationSec, 0))}s` });
+
+      // 6. Thumbnail: text-free art + the exact title as editable text layers.
+      set("thumbnail", { state: "running" });
+      try {
+        const subject = production?.topic || project.topic || project.name;
+        const art = await generateProviderImage(thumbnailArtPrompt(subject, production), "16:9");
+        if (!art.ok) throw new Error(art.message);
+        const baseSvg = await uploadToBase(art.data.url);
+        const artCount = packaging.variantsFor(project.id).filter((v) => /^Art \d+/.test(v.name)).length;
+        const headline = packaging.primaryTitleFor(project.id)?.text || project.name;
+        packaging.addVariant(project.id, { name: `Art ${artCount + 1}`, baseKind: "upload", baseSvg, overlays: titleOverlays(headline) });
+        set("thumbnail", { state: "done", detail: "Saved to Thumbnails" });
+      } catch {
+        set("thumbnail", { state: "partial", detail: "Couldn't make one — create it later in the Thumbnail tab" });
+      }
       setFinished(true);
     } catch (e) {
       setFatal(e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Video generation failed.");
@@ -349,7 +368,7 @@ export function GenerateVideoDialog({
   const needsConfirm = existingClips > 0 && !replaceOk;
 
   return (
-    <Modal title="Generate video from script" description={`${writable.length} scenes · ${aspect} · voice-over, visuals, music and captions`} onClose={() => { cancelled.current = true; onClose(); }}>
+    <Modal title="Generate video from script" description={`${writable.length} scenes · ${aspect} · voice-over, visuals, music, captions and thumbnail`} onClose={() => { cancelled.current = true; onClose(); }}>
       {writable.length === 0 ? (
         <p className="text-sm text-muted-text">Write the script first — every section with text becomes a scene.</p>
       ) : (
