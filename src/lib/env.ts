@@ -80,6 +80,8 @@ const serverSchema = z.object({
   /** Cloud Text-to-Speech: an API key (or the service account above) and an optional voice name. */
   GOOGLE_TTS_API_KEY: z.string().optional(),
   GOOGLE_TTS_VOICE: z.string().optional(),
+  /** Hugging Face (Inference Providers): many open models as extra text + picture backups. */
+  HF_TOKEN: z.string().optional(),
   /** Self-hosted Piper voice server (e.g. a Hugging Face Space): base URL + bearer token. */
   PIPER_URL: z.string().url().optional().or(z.literal("")),
   PIPER_TOKEN: z.string().optional(),

@@ -6,7 +6,8 @@ import { normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPl
 import { stripMarkdown } from "@/src/lib/text/markdown";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
 import { isNvidiaConfigured, nvidiaGenerateText } from "@/src/server/ai/nvidia";
-import { arkGenerateImage, isArkConfigured } from "@/src/server/ai/ark";
+import { arkGenerateImage, arkGenerateText, isArkConfigured } from "@/src/server/ai/ark";
+import { hfGenerateImage, hfGenerateText, isHuggingFaceConfigured } from "@/src/server/ai/huggingface";
 import { cleanImagePrompt, isNvidiaImageConfigured, nvidiaGenerateImage } from "@/src/server/ai/nvidia-image";
 import { isMistralConfigured, mistralGenerateText, mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
 
@@ -17,6 +18,8 @@ function backupTextProviders(env = getServerEnv()): { name: string; run: (r: Tex
   return [
     ...(isMistralConfigured(env) ? [{ name: "mistral", run: (r: TextRequest) => mistralGenerateText(r) }] : []),
     ...(isNvidiaConfigured(env) ? [{ name: "nvidia", run: (r: TextRequest) => nvidiaGenerateText(r) }] : []),
+    ...(isHuggingFaceConfigured(env) ? [{ name: "huggingface", run: (r: TextRequest) => hfGenerateText(r) }] : []),
+    ...(isArkConfigured(env) ? [{ name: "byteplus", run: (r: TextRequest) => arkGenerateText(r) }] : []),
   ];
 }
 
@@ -73,7 +76,7 @@ export function isGeminiConfigured(env = getServerEnv()): boolean {
 
 /** Text features work with Gemini, Mistral, NVIDIA, or any mix. */
 export function isTextConfigured(env = getServerEnv()): boolean {
-  return isGeminiConfigured(env) || isMistralConfigured(env) || isNvidiaConfigured(env);
+  return isGeminiConfigured(env) || isMistralConfigured(env) || isNvidiaConfigured(env) || isHuggingFaceConfigured(env) || isArkConfigured(env);
 }
 
 /** Resolved model names (env overrides, safe defaults). */
@@ -287,6 +290,14 @@ async function backupImage(prompt: string, aspect: "16:9" | "9:16" | "1:1"): Pro
       console.error("[nvidia] image fallback failed:", error instanceof Error ? error.message.slice(0, 300) : error);
     }
   }
+  if (isHuggingFaceConfigured(env)) {
+    try {
+      return (await hfGenerateImage(cleanImagePrompt(prompt), aspect)).dataUrl;
+    } catch (error) {
+      console.error("[huggingface] image fallback failed:", error instanceof Error ? error.message.slice(0, 300) : error);
+      if (!/filtered/i.test(last instanceof Error ? last.message : "")) last = error;
+    }
+  }
   if (isArkConfigured(env)) {
     try {
       return (await arkGenerateImage(cleanImagePrompt(prompt), aspect)).dataUrl;
@@ -309,7 +320,7 @@ export class GeminiImageProvider implements ImageProvider {
     const env = getServerEnv();
     const model = env.GEMINI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL;
     const aspect = request.aspectRatio === "9:16" || request.aspectRatio === "1:1" ? request.aspectRatio : "16:9";
-    const backups = isNvidiaImageConfigured(env) || isArkConfigured(env);
+    const backups = isNvidiaImageConfigured(env) || isHuggingFaceConfigured(env) || isArkConfigured(env);
     // No Gemini key: the backup image models directly.
     if (!isGeminiConfigured(env) && backups) {
       try {
