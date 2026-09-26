@@ -140,7 +140,7 @@ export function jamendoTrack(r: JamendoRaw): LibraryTrack | null {
 /** The file to store for a Jamendo track (full download when the artist allows it). */
 const jamendoFiles = new Map<string, string>();
 
-async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, extra: string): Promise<LibraryTrack[]> {
+async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, extra: string, broad = false): Promise<LibraryTrack[]> {
   const params = new URLSearchParams({
     client_id: clientId,
     format: "json",
@@ -155,6 +155,11 @@ async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, 
     ccnd: "false",
   });
   if (extra) params.set("search", extra);
+  if (broad) {
+    params.delete("fuzzytags");
+    params.set("search", MUSIC_MOODS[mood].query.split(" ")[0]);
+    params.set("order", "relevance");
+  }
   const body = (await get(`${JAMENDO}?${params}`)) as { headers?: { status?: string; error_message?: string }; results?: JamendoRaw[] };
   if (body.headers?.status && body.headers.status !== "success") throw new Error(`Music library: ${body.headers.error_message ?? body.headers.status}`);
   const out: LibraryTrack[] = [];
@@ -190,7 +195,8 @@ export async function searchLibraryMusic(mood: MusicMoodId, page = 1, extra = ""
       return [] as LibraryTrack[];
     });
     if (tracks.length) return tracks;
-    const retry = extra ? await jamendoSearch(clientId, mood, page, "").catch(() => [] as LibraryTrack[]) : [];
+    // Empty answers happen now and then: retry broader (no extra words, loose tags) before the fallback.
+    const retry = await jamendoSearch(clientId, mood, page, "", true).catch(() => [] as LibraryTrack[]);
     if (retry.length) return retry;
   }
   return openverseSearch(mood, page, extra);
