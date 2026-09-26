@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, Copy, Library, Plus, Search, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/src/lib/api";
 import { useMedia } from "@/src/components/media/MediaProvider";
@@ -65,15 +65,17 @@ export function MusicLibrary({
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   const added = assetsFor(projectId).filter((a) => a.kind === "music" && a.tags.includes("library"));
   const addedIds = new Set(added.flatMap((a) => a.tags.filter((t) => t.startsWith("track:")).map((t) => t.slice(6))));
 
   async function search(nextMood = mood, nextPage = 1) {
     setMood(nextMood);
-    setPage(nextPage);
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const q = new URLSearchParams({ mood: nextMood, page: String(nextPage) });
       if (extra.trim()) q.set("q", extra.trim());
@@ -84,7 +86,15 @@ export function MusicLibrary({
         await new Promise((r) => setTimeout(r, 1200));
         return api.get<{ tracks: LibraryTrack[] }>(url);
       });
-      setTracks(data.tracks);
+      if (nextPage > 1 && data.tracks.length === 0) {
+        // Keep the current list rather than blanking it.
+        setNotice("That's every track for this mood — try another mood or search words.");
+      } else {
+        setTracks(data.tracks);
+        setPage(nextPage);
+        // New results appear above the paging buttons: bring them into view.
+        if (nextPage !== page) requestAnimationFrame(() => listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "The music library couldn't be reached. Please try again.");
     }
@@ -170,7 +180,7 @@ export function MusicLibrary({
       {tracks && tracks.length === 0 && !busy && <p className="text-sm text-muted-text">No instrumental tracks found for that — try another mood or word.</p>}
 
       {tracks && tracks.length > 0 && (
-        <ul className="divide-y divide-border rounded-lg border border-border">
+        <ul ref={listRef} className="divide-y divide-border rounded-lg border border-border">
           {tracks.map((t) => {
             const isAdded = addedIds.has(t.id);
             const addedAsset = added.find((a) => a.tags.includes(`track:${t.id}`));
@@ -215,17 +225,19 @@ export function MusicLibrary({
       )}
 
       {tracks && tracks.length > 0 && (
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           {page > 1 && (
             <Button size="sm" variant="ghost" onClick={() => void search(mood, page - 1)} disabled={busy}>
               Previous
             </Button>
           )}
-          <Button size="sm" variant="ghost" onClick={() => void search(mood, page + 1)} disabled={busy}>
+          <Button size="sm" variant="ghost" onClick={() => void search(mood, page + 1)} loading={busy} disabled={busy}>
             More tracks
           </Button>
+          {page > 1 && <span className="text-xs text-muted-text">Page {page}</span>}
         </div>
       )}
+      {notice && <p className="text-xs text-muted-text">{notice}</p>}
 
       {credits && (
         <div className="rounded-lg border border-border bg-background p-3">
@@ -245,7 +257,8 @@ export function MusicLibrary({
               {copied ? "Copied" : "Copy"}
             </Button>
           </div>
-          <pre className="mt-1 whitespace-pre-wrap text-xs text-muted-text">{credits}</pre>
+          <p className="mt-0.5 text-[11px] text-muted-text">These free tracks require a credit. Paste this into your YouTube description when you publish.</p>
+          <pre className="mt-1 whitespace-pre-wrap break-all text-xs text-muted-text">{credits}</pre>
         </div>
       )}
     </section>

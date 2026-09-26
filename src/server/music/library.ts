@@ -148,8 +148,8 @@ async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, 
   const params = new URLSearchParams({
     client_id: clientId,
     format: "json",
-    limit: "40",
-    offset: String((Math.max(1, Math.min(20, page)) - 1) * 40),
+    limit: "30",
+    offset: String((Math.max(1, Math.min(30, page)) - 1) * 30),
     vocalinstrumental: "instrumental",
     fuzzytags: MUSIC_MOODS[mood].tags.replace(/ /g, "+"),
     audioformat: "mp32",
@@ -175,7 +175,7 @@ async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, 
     if (r.audiodownload_allowed !== false && r.audiodownload) jamendoFiles.set(t.id, r.audiodownload);
     out.push(t);
   }
-  return out.slice(0, 24);
+  return out;
 }
 
 async function jamendoOne(clientId: string, id: string): Promise<LibraryTrack> {
