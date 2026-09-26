@@ -26,7 +26,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { growth, type PublishRecord } from "@/src/lib/growth-client";
-import { suggestTitlesWithProvider, writeSeoWithProvider } from "@/src/lib/ai-client";
+import { suggestTitlesWithProvider, writeSeoWithProvider, type MarketReference } from "@/src/lib/ai-client";
 import { usePackaging } from "@/src/components/package/PackagingProvider";
 import { inlineSvgImages } from "@/src/lib/package/svg-images";
 import { composeThumbnail } from "@/src/lib/package/thumbnails";
@@ -105,6 +105,11 @@ async function svgToImage(composed: string): Promise<{ mime: "image/png" | "imag
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const fmtMb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 
+/** 12_400 → "12.4K". */
+function compact(n: number): string {
+  return Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+}
+
 export interface PublishSource {
   projectId: string;
   projectName: string;
@@ -165,12 +170,13 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
   const pack = usePackaging();
   const seo = pack.seoFor(source.projectId);
   const primary = pack.primaryTitleFor(source.projectId);
-  // Thumbnails with artwork, newest edit first. The newest is used unless the
-  // creator picks another (an older "approved" one must never win silently).
+  // Thumbnails with artwork: the generated art ("Art N") comes first, then
+  // the rest, newest edit first. The first is used unless the creator picks another.
+  const isArt = (v: { name: string; baseKind?: string }) => v.baseKind === "upload" && /^Art \d+/.test(v.name);
   const thumbOptions = pack
     .variantsFor(source.projectId)
     .filter((v) => v.baseSvg)
-    .sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+    .sort((a, b) => Number(isArt(b)) - Number(isArt(a)) || (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
   const [thumbId, setThumbId] = useState<string | null>(null);
   const variant = thumbOptions.find((v) => v.id === thumbId) ?? thumbOptions[0] ?? null;
   const hiddenTracks = useMemo(() => new Set(source.comp.tracks.filter((t) => t.hidden).map((t) => t.id)), [source.comp.tracks]);
@@ -184,6 +190,8 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
   const [titleIdeas, setTitleIdeas] = useState<{ text: string; category: string }[]>([]);
   const [aiBusy, setAiBusy] = useState<"titles" | "seo" | "all" | null>(null);
   const [aiError, setAiError] = useState("");
+  /** Top YouTube videos in this niche that the copy was modelled on. */
+  const [refs, setRefs] = useState<MarketReference[]>([]);
   // What the video actually says (captions) — grounds the AI metadata.
   const transcript = useMemo(
     () =>
@@ -220,6 +228,8 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
     setAiError("");
     const [t, o] = await Promise.all([suggestTitlesWithProvider(aiContext()), writeSeoWithProvider(aiContext())]);
     setAiBusy(null);
+    const found = (t.ok && t.data.references?.length ? t.data.references : o.ok ? o.data.references : undefined) ?? [];
+    if (found.length) setRefs(found);
     if (t.ok) {
       setTitleIdeas(t.data.titles);
       if (t.data.titles[0]) setTitle(clampTitle(t.data.titles[0].text));
@@ -235,8 +245,10 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
     setAiError("");
     const o = await suggestTitlesWithProvider(aiContext());
     setAiBusy(null);
-    if (o.ok) setTitleIdeas(o.data.titles);
-    else setAiError(o.message);
+    if (o.ok) {
+      setTitleIdeas(o.data.titles);
+      if (o.data.references?.length) setRefs(o.data.references);
+    } else setAiError(o.message);
   }
   async function genSeo() {
     setAiBusy("seo");
@@ -244,6 +256,7 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
     const o = await writeSeoWithProvider(aiContext());
     setAiBusy(null);
     if (!o.ok) return setAiError(o.message);
+    if (o.data.references?.length) setRefs(o.data.references);
     setDescription(buildDescription({ description: o.data.description, chapters: seo.chapters, hashtags: o.data.hashtags }));
     setTags(normalizeTags(o.data.tags).join(", "));
   }
@@ -536,12 +549,29 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 p-3">
             <p className="min-w-0 flex-1 text-xs text-muted-text">
-              Write the title, description and tags from your script, audience and channel — tuned for search and clicks without over-promising.
+              Studies the top-performing YouTube videos on this topic right now, then writes your title, description and tags from what&apos;s working — true to your script, without over-promising.
             </p>
             <Button size="sm" loading={aiBusy === "all"} disabled={aiBusy !== null && aiBusy !== "all"} onClick={() => void genAll()}>
-              <Sparkles className="size-4" aria-hidden="true" /> Optimize for reach
+              <Sparkles className="size-4" aria-hidden="true" /> Optimize with YouTube data
             </Button>
           </div>
+          {refs.length > 0 && (
+            <details className="rounded-lg border border-border p-3 text-xs">
+              <summary className="cursor-pointer font-medium">Based on {refs.length} top videos in this niche</summary>
+              <ul className="mt-2 space-y-1">
+                {refs.slice(0, 8).map((r) => (
+                  <li key={r.videoId} className="flex items-baseline gap-2">
+                    <a href={`https://youtu.be/${r.videoId}`} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline" title={`${r.title} — ${r.channel}`}>
+                      {r.title}
+                    </a>
+                    <span className="shrink-0 text-muted-text">
+                      {compact(r.viewsPerDay)}/day{r.outlier !== null && r.outlier >= 1 ? ` · ${r.outlier}× subs` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           <div className="grid gap-4 sm:grid-cols-[200px_minmax(0,1fr)]">
             <div className="space-y-2">
               {thumbPreview && includeThumb ? (

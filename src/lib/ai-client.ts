@@ -146,15 +146,25 @@ export interface PackagingContext {
   durationSec?: number;
 }
 
+/** A top YouTube video the copy was modelled on. */
+export interface MarketReference {
+  videoId: string;
+  title: string;
+  channel: string;
+  views: number;
+  viewsPerDay: number;
+  outlier: number | null;
+}
+
 export function suggestTitlesWithProvider(context: PackagingContext) {
   return attempt(() =>
-    api.post<{ titles: { text: string; category: string }[]; model: string }>("/api/v1/ai/package", { kind: "titles", context }),
+    api.post<{ titles: { text: string; category: string }[]; references?: MarketReference[]; model: string }>("/api/v1/ai/package", { kind: "titles", context }),
   );
 }
 
 export function writeSeoWithProvider(context: PackagingContext) {
   return attempt(() =>
-    api.post<{ description: string; tags: string[]; hashtags: string[]; model: string }>("/api/v1/ai/package", { kind: "seo", context }),
+    api.post<{ description: string; tags: string[]; hashtags: string[]; references?: MarketReference[]; model: string }>("/api/v1/ai/package", { kind: "seo", context }),
   );
 }
 

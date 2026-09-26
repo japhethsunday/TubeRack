@@ -19,6 +19,7 @@ import { Modal, Drawer } from "@/src/components/ui/overlays";
 import { ConfirmDialog } from "@/src/components/ui/Section";
 import { Input, Textarea } from "@/src/components/ui/fields";
 import { stageHref } from "@/src/lib/projects/stages";
+import { ProjectPublish } from "@/src/components/video/ProjectPublish";
 import { EmptyState, ErrorState } from "@/src/components/ui/states";
 import { LoadingState, Progress } from "@/src/components/ui/feedback";
 
@@ -104,7 +105,8 @@ export default function ProjectOverviewPage() {
             <span title={formatDateTime(project.updatedAt)}>Updated {timeAgo(project.updatedAt)}</span>
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ProjectPublish projectId={project.id} projectName={project.name} topic={project.topic} />
           <Button variant="outline" size="sm" onClick={() => openEditor(project.name, project.description)}>
             <Pencil className="size-4" aria-hidden="true" />
             Edit details

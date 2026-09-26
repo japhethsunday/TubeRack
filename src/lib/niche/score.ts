@@ -13,6 +13,8 @@ export interface NicheVideoSample {
   views: number;
   durationSec: number | null;
   channelSubs: number | null;
+  /** The video's own tags (when the uploader set any). */
+  tags?: string[];
 }
 
 export interface NicheMetrics {

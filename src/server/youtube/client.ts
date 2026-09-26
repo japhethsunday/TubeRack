@@ -621,6 +621,7 @@ export async function scanNiche(
       views: toNumber(st.viewCount) ?? 0,
       durationSec: typeof cd.duration === "string" ? parseIsoDuration(cd.duration) : null,
       channelSubs: subsById.get(channelId) ?? null,
+      tags: Array.isArray(sn.tags) ? (sn.tags as unknown[]).filter((t): t is string => typeof t === "string").slice(0, 15) : [],
     };
   });
   return { samples, totalResults };

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { writePackaging } from "@/src/server/ai/gemini";
+import { marketBrief } from "@/src/server/youtube/market-brief";
 import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } from "@/src/server/ai/guard";
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
@@ -26,6 +27,8 @@ const body = z.object({
     format: field(40),
     durationSec: z.number().min(0).max(86400).optional(),
   }),
+  /** Ground the copy in the top recent YouTube videos for the topic. */
+  useYouTube: z.boolean().default(true),
 });
 
 /** POST /api/v1/ai/package — Gemini title options or SEO description/tags (editor+). */
@@ -36,7 +39,9 @@ export async function POST(request: Request) {
     caller = await guardProviderCall();
     const input = await parseBody(request, body);
     kind = input.kind;
-    const result = await writePackaging(input.kind, input.context);
+    // Real market data first; the copy still works (from the video alone) if YouTube is unavailable.
+    const market = input.useYouTube && input.context.topic ? await marketBrief(input.context.topic).catch(() => null) : null;
+    const result = { ...(await writePackaging(input.kind, { ...input.context, market: market?.summary })), references: market?.references ?? [] };
     await recordUsage(caller, { kind: "text", provider: "gemini", model: result.model, status: "completed", ref: kind });
     return NextResponse.json({ data: result });
   } catch (error) {

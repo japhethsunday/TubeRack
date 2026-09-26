@@ -703,14 +703,21 @@ export async function writePackaging(
     hook?: string;
     format?: string;
     durationSec?: number;
+    /** Real YouTube evidence: the top recent videos in this niche (see market-brief). */
+    market?: string;
   },
 ): Promise<{ titles?: { text: string; category: string }[]; description?: string; tags?: string[]; hashtags?: string[]; model: string }> {
   if (!isTextConfigured()) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
-  const brief = JSON.stringify({ ...context, script: context.script.slice(0, 5000) });
+  const { market, ...video } = context;
+  const brief = JSON.stringify({ ...video, script: video.script.slice(0, 5000) });
   const rules =
     "Base everything on what the video actually says (script) and who it is for. Never invent statistics, rankings, or view counts. " +
     "No clickbait the video does not deliver — over-promising kills retention and hurts reach." +
-    (context.format === "Short" ? " This is a YouTube Short: keep it punchy and mobile-first." : "");
+    (context.format === "Short" ? " This is a YouTube Short: keep it punchy and mobile-first." : "") +
+    (market
+      ? `\nWhat is working on YouTube for this topic right now (real data):\n${market.slice(0, 4000)}\n` +
+        "Study these winners: reuse the title structures, angles, emotional hooks and search phrases that clearly earn views (especially the ones far above their channel's size), and use the words and tags viewers already search for. Never copy a title word for word, and stay true to this video's own content."
+      : "");
   if (kind === "titles") {
     const { text, model } = await new GeminiTextProvider().generateText({
     skills: ["youtube", "copy", "marketing"],
