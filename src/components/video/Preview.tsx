@@ -96,8 +96,12 @@ function playCached(
   };
 }
 
+/** Phones have few video decoders and little bandwidth: keep far fewer clips loaded there. */
+const IS_PHONE = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 /** How far ahead of the playhead video clips start downloading. */
-const PREFETCH_SEC = 30;
+const PREFETCH_SEC = IS_PHONE ? 8 : 30;
+/** Most video elements kept loaded at once. */
+const MAX_LOADED_VIDEOS = IS_PHONE ? 3 : 12;
 
 /** Plain time: "0:07.6" while editing, "5:49" for a length (hours when needed). */
 export function fmtTimecode(sec: number, _fps = 30, tenths = true): string {
@@ -198,6 +202,7 @@ export function Preview({
       const el = document.createElement("video");
       el.crossOrigin = "anonymous";
       el.playsInline = true;
+      el.muted = true; // phones only let muted video start without a tap; unmuted when audible
       el.preload = "auto";
       el.src = url;
       el.load(); // mobile browsers may not start buffering a detached element otherwise
@@ -232,8 +237,13 @@ export function Preview({
     const mutedTracks = new Set(s.comp.tracks.filter((tr) => tr.muted).map((tr) => tr.id));
     const hidden = new Set(s.comp.tracks.filter((tr) => tr.hidden).map((tr) => tr.id));
     // Only fetch video clips near the playhead: loading every clip at once starves the one on screen.
-    for (const clip of s.comp.clips)
-      if (clip.kind === "video" && !hidden.has(clip.trackId) && t >= clip.startSec - PREFETCH_SEC && t < clip.startSec + clip.durationSec + 1) ensureMedia(clip);
+    // Nearest first, and never more than the device can decode.
+    const near = s.comp.clips
+      .filter((clip) => clip.kind === "video" && !hidden.has(clip.trackId) && t >= clip.startSec - PREFETCH_SEC && t < clip.startSec + clip.durationSec + 1)
+      .sort((a, b) => a.startSec - b.startSec)
+      .slice(0, MAX_LOADED_VIDEOS);
+    const keep = new Set(near.map((c) => c.id));
+    for (const clip of near) ensureMedia(clip);
     for (const clip of s.comp.clips) if (clip.kind === "image" && !hidden.has(clip.trackId)) ensureMedia(clip);
     for (const [clipId, { el }] of videos.current) {
       const clip = s.comp.clips.find((c) => c.id === clipId);
@@ -243,7 +253,8 @@ export function Preview({
         continue;
       }
       // Far from the playhead: stop its download so bandwidth goes to what's on screen.
-      if (t < clip.startSec - PREFETCH_SEC - 15 || t > clip.startSec + clip.durationSec + 15) {
+      const slack = IS_PHONE ? 2 : 15;
+      if (!keep.has(clipId) && (t < clip.startSec - PREFETCH_SEC - slack || t > clip.startSec + clip.durationSec + slack || videos.current.size > MAX_LOADED_VIDEOS)) {
         el.pause();
         el.removeAttribute("src");
         el.load();
