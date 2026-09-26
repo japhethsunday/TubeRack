@@ -235,10 +235,24 @@ export async function previewSource(id: string): Promise<string> {
 
 /** Stream a track preview through our server (music sites often refuse playback embedded on other sites). */
 export async function fetchPreview(id: string, range: string | null): Promise<Response> {
-  const src = await previewSource(id);
+  const primary = await previewSource(id);
+  const sources = [primary, primary, jamendoFiles.get(id)].filter((u, i, all): u is string => Boolean(u) && (i < 2 || u !== primary));
   const headers: Record<string, string> = { "User-Agent": UA };
   if (range && /^bytes=\d*-\d*$/.test(range)) headers.Range = range;
-  return fetch(src, { headers, redirect: "follow", signal: AbortSignal.timeout(30_000) });
+  let last = "no source";
+  for (const [i, src] of sources.entries()) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 400));
+    try {
+      const res = await fetch(src, { headers, redirect: "follow", signal: AbortSignal.timeout(20_000) });
+      if (res.ok && res.body) return res;
+      last = `HTTP ${res.status}`;
+      await res.body?.cancel();
+    } catch (e) {
+      last = e instanceof Error ? e.message : String(e);
+    }
+  }
+  console.warn(`[music] preview ${id} failed: ${last}`);
+  throw new Error(last);
 }
 
 /** Download the track's audio (size-capped) so it can be stored with the project. */

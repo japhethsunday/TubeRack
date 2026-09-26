@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     } catch {
       throw new BackendError("BACKEND_UNAVAILABLE", "This preview isn't available right now.");
     }
-    if (!upstream.ok || !upstream.body) throw new BackendError("NOT_FOUND", "This preview is no longer available.");
+
     const type = upstream.headers.get("content-type") ?? "";
     const headers = new Headers({
       "Content-Type": type.startsWith("audio/") ? type : "audio/mpeg",
