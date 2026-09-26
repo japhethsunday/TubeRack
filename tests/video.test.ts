@@ -349,6 +349,16 @@ describe("auto video: stock footage and music", () => {
     assert.equal(music?.assetId, "mus");
     assert.ok((music?.volume ?? 1) < 0.3);
   });
+
+  it("plays a scene's different stock clips one after another", () => {
+    const clips = buildFromScenes([scene({ id: "sc1", durationSec: 12 })], [
+      asset({ id: "a", kind: "video", sceneIds: ["sc1"], source: "provider-output", durationSec: 5 }),
+      asset({ id: "b", kind: "video", sceneIds: ["sc1"], source: "provider-output", durationSec: 5 }),
+      asset({ id: "c", kind: "video", sceneIds: ["sc1"], source: "provider-output", durationSec: 5 }),
+    ]).filter((c) => c.kind === "video");
+    assert.deepEqual(clips.map((c) => c.assetId), ["a", "b", "c"]);
+    assert.equal(clips[2].durationSec, 2);
+  });
 });
 
 import { stockMatches, stockQuery } from "@/src/components/video/AutoVideo";

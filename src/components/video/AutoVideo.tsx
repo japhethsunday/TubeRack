@@ -180,8 +180,12 @@ export function GenerateVideoDialog({
       set("voice", { state: "running", detail: `0/${scenes.length}` });
       let voiced = 0;
       const voiceErrors: string[] = [];
-      await pool(scenes, 2, isCancelled, async (scene) => {
-        const out = await synthesizeProviderSpeech(sceneSpeech(scene));
+      // One narrator for the whole video: the first take decides the voice
+      // service, and every other scene asks for that same one.
+      let engine: string | undefined;
+      const voiceScene = async (scene: Scene) => {
+        const out = await synthesizeProviderSpeech(sceneSpeech(scene), undefined, engine);
+        if (out.ok && !engine) engine = out.data.model;
         if (!out.ok) {
           voiceErrors.push(out.message);
         } else {
@@ -205,7 +209,13 @@ export function GenerateVideoDialog({
         }
         voiced += 1;
         set("voice", { detail: `${voiced}/${scenes.length}` });
-      });
+      };
+      for (const scene of scenes) {
+        if (engine || isCancelled()) break;
+        await voiceScene(scene);
+      }
+      const rest = scenes.slice(voiced);
+      await pool(rest, 2, isCancelled, voiceScene);
       if (isCancelled()) return;
       const voiceOk = made.filter((a) => a.kind === "voice").length;
       set("voice", { state: voiceOk === scenes.length ? "done" : voiceOk ? "partial" : "failed", detail: voiceOk === scenes.length ? `${voiceOk} takes` : `${voiceOk}/${scenes.length} — ${voiceErrors[0] ?? "failed"}` });
@@ -218,41 +228,48 @@ export function GenerateVideoDialog({
       const usedStock = new Set<string>();
       const orientation = vertical ? "vertical" : "horizontal";
       async function stockFor(scene: Scene): Promise<boolean> {
+        // Several different clips per scene, until they cover its length.
+        let covered = 0;
+        let found = 0;
         const keywords = stockKeywords.get(scene.id) ?? "";
         const queries = [keywords, stockQuery(keywords, 2), stockQuery(scene.visual, 3), stockQuery(scene.visual, 2)].filter((q, i, all) => q.length >= 2 && all.indexOf(q) === i);
         for (const q of queries) {
-          const found = await api
+          const res = await api
             .get<{ items: StockHit[] }>(`/api/v1/stock/search?${new URLSearchParams({ kind: "video", q, orientation, page: "1" })}`)
             .catch(() => ({ items: [] as StockHit[] }));
           // Only accept clips whose tags actually mention what the scene is about.
-          const pick = found.items.find((it) => !usedStock.has(it.id) && stockMatches(it.title, q));
-          if (!pick) continue;
-          usedStock.add(pick.id);
-          try {
-            const file = await api.post<{ url: string; mime: string; fileSize: number }>("/api/v1/stock/import", { id: pick.id });
-            const asset = media.addAsset({
-              projectId: project.id,
-              sceneIds: [scene.id],
-              kind: "video",
-              source: "provider-output",
-              status: "ready",
-              title: pick.title || `Stock — scene ${scene.number}`,
-              payload: file.url,
-              mime: file.mime,
-              durationSec: pick.durationSec ?? undefined,
-              width: pick.width || undefined,
-              height: pick.height || undefined,
-              fileSize: file.fileSize,
-              tags: ["auto-video", "stock", `stock:${pick.id}`, "license:Pixabay Content License"],
-              approval: "approved",
-            });
-            made.push(asset);
-            return true;
-          } catch {
-            // Try the next query.
+          const picks = res.items.filter((it) => !usedStock.has(it.id) && stockMatches(it.title, q));
+          for (const pick of picks) {
+            if (covered >= scene.durationSec || found >= 4) break;
+            usedStock.add(pick.id);
+            try {
+              const file = await api.post<{ url: string; mime: string; fileSize: number }>("/api/v1/stock/import", { id: pick.id });
+              const asset = media.addAsset({
+                projectId: project.id,
+                sceneIds: [scene.id],
+                kind: "video",
+                source: "provider-output",
+                status: "ready",
+                title: pick.title || `Stock — scene ${scene.number}`,
+                payload: file.url,
+                mime: file.mime,
+                durationSec: pick.durationSec ?? undefined,
+                width: pick.width || undefined,
+                height: pick.height || undefined,
+                fileSize: file.fileSize,
+                tags: ["auto-video", "stock", `stock:${pick.id}`, "license:Pixabay Content License"],
+                approval: "approved",
+              });
+              made.push(asset);
+              found += 1;
+              covered += pick.durationSec && pick.durationSec > 1 ? pick.durationSec : scene.durationSec;
+            } catch {
+              // Try the next clip.
+            }
           }
+          if (covered >= scene.durationSec || found >= 4) break;
         }
-        return false;
+        return found > 0;
       }
       async function aiImageFor(scene: Scene): Promise<boolean> {
         const out = await generateProviderImage(scene.visual, aspect);

@@ -211,24 +211,26 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
   const clips: TimelineClip[] = [];
   for (const seg of sceneSegments(scenes)) {
     const scene = scenes.find((s) => s.id === seg.sceneId);
-    // A stock/AI video clip for the scene wins over a still; it is muted so the
-    // voice-over stays clear, and repeats when shorter than the scene.
-    const clipAsset = assets.find(
+    // Stock/AI video clips for the scene win over a still. They are muted so the
+    // voice-over stays clear, and play one after another (cycling only when
+    // they are all shorter than the scene together).
+    const sceneVideos = assets.filter(
       (a) => a.kind === "video" && a.status === "ready" && (a.approval === "approved" || a.approval === "used") && a.sceneIds.includes(seg.sceneId),
     );
-    const image = clipAsset ? undefined : approvedImageFor(seg.sceneId, assets);
-    if (clipAsset) {
+    const image = sceneVideos.length ? undefined : approvedImageFor(seg.sceneId, assets);
+    for (let at = 0, i = 0; sceneVideos.length && at < seg.durationSec - 0.2; i++) {
+      const clipAsset = sceneVideos[i % sceneVideos.length];
       const len = clipAsset.durationSec && clipAsset.durationSec > 1 ? clipAsset.durationSec : seg.durationSec;
-      for (let at = 0; at < seg.durationSec - 0.2; at += len) {
-        clips.push({
-          ...clipBase("track_video", "video", clipAsset.title, seg.startSec + at, Math.min(len, seg.durationSec - at)),
-          sceneId: seg.sceneId,
-          assetId: clipAsset.id,
-          inSec: 0,
-          volume: 0,
-          muted: true,
-        });
-      }
+      const dur = Math.min(len, seg.durationSec - at);
+      clips.push({
+        ...clipBase("track_video", "video", clipAsset.title, seg.startSec + at, dur),
+        sceneId: seg.sceneId,
+        assetId: clipAsset.id,
+        inSec: 0,
+        volume: 0,
+        muted: true,
+      });
+      at += dur;
     }
     if (image) {
       clips.push({

@@ -500,6 +500,8 @@ export class GeminiTtsProvider implements TtsProvider {
   async synthesizeSpeech(request: {
     text: string;
     voice?: string;
+    /** Model of an earlier take (e.g. "google-cloud-tts"): that service goes first, so a multi-part narration keeps one voice. */
+    engine?: string;
   }): Promise<{ audioBase64: string; mimeType: string; model: string; durationSec: number }> {
     const text = request.text.trim();
     if (!text) throw new Error("Speech synthesis failed: text cannot be empty.");
@@ -528,6 +530,12 @@ export class GeminiTtsProvider implements TtsProvider {
     if (mistral) routes.push({ name: "voxtral", run: viaMistral });
     // Self-hosted Piper: no quota, the voice of last resort.
     if (isPiperConfigured(env)) routes.push({ name: "piper", run: async () => ({ parts: await mapLimit(splitForSpeech(text, PIPER_CHUNK_CHARS), 2, (chunk) => piperChunk(chunk)), model: "piper" }) });
+    if (request.engine) {
+      const want = request.engine === "google-cloud-tts" ? "cloud-tts" : request.engine === "voxtral-mini-tts" ? "voxtral" : request.engine === "piper" ? "piper" : "gemini";
+      const i = routes.findIndex((r) => r.name === want);
+      // Same service first, with one retry, before any other voice is used.
+      if (i >= 0) routes.unshift(routes[i], routes[i]), routes.splice(i + 2, 1);
+    }
     try {
       if (!routes.length) throw new ProviderNotConfiguredError("tts", "Voice generation is not configured.");
       let result: { parts: { pcm: Buffer; rate: number }[]; model: string } | null = null;
