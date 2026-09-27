@@ -3,11 +3,12 @@ import { z } from "zod";
 import { getDb } from "@/src/server/db";
 import { requireUser } from "@/src/server/auth";
 import { requireMembership, assertCanManageBilling } from "@/src/server/authz";
-import { toErrorResponse, backendUnavailable, validationError } from "@/src/server/errors";
+import { toErrorResponse, backendUnavailable, validationError, forbidden } from "@/src/server/errors";
 import { parseBody, parseId } from "@/src/server/validate";
 import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
+import { isAdmin } from "@/src/server/admin";
 
 const grantSchema = z.object({
   workspaceId: z.string().min(1),
@@ -22,6 +23,8 @@ export async function POST(request: Request) {
     const limit = limiterFor("write").take(`write:${callerKey(request)}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const user = await requireUser();
+    // Credits are only ever added by the platform admin, never self-granted.
+    if (!isAdmin(user)) throw forbidden("Credits are managed by Recktube.");
     const body = await parseBody(request, grantSchema);
     const workspaceId = parseId(body.workspaceId, "workspace");
     const membership = await requireMembership(workspaceId, user, "viewer");

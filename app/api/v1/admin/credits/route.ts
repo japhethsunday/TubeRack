@@ -1,0 +1,47 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { adminCredits, adminDb, requireAdmin } from "@/src/server/admin";
+import { adjustCredits, setCreditPlan } from "@/src/server/credits";
+import { audit } from "@/src/server/audit";
+import { notFound, toErrorResponse, validationError } from "@/src/server/errors";
+import { parseBody, parseId } from "@/src/server/validate";
+
+export const dynamic = "force-dynamic";
+
+/** GET /api/v1/admin/credits?q= — every credit account, emptiest first. */
+export async function GET(request: Request) {
+  try {
+    await requireAdmin(request, "credits.list");
+    const q = (new URL(request.url).searchParams.get("q") ?? "").trim().slice(0, 120);
+    return NextResponse.json({ data: await adminCredits(q) }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+const body = z.object({
+  workspaceId: z.string().min(1),
+  delta: z.number().int().min(-1_000_000).max(1_000_000).optional(),
+  reason: z.string().trim().max(200).optional(),
+  monthlyGrant: z.number().int().min(0).max(1_000_000).optional(),
+  unlimited: z.boolean().optional(),
+});
+
+/** POST /api/v1/admin/credits — add/remove credits or change a monthly limit (audited). */
+export async function POST(request: Request) {
+  try {
+    const admin = await requireAdmin(request, "credits.change");
+    const input = await parseBody(request, body);
+    const workspaceId = parseId(input.workspaceId, "workspace");
+    const [ws] = await adminDb()`SELECT id FROM workspaces WHERE id = ${workspaceId}`;
+    if (!ws) throw notFound("Workspace");
+    if (input.delta === undefined && input.monthlyGrant === undefined && input.unlimited === undefined) throw validationError("Nothing to change.");
+    let state = null;
+    if (input.delta) state = await adjustCredits(workspaceId, input.delta, input.reason?.trim() || "Admin adjustment");
+    if (input.monthlyGrant !== undefined || input.unlimited !== undefined) state = await setCreditPlan(workspaceId, { monthlyGrant: input.monthlyGrant, unlimited: input.unlimited });
+    await audit({ userId: admin.id, workspaceId, action: "admin.credits.change", resourceType: "credit_accounts", resourceId: workspaceId, metadata: { delta: input.delta, monthlyGrant: input.monthlyGrant, unlimited: input.unlimited, reason: input.reason } });
+    return NextResponse.json({ data: state });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}

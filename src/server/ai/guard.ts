@@ -1,3 +1,5 @@
+import { assertCredits, spendCredits } from "@/src/server/credits";
+import { isAdmin } from "@/src/server/admin";
 import { getDb } from "@/src/server/db";
 import { sharedLimit } from "@/src/server/shared-limit";
 import { requireUser, type SessionUser } from "@/src/server/auth";
@@ -28,6 +30,7 @@ export async function guardProviderCall(): Promise<ProviderCaller> {
   await sharedLimit(`ai:${user.id}`, 300, 3600);
   const workspaceId = await defaultWorkspace(user);
   await requireMembership(workspaceId, user, "editor");
+  if (!isAdmin(user)) await assertCredits(workspaceId);
   return { user, workspaceId };
 }
 
@@ -46,6 +49,7 @@ export async function recordUsage(
 ): Promise<void> {
   const db = getDb();
   if (!db) return;
+  if (entry.status === "completed" && !isAdmin(caller.user)) await spendCredits(caller.workspaceId, entry.kind, entry.ref).catch(() => {});
   try {
     await db`
       INSERT INTO usage_events (workspace_id, user_id, kind, units, model, provider, status, ref)

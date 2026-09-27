@@ -113,6 +113,8 @@ export async function adminUsers(q: string, page: number) {
            (SELECT count(*) FROM memberships m JOIN projects p ON p.workspace_id = m.workspace_id AND p.deleted_at IS NULL WHERE m.user_id = u.id) AS projects,
            (SELECT count(*) FROM usage_events e WHERE e.user_id = u.id AND e.created_at > now() - interval '30 days') AS usage30,
            EXISTS (SELECT 1 FROM youtube_connections y JOIN memberships m ON m.workspace_id = y.workspace_id WHERE m.user_id = u.id) AS youtube,
+           (SELECT c.balance FROM memberships m JOIN credit_accounts c ON c.workspace_id = m.workspace_id WHERE m.user_id = u.id AND m.role = 'owner' ORDER BY m.id LIMIT 1) AS credits,
+           (SELECT c.unlimited FROM memberships m JOIN credit_accounts c ON c.workspace_id = m.workspace_id WHERE m.user_id = u.id AND m.role = 'owner' ORDER BY m.id LIMIT 1) AS unlimited,
            count(*) OVER () AS total
     FROM users u
     WHERE u.deleted_at IS NULL AND (${q} = '' OR u.email ILIKE ${like} OR u.name ILIKE ${like})
@@ -125,6 +127,7 @@ export async function adminUsers(q: string, page: number) {
       id: String(r.id), email: String(r.email), name: String(r.name), status: String(r.status),
       verified: Boolean(r.email_verified_at), createdAt: iso(r.created_at)!, lastSeen: iso(r.last_seen),
       projects: n(r.projects), usage30: n(r.usage30), youtube: Boolean(r.youtube),
+      credits: r.credits === null || r.credits === undefined ? null : n(r.credits), unlimited: Boolean(r.unlimited),
     })),
   };
 }
@@ -141,4 +144,89 @@ export async function adminAudit(page: number, action: string) {
     id: String(r.id), action: String(r.action), resource: r.resource_type ? `${String(r.resource_type)}${r.resource_id ? ` ${String(r.resource_id).slice(0, 12)}` : ""}` : "",
     email: r.email ? String(r.email) : "", createdAt: iso(r.created_at)!, metadata: r.metadata as Record<string, unknown>,
   }));
+}
+
+/** Everything about one account, for the user drawer. */
+export async function adminUserDetail(id: string) {
+  const db = adminDb();
+  const [u] = await db`SELECT id, email, name, status, email_verified_at, created_at FROM users WHERE id = ${id} AND deleted_at IS NULL`;
+  if (!u) return null;
+  const workspaces = await db`
+    SELECT w.id, w.name, m.role, c.balance, c.monthly_grant, c.unlimited, c.refilled_at,
+           (SELECT count(*) FROM projects p WHERE p.workspace_id = w.id AND p.deleted_at IS NULL) AS projects,
+           (SELECT count(*) FROM media_assets a WHERE a.workspace_id = w.id) AS assets,
+           (SELECT channel_title FROM youtube_connections y WHERE y.workspace_id = w.id) AS youtube
+    FROM memberships m JOIN workspaces w ON w.id = m.workspace_id LEFT JOIN credit_accounts c ON c.workspace_id = w.id
+    WHERE m.user_id = ${id} ORDER BY (m.role = 'owner') DESC, w.created_at`;
+  const sessions = await db`
+    SELECT created_at, last_used_at, user_agent FROM auth_sessions
+    WHERE user_id = ${id} AND revoked_at IS NULL AND expires_at > now() ORDER BY last_used_at DESC LIMIT 10`;
+  const usage = await db`
+    SELECT kind, status, provider, created_at FROM usage_events WHERE user_id = ${id} ORDER BY created_at DESC LIMIT 25`;
+  const ledger = await db`
+    SELECT t.kind, t.amount, t.balance_after, t.ref, t.created_at FROM credit_transactions t
+    JOIN credit_accounts c ON c.id = t.account_id JOIN memberships m ON m.workspace_id = c.workspace_id AND m.user_id = ${id}
+    ORDER BY t.created_at DESC LIMIT 25`;
+  const projects = await db`
+    SELECT p.id, p.name, p.status, p.updated_at FROM projects p JOIN memberships m ON m.workspace_id = p.workspace_id AND m.user_id = ${id}
+    WHERE p.deleted_at IS NULL ORDER BY p.updated_at DESC LIMIT 15`;
+  return {
+    user: { id: String(u.id), email: String(u.email), name: String(u.name), status: String(u.status), verified: Boolean(u.email_verified_at), createdAt: iso(u.created_at)!, admin: isAdmin({ email: String(u.email), emailVerifiedAt: u.email_verified_at ? "y" : null, status: String(u.status) }) },
+    workspaces: workspaces.map((w) => ({ id: String(w.id), name: String(w.name), role: String(w.role), balance: n(w.balance), monthlyGrant: n(w.monthly_grant), unlimited: Boolean(w.unlimited), refilledAt: iso(w.refilled_at), projects: n(w.projects), assets: n(w.assets), youtube: w.youtube ? String(w.youtube) : null })),
+    sessions: sessions.map((x) => ({ createdAt: iso(x.created_at)!, lastUsedAt: iso(x.last_used_at)!, device: String(x.user_agent ?? "").slice(0, 120) })),
+    usage: usage.map((x) => ({ kind: String(x.kind), status: String(x.status), provider: String(x.provider ?? ""), createdAt: iso(x.created_at)! })),
+    ledger: ledger.map((x) => ({ kind: String(x.kind), amount: n(x.amount), balanceAfter: n(x.balance_after), ref: x.ref ? String(x.ref) : "", createdAt: iso(x.created_at)! })),
+    projects: projects.map((x) => ({ id: String(x.id), name: String(x.name), status: String(x.status), updatedAt: iso(x.updated_at)! })),
+  };
+}
+
+/** Credit accounts across the app, lowest balance first (who needs a top-up). */
+export async function adminCredits(q: string) {
+  const db = adminDb();
+  const like = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
+  const rows = await db`
+    SELECT c.workspace_id, w.name AS workspace, u.email, c.balance, c.monthly_grant, c.unlimited, c.refilled_at,
+           (SELECT coalesce(sum(-t.amount), 0) FROM credit_transactions t WHERE t.account_id = c.id AND t.amount < 0 AND t.created_at > now() - interval '30 days') AS spent30
+    FROM credit_accounts c JOIN workspaces w ON w.id = c.workspace_id LEFT JOIN users u ON u.id = w.owner_id
+    WHERE ${q} = '' OR u.email ILIKE ${like} OR w.name ILIKE ${like}
+    ORDER BY c.unlimited, c.balance ASC LIMIT 100`;
+  const [totals] = await db`SELECT coalesce(sum(balance), 0) AS balance, count(*) FILTER (WHERE balance = 0 AND NOT unlimited) AS empty, count(*) FILTER (WHERE unlimited) AS unlimited FROM credit_accounts`;
+  return {
+    totals: { balance: n(totals.balance), empty: n(totals.empty), unlimited: n(totals.unlimited) },
+    accounts: rows.map((r) => ({ workspaceId: String(r.workspace_id), workspace: String(r.workspace), email: r.email ? String(r.email) : "", balance: n(r.balance), monthlyGrant: n(r.monthly_grant), unlimited: Boolean(r.unlimited), refilledAt: iso(r.refilled_at), spent30: n(r.spent30) })),
+  };
+}
+
+/** Live feed of generations across the app. */
+export async function adminUsageFeed(status: string) {
+  const db = adminDb();
+  const rows = await db`
+    SELECT e.kind, e.status, e.provider, e.model, e.created_at, u.email
+    FROM usage_events e LEFT JOIN users u ON u.id = e.user_id
+    WHERE (${status} = '' OR e.status = ${status})
+    ORDER BY e.created_at DESC LIMIT 100`;
+  return rows.map((r) => ({ kind: String(r.kind), status: String(r.status), provider: String(r.provider ?? ""), model: String(r.model ?? ""), email: r.email ? String(r.email) : "", createdAt: iso(r.created_at)! }));
+}
+
+/** Recent projects across all workspaces. */
+export async function adminProjects(q: string) {
+  const db = adminDb();
+  const like = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
+  const rows = await db`
+    SELECT p.id, p.name, p.status, p.updated_at, p.created_at, u.email,
+           (SELECT count(*) FROM media_assets a WHERE a.project_id = p.id) AS assets
+    FROM projects p JOIN workspaces w ON w.id = p.workspace_id LEFT JOIN users u ON u.id = w.owner_id
+    WHERE p.deleted_at IS NULL AND (${q} = '' OR p.name ILIKE ${like} OR u.email ILIKE ${like})
+    ORDER BY p.updated_at DESC LIMIT 100`;
+  return rows.map((r) => ({ id: String(r.id), name: String(r.name), status: String(r.status), email: r.email ? String(r.email) : "", assets: n(r.assets), updatedAt: iso(r.updated_at)!, createdAt: iso(r.created_at)! }));
+}
+
+/** Post an in-app announcement to every active user. */
+export async function adminBroadcast(title: string, body: string): Promise<number> {
+  const db = adminDb();
+  const rows = await db`
+    INSERT INTO notifications (user_id, type, title, body)
+    SELECT id, 'announcement', ${title}, ${body} FROM users WHERE deleted_at IS NULL AND status = 'active'
+    RETURNING id`;
+  return rows.length;
 }

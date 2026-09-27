@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { adminDb, isAdmin, requireAdmin } from "@/src/server/admin";
+import { adminDb, adminUserDetail, isAdmin, requireAdmin } from "@/src/server/admin";
 import { revokeAllSessions } from "@/src/server/auth";
 import { audit } from "@/src/server/audit";
 import { forbidden, notFound, toErrorResponse } from "@/src/server/errors";
@@ -33,6 +33,18 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     }
     await audit({ userId: admin.id, action: `admin.user.${action}`, resourceType: "user", resourceId: id, metadata: { target: String(target.email) } });
     return NextResponse.json({ data: { ok: true } });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+/** GET /api/v1/admin/users/:id — full account detail (admins only). */
+export async function GET(request: Request, ctx: { params: Promise<{ id: string }> }) {
+  try {
+    await requireAdmin(request, "users.view");
+    const detail = await adminUserDetail(parseId((await ctx.params).id, "user"));
+    if (!detail) throw notFound("User");
+    return NextResponse.json({ data: detail }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return toErrorResponse(error);
   }

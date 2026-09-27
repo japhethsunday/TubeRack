@@ -1,0 +1,137 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { api, ApiError } from "@/src/lib/api";
+import { Button } from "@/src/components/ui/Button";
+import { cx } from "@/src/components/ui/cx";
+
+export const fmt = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+export const bytes = (b: number) => (b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.round(b / 1e6)} MB`);
+export const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—");
+export const errorText = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+
+/** Load admin data from the backend with loading / error / reload. */
+export function useAdmin<T>(path: string | null) {
+  const [data, setData] = useState<T | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const reload = useCallback(async () => {
+    if (!path) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setData(await api.get<T>(path));
+    } catch (e) {
+      setError(errorText(e));
+    }
+    setLoading(false);
+  }, [path]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load from the backend when the path changes.
+    void reload();
+  }, [reload]);
+  return { data, error, loading, reload };
+}
+
+export function PageTitle({ title, sub, actions }: { title: string; sub?: string; actions?: React.ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+        {sub && <p className="mt-1 text-sm text-muted-text">{sub}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+export function Panel({ title, children, className, right }: { title?: string; children: React.ReactNode; className?: string; right?: React.ReactNode }) {
+  return (
+    <section className={cx("rounded-xl border border-border bg-surface", className)}>
+      {title && (
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold">{title}</h2>
+          {right}
+        </div>
+      )}
+      <div className="p-4">{children}</div>
+    </section>
+  );
+}
+
+export function Kpi({ label, value, hint, tone }: { label: string; value: string | number; hint?: string; tone?: "good" | "bad" }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface p-4">
+      <div className="text-xs font-medium text-muted-text">{label}</div>
+      <div className={cx("mt-1 text-2xl font-bold tabular-nums", tone === "good" && "text-success", tone === "bad" && "text-destructive")}>{typeof value === "number" ? fmt.format(value) : value}</div>
+      {hint && <div className="mt-0.5 text-[11px] text-muted-text">{hint}</div>}
+    </div>
+  );
+}
+
+export function Loading({ error, onRetry }: { error?: string | null; onRetry?: () => void }) {
+  if (error)
+    return (
+      <div role="alert" className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        {error}
+        {onRetry && <Button size="sm" variant="ghost" onClick={onRetry}>Retry</Button>}
+      </div>
+    );
+  return <p className="text-sm text-muted-text">Loading…</p>;
+}
+
+export const th = "px-3 py-2 text-left text-xs font-medium text-muted-text";
+export const td = "px-3 py-2 align-top";
+
+/** Add/remove credits and change the monthly limit for one workspace. */
+export function CreditEditor({ workspaceId, balance, monthlyGrant, unlimited, onDone }: { workspaceId: string; balance: number; monthlyGrant: number; unlimited: boolean; onDone: () => void }) {
+  const [amount, setAmount] = useState("100");
+  const [reason, setReason] = useState("");
+  const [grant, setGrant] = useState(String(monthlyGrant));
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function send(kind: string, body: Record<string, unknown>) {
+    setBusy(kind);
+    setMsg(null);
+    try {
+      await api.post("/api/v1/admin/credits", { workspaceId, ...body });
+      setMsg({ ok: true, text: "Saved." });
+      onDone();
+    } catch (e) {
+      setMsg({ ok: false, text: errorText(e) });
+    }
+    setBusy(null);
+  }
+  const n = Math.max(0, Math.floor(Number(amount) || 0));
+
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <span className="text-2xl font-bold tabular-nums">{unlimited ? "∞" : balance.toLocaleString()}</span>
+        <span className="text-muted-text">credits · refills to {monthlyGrant.toLocaleString()} every 30 days{unlimited ? " · unlimited" : ""}</span>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="space-y-1">
+          <span className="block text-xs text-muted-text">Amount</span>
+          <input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="h-9 w-28 rounded-lg border border-border bg-background px-2" />
+        </label>
+        <label className="min-w-40 flex-1 space-y-1">
+          <span className="block text-xs text-muted-text">Reason (shown in the ledger)</span>
+          <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="e.g. Bonus for beta feedback" className="h-9 w-full rounded-lg border border-border bg-background px-2" />
+        </label>
+        <Button size="sm" disabled={!n} loading={busy === "add"} onClick={() => void send("add", { delta: n, reason })}>Add {n || ""}</Button>
+        <Button size="sm" variant="outline" disabled={!n} loading={busy === "remove"} onClick={() => window.confirm(`Remove ${n} credits?`) && void send("remove", { delta: -n, reason })}>Remove</Button>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="space-y-1">
+          <span className="block text-xs text-muted-text">Monthly limit</span>
+          <input type="number" min={0} value={grant} onChange={(e) => setGrant(e.target.value)} className="h-9 w-28 rounded-lg border border-border bg-background px-2" />
+        </label>
+        <Button size="sm" variant="outline" loading={busy === "grant"} onClick={() => void send("grant", { monthlyGrant: Math.max(0, Math.floor(Number(grant) || 0)) })}>Save limit</Button>
+        <Button size="sm" variant="ghost" loading={busy === "unlimited"} onClick={() => void send("unlimited", { unlimited: !unlimited })}>{unlimited ? "Remove unlimited" : "Make unlimited"}</Button>
+      </div>
+      {msg && <p className={cx("text-xs", msg.ok ? "text-success" : "text-destructive")}>{msg.text}</p>}
+    </div>
+  );
+}
