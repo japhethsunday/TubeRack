@@ -9,6 +9,8 @@ import { z } from "zod";
 const serverSchema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+  /** Comma-separated emails allowed into /admin (default: the owner). */
+  ADMIN_EMAILS: z.string().optional(),
 
   // Supabase backend (all server-only; user supplies real values per environment)
   // DATABASE_URL: Supabase pooler connection string (Project → Connect).
