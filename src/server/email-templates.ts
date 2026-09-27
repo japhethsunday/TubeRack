@@ -5,7 +5,7 @@
  */
 
 const INK = "#0b0714";
-const PRIMARY = "#5b21b6";
+const PRIMARY = "#6d28d9";
 const PRIMARY_SOFT = "#ede9fe";
 const TEXT = "#18181b";
 const MUTED = "#52525b";
@@ -187,11 +187,11 @@ export function renderEmail(e: EmailLayout): { html: string; text: string } {
 <table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px">
 <tr><td style="padding:0 4px 14px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-<td><a href="${esc(safeUrl(app))}" style="text-decoration:none"><span style="display:inline-block;width:30px;height:30px;line-height:30px;border-radius:9px;background:${INK};color:#fff;text-align:center;font-size:14px;font-weight:900;vertical-align:middle">&#9654;</span><span style="margin-left:9px;font-size:16px;font-weight:800;color:${TEXT};vertical-align:middle">Recktube</span></a></td>
+<td><a href="${esc(safeUrl(app))}" style="text-decoration:none"><img src="${esc(safeUrl(`${app}/recktube-logo-120.png`))}" width="32" height="32" alt="Recktube" style="display:inline-block;width:32px;height:32px;border:0;border-radius:9px;vertical-align:middle"><span style="margin-left:10px;font-size:17px;font-weight:800;letter-spacing:-.01em;color:${TEXT};vertical-align:middle">Reck<span style="color:${PRIMARY}">tube</span></span></a></td>
 ${e.eyebrow ? `<td align="right" style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:${FAINT}">${esc(e.eyebrow)}</td>` : ""}
 </tr></table></td></tr>
 <tr><td style="background:#ffffff;border:1px solid ${LINE};border-radius:20px;overflow:hidden">
-<div style="height:6px;background:${PRIMARY};background-image:linear-gradient(90deg,${INK},${PRIMARY});border-radius:20px 20px 0 0"></div>
+<div style="height:6px;background:${PRIMARY};background-image:linear-gradient(90deg,#d946ef,#7c3aed,#0ea5e9);border-radius:20px 20px 0 0"></div>
 <div class="pad" style="padding:34px 36px 30px">
 <h1 style="margin:0 0 12px;font-size:28px;line-height:1.2;font-weight:800;letter-spacing:-.01em;color:${TEXT}">${esc(e.heading)}</h1>
 ${e.intro ? `<p style="margin:0 0 22px;font-size:16px;line-height:1.6;color:${MUTED};white-space:pre-line">${esc(e.intro)}</p>` : ""}

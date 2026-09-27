@@ -7,11 +7,13 @@ import { rotateDueTests } from "@/src/server/growth/abtests";
 import { runWatch, type TrendWatch } from "@/src/server/growth/trends";
 import { competitorReport } from "@/src/server/growth/competitors";
 import { notifyWorkspace, workspaceEmails } from "@/src/server/growth/notify";
-import type { TrendResult } from "@/src/lib/growth/trends";
+import type { TrendResult, TrendVideo } from "@/src/lib/growth/trends";
+import { breakoutAlert, isBreakout, nicheBrief } from "@/src/server/growth/briefs";
 
 /** Daily automation (Vercel Cron): A/B rotation, trend digests, competitor alerts, reminders. */
 
-const MAX_TREND_SCANS = 25; // ~2,550 YouTube units
+const MAX_TREND_SCANS = 45; // ~4,600 YouTube units
+const MAX_AUTO_WATCHES = 3; // niches followed automatically per workspace
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 
 function db() {
@@ -24,13 +26,15 @@ function appUrl(): string {
   return getServerEnv().APP_URL.replace(/\/$/, "");
 }
 
-async function trendDigests(): Promise<{ scanned: number; emailed: number; failed: number }> {
+async function trendDigests(): Promise<{ scanned: number; emailed: number; failed: number; alerts: number }> {
   const watches = (await db()`
     SELECT w.id, w.user_id, w.workspace_id, w.query, w.region, w.email_digest, w.last_run_at, w.last_results, u.email
     FROM trend_watches w JOIN users u ON u.id = w.user_id
     ORDER BY w.last_run_at NULLS FIRST LIMIT ${MAX_TREND_SCANS}
   `) as unknown as (TrendWatch & { workspace_id: string; email: string })[];
   const byUser = new Map<string, { email: string; sections: { query: string; result: TrendResult }[] }>();
+  const alerted = new Set<string>();
+  let alerts = 0;
   let scanned = 0;
   let failed = 0;
   for (const w of watches) {
@@ -45,6 +49,13 @@ async function trendDigests(): Promise<{ scanned: number; emailed: number; faile
           body: fresh.map((v) => `${v.title} (${compact.format(v.viewsPerHour)} views/hr)`).join(" · "),
           metadata: { watchId: w.id },
         });
+      }
+      // Instant alert when a new upload in the niche is racing ahead (one per person per run).
+      const breakout = result.videos.find((v) => isBreakout(v, result.medianViewsPerHour));
+      if (breakout && w.email_digest && !alerted.has(w.user_id)) {
+        alerted.add(w.user_id);
+        await sendBreakout(w.email, w.query, breakout, result.medianViewsPerHour);
+        alerts++;
       }
       if (w.email_digest) {
         const entry = byUser.get(w.user_id) ?? { email: w.email, sections: [] };
@@ -63,7 +74,51 @@ async function trendDigests(): Promise<{ scanned: number; emailed: number; faile
     const res = await sendEmail({ to: email, subject: mail.subject, text: mail.text, html: mail.html, kind: "digest" });
     if (res.sent) emailed++;
   }
-  return { scanned, emailed, failed };
+  return { scanned, emailed, failed, alerts };
+}
+
+async function sendBreakout(to: string, niche: string, video: TrendVideo, median: number) {
+  const mail = breakoutAlert(niche, video, median, appUrl());
+  await sendEmail({ to, subject: mail.subject, text: mail.text, html: mail.html, kind: "alert" });
+}
+
+/**
+ * Everyone gets briefs about their own niche without setting anything up:
+ * niches from their channels, saved niches and Content Creator sets are
+ * followed automatically (a few per workspace; removable in Trend Radar).
+ */
+async function autoFollowNiches(): Promise<{ added: number }> {
+  const rows = (await db()`
+    WITH niches AS (
+      SELECT c.workspace_id, m.user_id, c.niche AS query, c.updated_at AS at
+        FROM channels c JOIN memberships m ON m.workspace_id = c.workspace_id AND m.role = 'owner'
+        WHERE c.deleted_at IS NULL AND length(trim(c.niche)) > 2
+      UNION ALL
+      SELECT workspace_id, user_id, query, created_at FROM saved_niches
+      UNION ALL
+      SELECT workspace_id, user_id, niche, created_at FROM content_idea_sets WHERE user_id IS NOT NULL AND length(trim(niche)) > 2
+    )
+    SELECT DISTINCT ON (workspace_id, lower(trim(query))) workspace_id, user_id, trim(query) AS query
+    FROM niches ORDER BY workspace_id, lower(trim(query)), at DESC
+  `) as unknown as { workspace_id: string; user_id: string; query: string }[];
+  const perWorkspace = new Map<string, number>();
+  const existing = (await db()`SELECT workspace_id, count(*)::int AS n FROM trend_watches GROUP BY workspace_id`) as unknown as { workspace_id: string; n: number }[];
+  for (const e of existing) perWorkspace.set(e.workspace_id, e.n);
+  let added = 0;
+  for (const r of rows) {
+    const n = perWorkspace.get(r.workspace_id) ?? 0;
+    if (n >= MAX_AUTO_WATCHES) continue;
+    const res = await db()`
+      INSERT INTO trend_watches (workspace_id, user_id, query, region, email_digest)
+      VALUES (${r.workspace_id}, ${r.user_id}, ${r.query.slice(0, 120)}, '', true)
+      ON CONFLICT (workspace_id, query, region) DO NOTHING RETURNING id
+    `;
+    if (res.length) {
+      added++;
+      perWorkspace.set(r.workspace_id, n + 1);
+    }
+  }
+  return { added };
 }
 
 async function competitorAlerts(): Promise<{ workspaces: number; emailed: number }> {
@@ -126,77 +181,9 @@ async function competitorAlerts(): Promise<{ workspaces: number; emailed: number
   return { workspaces: rows.length, emailed };
 }
 
-/** "Top videos in your niche" briefing from the day's trend scans. */
-export function nicheBriefing(sections: { query: string; result: TrendResult }[]): { subject: string; html: string; text: string } | null {
-  const withVideos = sections.filter((s) => s.result.videos.length > 0);
-  if (withVideos.length === 0) return null;
-  const all = withVideos.flatMap((s) => s.result.videos.map((v) => ({ ...v, query: s.query, median: s.result.medianViewsPerHour })));
-  const best = [...all].sort((a, b) => b.viewsPerHour - a.viewsPerHour)[0];
-  const watch = (id: string) => `https://www.youtube.com/watch?v=${id}`;
-  const lift = (v: { viewsPerHour: number; median: number }) => (v.median > 0 ? v.viewsPerHour / v.median : 0);
-  const newCount = all.filter((v) => v.isNew).length;
-  const blocks: EmailBlock[] = [
-    {
-      type: "stats",
-      items: [
-        { label: "Videos tracked", value: String(all.length) },
-        { label: "New since yesterday", value: String(newCount), tone: newCount ? "good" : undefined },
-        { label: "Fastest views / hour", value: num(best.viewsPerHour), tone: "hot" },
-      ],
-    },
-    {
-      type: "hero-video",
-      rank: 1,
-      title: best.title,
-      channel: `${best.channelTitle}${best.channelSubs !== null ? ` · ${num(best.channelSubs)} subscribers` : ""}`,
-      thumbnail: best.thumbnail,
-      url: watch(best.videoId),
-      meta: [`${num(best.views)} views`, `${num(best.viewsPerHour)} views/hour`, ...(lift(best) >= 1.5 ? [`${lift(best).toFixed(1)}× the niche pace`] : [])],
-      badge: best.isNew ? "New today" : lift(best) >= 2 ? "Breakout" : undefined,
-    },
-  ];
-  for (const s of withVideos) {
-    const rest = s.result.videos.filter((v) => v.videoId !== best.videoId).slice(0, 4);
-    if (rest.length) {
-      blocks.push({ type: "heading", text: `Top in “${s.query}”`, note: "last 7 days" });
-      blocks.push({
-        type: "videos",
-        items: rest.map((v, i) => ({
-          rank: i + (s.result.videos[0]?.videoId === best.videoId ? 2 : 1),
-          title: v.title,
-          channel: v.channelTitle,
-          thumbnail: v.thumbnail,
-          url: watch(v.videoId),
-          meta: `${num(v.views)} views · ${num(v.viewsPerHour)}/hr`,
-          badge: v.isNew ? "New" : s.result.medianViewsPerHour > 0 && v.viewsPerHour >= 2 * s.result.medianViewsPerHour ? "Breakout" : undefined,
-        })),
-      });
-    }
-    const phrases = s.result.phrases.slice(0, 8).map((p) => p.phrase);
-    if (phrases.length) blocks.push({ type: "chips", label: `Phrases rising in “${s.query}” titles:`, items: phrases });
-  }
-  const topPhrase = withVideos[0].result.phrases[0]?.phrase;
-  blocks.push({
-    type: "callout",
-    title: "Today's idea",
-    text: topPhrase
-      ? `Viewers are clicking on “${topPhrase}” right now. Take the #1 video's promise, add your own angle, and ship it while the topic is rising.`
-      : "Take the #1 video's promise, add your own angle, and ship it while the topic is rising.",
-    action: { label: "Turn it into a video", url: `${appUrl()}/intelligence/lab?seed=${encodeURIComponent(topPhrase || best.title)}` },
-  });
-  const niches = withVideos.map((s) => s.query);
-  const mail = renderEmail({
-    preheader: `#1 right now: “${best.title}” — ${num(best.viewsPerHour)} views/hour.`,
-    eyebrow: "Daily niche briefing",
-    heading: niches.length === 1 ? `Best videos in ${niches[0]} today` : "Best videos in your niches today",
-    intro: `What's winning on YouTube in the last 7 days${niches.length > 1 ? ` across ${niches.join(", ")}` : ""} — ranked by how fast they're pulling views.`,
-    blocks,
-    cta: { label: "Open Trend Radar", url: `${appUrl()}/intelligence/trends` },
-    secondary: { label: "Find more niches", url: `${appUrl()}/intelligence/niche` },
-    reason: "You get this because a topic in your Trend Radar has the daily email on. Turn it off there anytime.",
-    appUrl: appUrl(),
-  });
-  return { subject: `🔥 #1 in ${niches[0]}: “${best.title.slice(0, 50)}${best.title.length > 50 ? "…" : ""}”`, ...mail };
+/** "Top videos in your niche" briefing, in today's rotating format. */
+export function nicheBriefing(sections: { query: string; result: TrendResult }[]) {
+  return nicheBrief(sections, appUrl());
 }
 
 async function calendarReminders(): Promise<{ sent: number }> {
@@ -255,6 +242,7 @@ export async function runDaily() {
     abtests: await safe("abtests", rotateDueTests),
     reminders: await safe("reminders", calendarReminders),
     competitors: await safe("competitors", competitorAlerts),
+    follow: await safe("follow", autoFollowNiches),
     trends: await safe("trends", trendDigests),
     housekeeping: await safe("housekeeping", pruneSharedLimits),
   };
