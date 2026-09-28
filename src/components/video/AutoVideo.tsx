@@ -356,6 +356,9 @@ export function GenerateVideoDialog({
       const preset = presetById(vertical ? "shorts" : "youtube");
       const canvas = video.compFor(project.id).canvas;
       video.setCanvas(project.id, { ...canvas, preset: preset.id, aspect: preset.aspect, width: preset.width, height: preset.height });
+      // Hold the last shot after the final word so the video doesn't stop abruptly.
+      const last = scenes[scenes.length - 1];
+      if (last) last.durationSec = Math.round((last.durationSec + 1.5) * 100) / 100;
       const clips = buildFromScenes(scenes, made);
       video.setClips(project.id, clips);
       set("build", { state: "done", detail: `${clips.length} clips · ${Math.round(scenes.reduce((n, s) => n + s.durationSec, 0))}s` });

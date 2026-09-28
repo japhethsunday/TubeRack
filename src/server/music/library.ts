@@ -144,34 +144,43 @@ const jamendoFiles = new Map<string, string>();
 /** Titles that point to a vocal song rather than an instrumental bed. */
 const SONG_LIKE = /\b(feat\.?|ft\.|vocal|vocals|remix|radio edit|lyrics?|rap|karaoke|acapella|a cappella)\b/i;
 
-async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, extra: string, broad = false): Promise<LibraryTrack[]> {
+/**
+ * Search levels, strictest first. Licence (no NC/ND) and length are checked
+ * here in code, so the looser levels never let unusable tracks through —
+ * they just stop Jamendo's own filters from returning nothing.
+ */
+type JamendoLevel = "tags" | "keyword" | "open";
+
+async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, extra: string, level: JamendoLevel = "tags"): Promise<LibraryTrack[]> {
   const params = new URLSearchParams({
     client_id: clientId,
     format: "json",
-    limit: "30",
-    offset: String((Math.max(1, Math.min(30, page)) - 1) * 30),
+    limit: level === "open" ? "100" : "30",
+    offset: String((Math.max(1, Math.min(30, page)) - 1) * (level === "open" ? 100 : 30)),
     vocalinstrumental: "instrumental",
-    fuzzytags: MUSIC_MOODS[mood].tags.replace(/ /g, "+"),
     audioformat: "mp32",
+    include: "licenses",
     order: "popularity_total",
-    durationbetween: "45_900",
-    ccnc: "false",
-    ccnd: "false",
   });
-  if (extra) params.set("search", extra);
-  if (broad) {
-    params.delete("fuzzytags");
+  if (level === "tags") {
+    params.set("fuzzytags", MUSIC_MOODS[mood].tags.replace(/ /g, "+"));
+    if (extra) params.set("search", extra);
+  } else if (level === "keyword") {
     params.set("search", MUSIC_MOODS[mood].query.split(" ")[0]);
     params.set("order", "relevance");
+  } else {
+    params.set("order", "popularity_week");
   }
   const body = (await get(`${JAMENDO}?${params}`)) as { headers?: { status?: string; error_message?: string; results_count?: number }; results?: JamendoRaw[] };
   if (body.headers?.status && body.headers.status !== "success") throw new Error(`Music library: ${body.headers.error_message ?? body.headers.status}`);
-  if (!body.results?.length) console.warn(`[music] jamendo empty (${mood}${broad ? ", broad" : ""}): ${JSON.stringify(body.headers ?? {}).slice(0, 300)}`);
+  if (!body.results?.length) console.warn(`[music] jamendo empty (${mood}, ${level}): ${JSON.stringify(body.headers ?? {}).slice(0, 300)}`);
   const out: LibraryTrack[] = [];
   for (const r of body.results ?? []) {
     const t = jamendoTrack(r);
     if (!t) continue;
     if (SONG_LIKE.test(r.name ?? "")) continue;
+    // Beds need some length (the strict API filter is gone, so check here).
+    if (t.durationSec !== null && (t.durationSec < 40 || t.durationSec > 900)) continue;
     if (r.audiodownload_allowed !== false && r.audiodownload) jamendoFiles.set(t.id, r.audiodownload);
     out.push(t);
   }
@@ -201,11 +210,19 @@ export async function searchLibraryMusic(mood: MusicMoodId, page = 1, extra = ""
       return [] as LibraryTrack[];
     });
     if (tracks.length) return tracks;
-    // Empty answers happen now and then: retry broader (no extra words, loose tags) before the fallback.
-    const retry = await jamendoSearch(clientId, mood, page, "", true).catch(() => [] as LibraryTrack[]);
-    if (retry.length) return retry;
+    // Empty answers happen: step down to a single keyword, then to popular instrumentals.
+    for (const level of ["keyword", "open"] as const) {
+      const more = await jamendoSearch(clientId, mood, page, "", level).catch(() => [] as LibraryTrack[]);
+      if (more.length) return more;
+    }
   }
-  return openverseSearch(mood, page, extra);
+  // Last resort. It may need its own key now, so a failure here isn't fatal on its own.
+  const open = await openverseSearch(mood, page, extra).catch((e) => {
+    console.warn("[music] open library failed", e instanceof Error ? e.message : e);
+    return [] as LibraryTrack[];
+  });
+  if (open.length || clientId) return open;
+  throw new Error("The music library isn't available right now.");
 }
 
 async function openverseSearch(mood: MusicMoodId, page = 1, extra = ""): Promise<LibraryTrack[]> {

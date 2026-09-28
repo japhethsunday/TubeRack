@@ -218,10 +218,15 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
       (a) => a.kind === "video" && a.status === "ready" && (a.approval === "approved" || a.approval === "used") && a.sceneIds.includes(seg.sceneId),
     );
     const image = sceneVideos.length ? undefined : approvedImageFor(seg.sceneId, assets);
+    // Scene changes blend (short crossfade) instead of hard-cutting; the very
+    // last picture fades out so the video ends cleanly.
+    const blend = seg.number > 1 ? { transitionIn: "fade", transitionSec: 0.4 } : {};
+    const isLast = seg.number === scenes.length;
     for (let at = 0, i = 0; sceneVideos.length && at < seg.durationSec - 0.2; i++) {
       const clipAsset = sceneVideos[i % sceneVideos.length];
       const len = clipAsset.durationSec && clipAsset.durationSec > 1 ? clipAsset.durationSec : seg.durationSec;
       const dur = Math.min(len, seg.durationSec - at);
+      const endsVideo = isLast && at + dur >= seg.durationSec - 0.2;
       clips.push({
         ...clipBase("track_video", "video", clipAsset.title, seg.startSec + at, dur),
         sceneId: seg.sceneId,
@@ -229,6 +234,8 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
         inSec: 0,
         volume: 0,
         muted: true,
+        ...(i === 0 ? blend : {}),
+        ...(endsVideo ? { fadeOutSec: 0.8 } : {}),
       });
       at += dur;
     }
@@ -238,6 +245,8 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
         sceneId: seg.sceneId,
         assetId: image.id,
         motion: "kenburns",
+        ...blend,
+        ...(isLast ? { fadeOutSec: 0.8 } : {}),
       });
     }
     const voice = voiceFor(seg.sceneId, assets);
