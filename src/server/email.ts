@@ -151,7 +151,7 @@ export async function sendRecoveryCodeEmail(request: Request, to: string, code: 
       { type: "code", text: code },
       { type: "text", text: "Never share this code. Recktube will never ask you for it." },
     ],
-    cta: { label: "Open the reset page", url: `${linkOrigin(request)}/forgot-password?email=${encodeURIComponent(to)}` },
+    cta: { label: "Open the reset page", url: `${linkOrigin(request)}/forgot-password?email=${encodeURIComponent(to)}&step=code` },
     reason: "If you did not ask for this, ignore this email — your password stays the same.",
     appUrl: linkOrigin(request),
   });

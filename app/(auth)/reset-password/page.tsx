@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AuthLayout } from "@/src/components/auth/AuthLayout";
+import { GlassAuthCard as AuthLayout } from "@/src/components/auth/SplitAuthCard";
 import { ErrorState } from "@/src/components/ui/states";
 import { authError } from "@/src/lib/auth/errors";
 import { ResetForm } from "@/app/(auth)/reset-password/form";

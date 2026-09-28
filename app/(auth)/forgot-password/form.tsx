@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, KeyRound, Loader2, MailCheck } from "lucide-react";
-import { AuthLayout } from "@/src/components/auth/AuthLayout";
+import { ArrowLeft, ArrowRight, KeyRound, Loader2, Lock, Mail, MailCheck } from "lucide-react";
+import { GlassAuthCard, GlowField, gradientButton } from "@/src/components/auth/SplitAuthCard";
 import { CodeInput } from "@/src/components/auth/CodeInput";
-import { PasswordField } from "@/src/components/auth/PasswordField";
 import { PasswordStrength } from "@/src/components/auth/PasswordStrength";
 import { fieldErrors } from "@/src/components/auth/form";
 import { forgotSchema, resetSchema } from "@/src/lib/auth/validation";
-import { Input } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
 import { api, ApiError } from "@/src/lib/api";
 
@@ -36,8 +34,8 @@ function Badge({ done }: { done?: boolean }) {
   );
 }
 
-export function ForgotFlow({ initialEmail }: { initialEmail: string }) {
-  const [step, setStep] = useState<Step>(initialEmail ? "code" : "email");
+export function ForgotFlow({ initialEmail, startAtCode }: { initialEmail: string; startAtCode: boolean }) {
+  const [step, setStep] = useState<Step>(startAtCode ? "code" : "email");
   const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState("");
   const [token, setToken] = useState("");
@@ -47,7 +45,7 @@ export function ForgotFlow({ initialEmail }: { initialEmail: string }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [codeState, setCodeState] = useState<"idle" | "error" | "success">("idle");
   const [loading, setLoading] = useState(false);
-  const [resendIn, setResendIn] = useState(initialEmail ? 0 : RESEND_AFTER);
+  const [resendIn, setResendIn] = useState(startAtCode ? 0 : RESEND_AFTER);
 
   useEffect(() => {
     if (step !== "code" || resendIn <= 0) return;
@@ -125,22 +123,22 @@ export function ForgotFlow({ initialEmail }: { initialEmail: string }) {
   );
 
   return (
-    <AuthLayout
+    <GlassAuthCard
       title={titles[step][0]}
       subtitle={titles[step][1]}
       footer={
-        <Link href="/login" className="font-medium text-foreground underline">
+        <Link href="/login" className="font-medium text-foreground hover:text-primary">
           Back to sign in
         </Link>
       }
     >
-      <div key={step} className="otp-glass otp-in -m-6 p-6 sm:-m-7 sm:p-7">
+      <div key={step} className="otp-in">
         {step === "email" && (
           <form onSubmit={sendCode} noValidate className="space-y-4">
             <Badge />
-            <Input label="Email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} placeholder="you@studio.com" />
+            <GlowField icon={Mail} label="Email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} />
             {alert}
-            <Button type="submit" loading={loading} className="auth-sheen group h-11 w-full">
+            <Button type="submit" loading={loading} className={gradientButton}>
               Send code
               {!loading && <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />}
             </Button>
@@ -172,7 +170,7 @@ export function ForgotFlow({ initialEmail }: { initialEmail: string }) {
                 </button>
               )}
             </p>
-            <Button className="auth-sheen h-11 w-full" disabled={code.length !== 6 || codeState === "success"} onClick={() => void verify()}>
+            <Button className={gradientButton} disabled={code.length !== 6 || codeState === "success"} onClick={() => void verify()}>
               {loading ? <><Loader2 className="size-4 animate-spin" aria-hidden="true" /> Verifying code…</> : codeState === "success" ? "Verified" : "Verify code"}
             </Button>
             <button type="button" onClick={() => { setStep("email"); setFormError(null); }} className="inline-flex items-center gap-1 text-xs text-muted-text hover:text-foreground">
@@ -185,12 +183,12 @@ export function ForgotFlow({ initialEmail }: { initialEmail: string }) {
           <form onSubmit={reset} noValidate className="space-y-4">
             <Badge done />
             <div className="space-y-2">
-              <PasswordField label="New password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
+              <GlowField icon={Lock} label="New password" password autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
               <PasswordStrength value={password} />
             </div>
-            <PasswordField label="Confirm new password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} error={errors.confirm} />
+            <GlowField icon={Lock} label="Confirm new password" password autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} error={errors.confirm} />
             {alert}
-            <Button type="submit" loading={loading} className="auth-sheen h-11 w-full">Set new password</Button>
+            <Button type="submit" loading={loading} className={gradientButton}>Set new password</Button>
           </form>
         )}
 
@@ -201,12 +199,12 @@ export function ForgotFlow({ initialEmail }: { initialEmail: string }) {
               <MailCheck className="size-4 text-success" aria-hidden="true" />
               Your password was changed. Other devices were signed out.
             </p>
-            <Link href="/login" className="auth-sheen inline-flex h-11 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
+            <Link href="/login" className={`${gradientButton} inline-flex items-center justify-center px-4 text-sm font-medium hover:opacity-90`}>
               Sign in with your new password
             </Link>
           </div>
         )}
       </div>
-    </AuthLayout>
+    </GlassAuthCard>
   );
 }

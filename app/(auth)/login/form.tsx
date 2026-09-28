@@ -3,15 +3,13 @@
 import { GoogleButton } from "@/src/components/auth/GoogleButton";
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { AuthLayout } from "@/src/components/auth/AuthLayout";
-import { PasswordField } from "@/src/components/auth/PasswordField";
+import { ArrowRight, Lock, Mail } from "lucide-react";
+import { GlowField, SplitAuthCard, stagger } from "@/src/components/auth/SplitAuthCard";
 import { AuthBoundaryNotice } from "@/src/components/auth/AuthBoundaryNotice";
 import { AccountStateBanner } from "@/src/components/auth/AccountStateBanner";
 import { fieldErrors } from "@/src/components/auth/form";
 import { loginSchema } from "@/src/lib/auth/validation";
 import { api, ApiError } from "@/src/lib/api";
-import { Input } from "@/src/components/ui/fields";
 import { Checkbox } from "@/src/components/ui/choices";
 import { Button } from "@/src/components/ui/Button";
 
@@ -62,17 +60,14 @@ export function LoginForm({ returnTo, expired, externalError }: { returnTo: stri
   }
 
   return (
-    <AuthLayout
-      title="Welcome back"
-      subtitle="Sign in to pick up where you left off."
-      footer={
-        <>
-          New to Recktube?{" "}
-          <Link href="/signup" className="font-medium text-foreground underline underline-offset-4">
-            Create an account
-          </Link>
-        </>
-      }
+    <SplitAuthCard
+      panelSide="right"
+      panelTitle="Welcome back!"
+      panelText="Sign in to pick up where you left off — your projects, ideas and drafts are waiting."
+      switchLabel="New here? Create an account"
+      switchHref="/signup"
+      title="Sign in"
+      subtitle="Welcome back to your studio."
     >
       {expired && (
         <div className="mb-4">
@@ -90,36 +85,22 @@ export function LoginForm({ returnTo, expired, externalError }: { returnTo: stri
         {externalError && (
           <p role="alert" className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{externalError}</p>
         )}
-        <div className="auth-rise mb-4" style={{ animationDelay: "180ms" }}>
+        <div className="su-from-left mb-4" style={stagger(0)}>
           <GoogleButton returnTo={returnTo} />
         </div>
         <form key={shake} onSubmit={submit} noValidate className={`space-y-4 ${shake > 0 ? "auth-shake" : ""}`}>
-          <div className="auth-rise" style={{ animationDelay: "240ms" }}>
-          <Input
-            label="Email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={errors.email}
-            placeholder="you@studio.com"
-          />
+          <div className="su-from-left" style={stagger(1)}>
+            <GlowField icon={Mail} label="Email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} />
           </div>
-          <div className="auth-rise" style={{ animationDelay: "300ms" }}>
-            <PasswordField
-              label="Password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              error={errors.password}
-            />
-            <p className="mt-1 text-right">
-              <Link href="/forgot-password" className="text-xs font-medium text-muted-text underline">
+          <div className="su-from-left" style={stagger(2)}>
+            <GlowField icon={Lock} label="Password" password autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
+            <p className="mt-1.5 text-right">
+              <Link href="/forgot-password" className="text-xs font-medium text-muted-text hover:text-foreground">
                 Forgot password?
               </Link>
             </p>
           </div>
-          <div className="auth-rise" style={{ animationDelay: "360ms" }}>
+          <div className="su-from-left" style={stagger(3)}>
             <Checkbox
               label="Stay signed in for 30 days"
               checked={remember}
@@ -131,15 +112,18 @@ export function LoginForm({ returnTo, expired, externalError }: { returnTo: stri
               {formError}
             </p>
           )}
-          <div className="auth-rise" style={{ animationDelay: "420ms" }}>
-            <Button type="submit" loading={loading} className="auth-sheen group h-11 w-full">
+          <div className="su-from-left" style={stagger(4)}>
+            <Button type="submit" loading={loading} className="auth-sheen group h-11 w-full rounded-full bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 text-white">
               {loading ? "Signing in…" : "Sign in"}
               {!loading && <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />}
             </Button>
           </div>
+          <p className="su-from-left text-center text-xs text-muted-text md:hidden" style={stagger(5)}>
+            New to Recktube? <Link href="/signup" className="font-medium text-primary">Create an account</Link>
+          </p>
         </form>
         </>
       )}
-    </AuthLayout>
+    </SplitAuthCard>
   );
 }

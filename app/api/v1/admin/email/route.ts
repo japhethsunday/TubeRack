@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/src/server/admin";
+import { adminDb, requireAdmin } from "@/src/server/admin";
 import { ADMIN_TEMPLATES, SECURITY_ADDRESS, SUPPORT_ADDRESS, missingFields, templateById } from "@/src/server/admin-mail";
 import { sendEmail } from "@/src/server/email";
 import { getServerEnv } from "@/src/lib/env";
@@ -8,9 +8,17 @@ import { audit } from "@/src/server/audit";
 import { toErrorResponse, validationError } from "@/src/server/errors";
 import { emailSchema, parseBody } from "@/src/server/validate";
 
-/** GET /api/v1/admin/email — the branded templates you can send. */
+/** GET /api/v1/admin/email — the branded templates you can send; ?lookup=email finds that user's name. */
 export async function GET(request: Request) {
   try {
+    const lookup = new URL(request.url).searchParams.get("lookup");
+    if (lookup !== null) {
+      await requireAdmin(request, "email.lookup");
+      const email = emailSchema.safeParse(lookup);
+      if (!email.success) return NextResponse.json({ data: { found: false } });
+      const [u] = await adminDb()`SELECT name FROM users WHERE lower(email) = ${email.data.toLowerCase()} AND deleted_at IS NULL LIMIT 1`;
+      return NextResponse.json({ data: u ? { found: true, name: String(u.name ?? "").trim() } : { found: false } });
+    }
     await requireAdmin(request, "email.templates");
     return NextResponse.json({ data: ADMIN_TEMPLATES.map(({ build: _build, ...t }) => t) });
   } catch (error) {

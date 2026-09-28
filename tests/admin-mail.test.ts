@@ -26,3 +26,16 @@ describe("admin email templates", () => {
     assert.ok(!m.html.includes("javascript:"));
   });
 });
+
+describe("admin email defaults", () => {
+  it("every template is ready to send straight from its defaults", () => {
+    for (const t of ADMIN_TEMPLATES) {
+      const fields = Object.fromEntries(t.fields.map((f) => [f.key, (f.default ?? "").replace("{{ref}}", "SEC-20260928-1234")]));
+      fields.name = "Ada";
+      assert.deepEqual(missingFields(t, fields), [], `${t.id} needs a default`);
+      const out = t.build(fields, APP);
+      assert.ok(out.subject && out.html.includes("Hi Ada"), t.id);
+    }
+    assert.ok(ADMIN_TEMPLATES.length >= 19);
+  });
+});

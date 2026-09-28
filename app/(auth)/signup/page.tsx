@@ -3,9 +3,8 @@
 import { GoogleButton } from "@/src/components/auth/GoogleButton";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
-import { CircuitBackdrop } from "@/src/components/auth/CircuitBackdrop";
+import { ArrowRight, Lock, Mail, User } from "lucide-react";
+import { GlowField as Field, SplitAuthCard, stagger } from "@/src/components/auth/SplitAuthCard";
 import { PasswordStrength } from "@/src/components/auth/PasswordStrength";
 import { AuthBoundaryNotice } from "@/src/components/auth/AuthBoundaryNotice";
 import { fieldErrors } from "@/src/components/auth/form";
@@ -13,48 +12,7 @@ import { signupSchema } from "@/src/lib/auth/validation";
 import { api, ApiError } from "@/src/lib/api";
 import { Checkbox } from "@/src/components/ui/choices";
 import { Button } from "@/src/components/ui/Button";
-import { BrandMark } from "@/src/components/ui/BrandMark";
 import { cx } from "@/src/components/ui/cx";
-
-const stagger = (i: number) => ({ animationDelay: `${420 + i * 70}ms` });
-
-/** Icon field with an animated gradient border on focus. */
-function Field({
-  icon: Icon,
-  label,
-  error,
-  password,
-  ...rest
-}: { icon: typeof User; label: string; error?: string; password?: boolean } & React.InputHTMLAttributes<HTMLInputElement>) {
-  const [shown, setShown] = useState(false);
-  const id = `su-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  return (
-    <div>
-      <label htmlFor={id} className="sr-only">{label}</label>
-      <div className="su-field" data-invalid={Boolean(error)}>
-        <div className="flex items-center gap-2.5 rounded-[11px] bg-surface px-3">
-          <Icon className="size-4 shrink-0 text-muted-text" aria-hidden="true" />
-          <input
-            id={id}
-            placeholder={label}
-            aria-invalid={Boolean(error) || undefined}
-            aria-describedby={error ? `${id}-err` : undefined}
-            type={password ? (shown ? "text" : "password") : rest.type}
-            className="h-11 w-full bg-transparent text-sm placeholder:text-muted-text"
-            style={{ outline: "none" }}
-            {...rest}
-          />
-          {password && (
-            <button type="button" onClick={() => setShown((s) => !s)} aria-label={shown ? "Hide password" : "Show password"} className="text-muted-text hover:text-foreground">
-              {shown ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
-          )}
-        </div>
-      </div>
-      {error && <p id={`${id}-err`} role="alert" className="mt-1 text-xs text-destructive">{error}</p>}
-    </div>
-  );
-}
 
 export default function SignupPage() {
   const [name, setName] = useState("");
@@ -68,8 +26,6 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [shake, setShake] = useState(0);
-  const [leaving, setLeaving] = useState(false);
-  const router = useRouter();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -100,53 +56,16 @@ export default function SignupPage() {
     setLoading(false);
   }
 
-  /** The glass panel sweeps across the card, then we go to sign in. */
-  function toLogin(e: React.MouseEvent) {
-    e.preventDefault();
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return router.push("/login");
-    setLeaving(true);
-    window.setTimeout(() => router.push("/login"), 520);
-  }
-
   return (
-    <main id="main" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
-      <CircuitBackdrop />
-      <div className="su-card relative grid w-full max-w-4xl overflow-hidden rounded-3xl border border-border bg-surface/80 backdrop-blur-xl md:grid-cols-[1fr_1.1fr]">
-        {/* Welcome panel */}
-        <div className={cx("su-panel relative overflow-hidden bg-gradient-to-br from-fuchsia-600 via-violet-700 to-sky-600 p-8 text-white md:p-10 md:pr-16", leaving && "su-panel-leave z-10")}>
-          <div className="auth-grid absolute inset-0 opacity-60" />
-          <div className="otp-glass absolute inset-0" />
-          <div className="relative flex h-full flex-col">
-            <Link href="/" aria-label="Recktube home" className="su-from-left flex items-center gap-2" style={{ animationDelay: "300ms" }}>
-              <span className="flex size-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur">
-                <BrandMark className="size-[18px]" />
-              </span>
-              <span className="font-semibold tracking-tight">Recktube</span>
-            </Link>
-            <div className="my-8 md:my-auto">
-              <h1 className="su-from-left text-3xl font-extrabold uppercase tracking-tight md:text-4xl" style={{ animationDelay: "450ms" }}>
-                Hello, creator!
-              </h1>
-              <p className="su-from-left mt-3 max-w-xs text-sm text-white/80" style={{ animationDelay: "560ms" }}>
-                Enter your details and start building your channel — from idea to published video, all in one studio.
-              </p>
-              <a
-                href="/login"
-                onClick={toLogin}
-                className="su-from-left mt-6 inline-flex h-10 items-center gap-2 rounded-full border border-white/60 px-5 text-sm font-semibold transition hover:bg-white hover:text-violet-700"
-                style={{ animationDelay: "660ms" }}
-              >
-                I have an account — Sign in
-              </a>
-            </div>
-          </div>
-        </div>
-
-        {/* Form */}
-        <div className="relative p-6 sm:p-8 md:p-10">
-          <h2 className="su-from-right text-2xl font-bold tracking-tight" style={{ animationDelay: "350ms" }}>Sign up</h2>
-          <p className="su-from-right mt-1 text-sm text-muted-text" style={{ animationDelay: "400ms" }}>One account for every studio. Free to start.</p>
-          <div className="mt-6">
+    <SplitAuthCard
+      panelSide="left"
+      panelTitle="Hello, creator!"
+      panelText="Enter your details and start building your channel — from idea to published video, all in one studio."
+      switchLabel="I have an account — Sign in"
+      switchHref="/login"
+      title="Sign up"
+      subtitle="One account for every studio. Free to start."
+    >
             {sentTo ? (
               <div role="status" className="otp-in space-y-3 text-sm">
                 <p className="rounded-lg bg-success/10 p-3 text-success">Check your inbox at <strong>{sentTo}</strong>.</p>
@@ -193,9 +112,6 @@ export default function SignupPage() {
                 </form>
               </>
             )}
-          </div>
-        </div>
-      </div>
-    </main>
+    </SplitAuthCard>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AuthLayout } from "@/src/components/auth/AuthLayout";
+import { GlassAuthCard as AuthLayout, gradientButton } from "@/src/components/auth/SplitAuthCard";
 import { PasswordField } from "@/src/components/auth/PasswordField";
 import { PasswordStrength } from "@/src/components/auth/PasswordStrength";
 import { api, ApiError } from "@/src/lib/api";
@@ -100,7 +100,7 @@ export function ResetForm({ token, expired }: { token: string; expired: boolean 
               <Link href="/forgot-password" className="font-medium underline">Request a new link</Link>
             </p>
           )}
-          <Button type="submit" loading={loading} className="auth-sheen w-full">
+          <Button type="submit" loading={loading} className={gradientButton}>
             Set new password
           </Button>
         </form>

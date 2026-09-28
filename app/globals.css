@@ -302,6 +302,16 @@ body {
 .su-card { animation: otp-in 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both, su-card-glow 6s ease-in-out 0.8s infinite; }
 .su-panel { clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%); animation: su-panel-in 0.9s 0.15s cubic-bezier(0.7, 0, 0.2, 1) both; }
 .su-panel-leave { animation: su-panel-out 0.55s cubic-bezier(0.7, 0, 0.2, 1) both; }
+@keyframes su-panel-r-in {
+  from { clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%); }
+  to { clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%); }
+}
+@keyframes su-panel-r-out {
+  from { clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%); }
+  to { clip-path: polygon(-100% 0, 100% 0, 100% 100%, -100% 100%); }
+}
+.su-panel-r { clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%); animation: su-panel-r-in 0.9s 0.15s cubic-bezier(0.7, 0, 0.2, 1) both; }
+.su-panel-r-leave { animation: su-panel-r-out 0.55s cubic-bezier(0.7, 0, 0.2, 1) both; }
 .su-from-right { animation: su-slide-right 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .su-from-left { animation: su-slide-left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .su-field { position: relative; border-radius: 0.75rem; padding: 1px; background: var(--color-border); transition: background 0.3s; }
@@ -313,7 +323,7 @@ body {
 }
 .su-field[data-invalid="true"] { background: var(--color-destructive); }
 @media (max-width: 767px) {
-  .su-panel { clip-path: none; animation: su-slide-left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .su-panel, .su-panel-r { clip-path: none; animation: su-slide-left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 }
 
 /* ---------- Home page motion ---------- */

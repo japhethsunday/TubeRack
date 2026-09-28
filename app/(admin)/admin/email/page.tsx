@@ -7,7 +7,7 @@ import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
 import { Loading, PageTitle, Panel, errorText, useAdmin } from "@/src/components/admin/kit";
 
-interface Field { key: string; label: string; multiline?: boolean; placeholder?: string; optional?: boolean }
+interface Field { key: string; label: string; multiline?: boolean; placeholder?: string; optional?: boolean; default?: string }
 interface Template { id: string; name: string; mailbox: "support" | "security"; description: string; fields: Field[] }
 
 export default function AdminEmail() {
@@ -19,7 +19,45 @@ export default function AdminEmail() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [mailbox, setMailbox] = useState<"support" | "security" | null>(null);
+  const [found, setFound] = useState<{ email: string; name: string } | null>(null);
   const t = useMemo(() => data?.find((x) => x.id === id) ?? null, [data, id]);
+
+  /** Fill a template with its ready-to-send defaults (plus the recipient's name if we know it). */
+  function fillFrom(tpl: Template, name = found?.name ?? "") {
+    const d = new Date();
+    const ref = `SEC-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const next: Record<string, string> = {};
+    for (const f of tpl.fields) next[f.key] = (f.default ?? "").replace("{{ref}}", ref);
+    if (tpl.fields.some((f) => f.key === "name")) next.name = name.split(" ")[0] ?? "";
+    if (tpl.fields.some((f) => f.key === "email") && /.+@.+\..+/.test(to)) next.email = to.trim();
+    setFields(next);
+  }
+
+  // The first template gets its defaults as soon as the list loads.
+  const [filledFor, setFilledFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!t || filledFor === t.id) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-fill once when the template list arrives.
+    setFilledFor(t.id);
+    fillFrom(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fillFrom reads current state on purpose.
+  }, [t, filledFor]);
+
+  // Look up the recipient: if they have an account, use their first name.
+  useEffect(() => {
+    const email = to.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    const timer = window.setTimeout(() => {
+      api
+        .get<{ found: boolean; name?: string }>(`/api/v1/admin/email?lookup=${encodeURIComponent(email)}`)
+        .then((r) => {
+          setFound(r.found ? { email, name: r.name ?? "" } : null);
+          if (r.found && r.name) setFields((f) => ("name" in f && !f.name ? { ...f, name: r.name!.split(" ")[0] } : f));
+        })
+        .catch(() => {});
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [to]);
 
   // Live preview, debounced.
   useEffect(() => {
@@ -53,11 +91,11 @@ export default function AdminEmail() {
         <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
           <div className="space-y-4">
             <Panel title="Template">
-              <ul className="space-y-1">
+              <ul className="max-h-[420px] space-y-1 overflow-y-auto pr-1">
                 {data.map((x) => (
                   <li key={x.id}>
                     <button
-                      onClick={() => { setId(x.id); setMsg(null); setMailbox(null); }}
+                      onClick={() => { setId(x.id); setMsg(null); setMailbox(null); setFilledFor(x.id); fillFrom(x); }}
                       className={cx("flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left", id === x.id ? "bg-primary/15" : "hover:bg-muted")}
                     >
                       {x.mailbox === "security" ? <ShieldCheck className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" /> : <LifeBuoy className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />}
@@ -93,6 +131,9 @@ export default function AdminEmail() {
                   <label className="block space-y-1">
                     <span className="text-xs text-muted-text">To</span>
                     <input type="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="creator@example.com" className="h-9 w-full rounded-lg border border-border bg-background px-2.5" />
+                    {found && found.email === to.trim().toLowerCase() && (
+                      <span className="block text-[11px] text-success">Recktube user{found.name ? `: ${found.name}` : ""} — name filled in.</span>
+                    )}
                   </label>
                   {t.fields.map((f) => (
                     <label key={f.key} className="block space-y-1">
@@ -104,6 +145,7 @@ export default function AdminEmail() {
                       )}
                     </label>
                   ))}
+                  <button type="button" onClick={() => fillFrom(t)} className="text-xs text-muted-text underline-offset-4 hover:text-foreground hover:underline">Reset to the template&apos;s text</button>
                   <Button className="w-full" disabled={!/.+@.+\..+/.test(to)} loading={busy} onClick={() => void send()}><Send className="size-4" aria-hidden="true" /> Send email</Button>
                   {msg && <p className={cx("text-xs", msg.ok ? "text-success" : "text-destructive")}>{msg.text}</p>}
                 </div>
