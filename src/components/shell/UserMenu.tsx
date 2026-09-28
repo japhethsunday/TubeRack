@@ -12,6 +12,7 @@ import {
   Check,
   Gift,
   Gauge,
+  Clapperboard,
 } from "lucide-react";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Drawer, Modal } from "@/src/components/ui/overlays";
@@ -61,6 +62,17 @@ export function UserMenu({ user, onClose }: { user: SessionInfo | null; onClose:
               </li>
             </ul>
           </div>
+
+          {user?.is_owner && (
+            <a
+              href="/brand"
+              className="flex items-center gap-3 rounded-xl border border-fuchsia-500/40 bg-gradient-to-r from-fuchsia-500/10 to-sky-500/10 px-3 py-3 text-sm font-semibold"
+            >
+              <Clapperboard className="size-5 text-fuchsia-500" aria-hidden="true" />
+              <span className="flex-1">Recktube Channel Manager</span>
+              <span aria-hidden="true">→</span>
+            </a>
+          )}
 
           {user?.is_admin && (
             <a

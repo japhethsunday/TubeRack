@@ -31,6 +31,14 @@ export default function AdminPromo() {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ feature: "overview", style: "Problem → solution", platform: "YouTube Shorts", lengthSec: 30, angle: "" });
+  // Opened from the Channel Manager's content plan: pre-fill that video.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const angle = q.get("angle");
+    if (!angle) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read the link's pre-fill once after mount.
+    setForm((f) => ({ ...f, angle: angle.slice(0, 600), feature: q.get("feature") || f.feature, lengthSec: q.get("format") === "Long" ? 90 : f.lengthSec, platform: q.get("format") === "Long" ? f.platform : "YouTube Shorts" }));
+  }, []);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);

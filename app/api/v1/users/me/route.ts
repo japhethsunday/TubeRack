@@ -6,7 +6,7 @@ import { parseBody, nameSchema } from "@/src/server/validate";
 import { limiterFor, callerKey } from "@/src/server/rate-limit";
 import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
-import { adminRole } from "@/src/server/admin";
+import { adminRole, isAdmin } from "@/src/server/admin";
 import { z } from "zod";
 
 /** GET /api/v1/users/me — never includes password hashes or tokens. */
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
       WHERE u.id = ${user.id} GROUP BY u.id LIMIT 1
     `;
     // is_admin only shows the console link; the admin pages and APIs check on the server.
-    return NextResponse.json({ data: rows[0] ? { ...rows[0], is_admin: Boolean(await adminRole(user)) } : null });
+    return NextResponse.json({ data: rows[0] ? { ...rows[0], is_admin: Boolean(await adminRole(user)), is_owner: isAdmin(user) } : null });
   } catch (error) {
     return toErrorResponse(error);
   }

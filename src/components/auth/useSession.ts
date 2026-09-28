@@ -10,6 +10,7 @@ export interface SessionInfo {
   name: string;
   email_verified_at: string | null;
   is_admin?: boolean;
+  is_owner?: boolean;
 }
 
 export type SessionState =
