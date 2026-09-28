@@ -17,6 +17,21 @@ const SUGGESTIONS = ["A generation or export failed", "Questions about my credit
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Please try again.");
 const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
+/** Replies may carry light markdown: show **bold** as bold and tidy bullets/headings instead of raw symbols. */
+function Rich({ text }: { text: string }) {
+  const clean = text
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^(\s*)[*-]\s+/gm, "$1• ")
+    .replace(/`([^`]+)`/g, "$1");
+  return (
+    <>
+      {clean.split(/(\*\*[^*]+\*\*|__[^_]+__)/g).map((part, i) =>
+        /^(\*\*|__).+\1$/.test(part) ? <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong> : part.replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|[.,!?;:]|$)/g, "$1$2"),
+      )}
+    </>
+  );
+}
+
 function Bubble({ m }: { m: Msg }) {
   if (m.role === "system") return <p className="support-in mx-auto max-w-[85%] text-center text-[11px] text-muted-text">{m.body}</p>;
   const mine = m.role === "user";
@@ -29,7 +44,7 @@ function Bubble({ m }: { m: Msg }) {
           mine ? "rounded-br-md bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white" : m.role === "admin" ? "rounded-bl-md border border-primary/40 bg-primary/10" : "rounded-bl-md bg-muted",
         )}
       >
-        {m.body}
+        {mine ? m.body : <Rich text={m.body} />}
       </div>
       <span className="mt-0.5 px-1 text-[10px] text-muted-text">{time(m.createdAt)}</span>
     </div>

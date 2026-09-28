@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FlaskConical, PenLine, Clapperboard, ArrowRight } from "lucide-react";
+import { MobileHome } from "@/src/components/home/MobileHome";
 import { NewProjectButton } from "@/src/components/projects/NewProjectDialog";
 import { LocalStorageNote, useProjects } from "@/src/components/projects/ProjectsProvider";
 import { continueLabelFor, progressOf } from "@/src/lib/projects/store";
@@ -38,7 +39,9 @@ export default function DashboardPage() {
   const recent = [...active].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 3);
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-8">
+    <>
+    <MobileHome />
+    <div className="mx-auto hidden w-full max-w-6xl space-y-8 lg:block">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-text">
@@ -190,6 +193,7 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

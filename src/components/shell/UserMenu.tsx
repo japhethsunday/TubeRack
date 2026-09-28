@@ -11,6 +11,7 @@ import {
   Plus,
   Check,
   Gift,
+  Gauge,
 } from "lucide-react";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Drawer, Modal } from "@/src/components/ui/overlays";
@@ -60,6 +61,17 @@ export function UserMenu({ user, onClose }: { user: SessionInfo | null; onClose:
               </li>
             </ul>
           </div>
+
+          {user?.is_admin && (
+            <a
+              href="/admin"
+              className="flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 text-sm font-semibold text-primary lg:hidden"
+            >
+              <Gauge className="size-5" aria-hidden="true" />
+              <span className="flex-1">Admin console</span>
+              <span aria-hidden="true">→</span>
+            </a>
+          )}
 
           <div>
             <p className="px-1 text-[11px] font-semibold uppercase tracking-wider text-disabled-text">
