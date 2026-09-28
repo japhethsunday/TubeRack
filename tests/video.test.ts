@@ -393,3 +393,12 @@ it("project format picks the canvas", () => {
   assert.equal(presetForProject({ platform: "YouTube", contentType: "Long-form video" }).aspect, "16:9");
   assert.equal(presetForProject({ platform: "YouTube", contentType: "Short" }).height, 1920);
 });
+
+describe("captions: natural line breaks", () => {
+  it("breaks at dashes, never shows a dash at a line edge, and doesn't end lines on weak words", () => {
+    const chunks = captionChunks("Start with a video idea—tailored to your niche—then a script that hooks viewers—and thumbnails that stop the scroll.");
+    assert.ok(chunks.every((c) => !/^[—–]|[—–]$/.test(c)), JSON.stringify(chunks));
+    assert.ok(chunks.every((c) => !/\b(a|to|your|with|the)$/i.test(c)), JSON.stringify(chunks));
+    assert.ok(chunks.includes("tailored to your niche"), JSON.stringify(chunks));
+  });
+});

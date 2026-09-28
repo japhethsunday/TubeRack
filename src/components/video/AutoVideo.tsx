@@ -188,7 +188,14 @@ export function GenerateVideoDialog({
       // service, and every other scene asks for that same one.
       let engine: string | undefined;
       const voiceScene = async (scene: Scene) => {
-        const out = await synthesizeProviderSpeech(sceneSpeech(scene), undefined, engine);
+        // Voice services refuse bursts ("too many requests"): wait and try again
+        // rather than leave the scene silent. Last try lets any voice answer.
+        let out = await synthesizeProviderSpeech(sceneSpeech(scene), undefined, engine);
+        for (const wait of [3000, 8000, 15000]) {
+          if (out.ok || isCancelled()) break;
+          await new Promise((r) => setTimeout(r, wait));
+          out = await synthesizeProviderSpeech(sceneSpeech(scene), undefined, wait === 15000 ? undefined : engine);
+        }
         if (out.ok && !engine) engine = out.data.model;
         if (!out.ok) {
           voiceErrors.push(out.message);
@@ -221,6 +228,17 @@ export function GenerateVideoDialog({
       const rest = scenes.slice(voiced);
       await pool(rest, 2, isCancelled, voiceScene);
       if (isCancelled()) return;
+      // One more calm pass, one at a time, for any scene still without a voice.
+      const missing = scenes.filter((sc) => !made.some((a) => a.kind === "voice" && a.sceneIds?.includes(sc.id)));
+      if (missing.length) {
+        voiced -= missing.length;
+        voiceErrors.length = 0;
+        for (const sc of missing) {
+          if (isCancelled()) return;
+          await new Promise((r) => setTimeout(r, 4000));
+          await voiceScene(sc);
+        }
+      }
       const voiceOk = made.filter((a) => a.kind === "voice").length;
       set("voice", { state: voiceOk === scenes.length ? "done" : voiceOk ? "partial" : "failed", detail: voiceOk === scenes.length ? `${voiceOk} takes` : `${voiceOk}/${scenes.length} — ${voiceErrors[0] ?? "failed"}` });
       putScenes(project.id, scenes); // durations now match the voice

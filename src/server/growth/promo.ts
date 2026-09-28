@@ -95,6 +95,8 @@ Rules:
 - End with a clear CTA to try Recktube free at recktube.xyz.
 - Captions for YouTube Shorts, TikTok and Instagram Reels: a title/first line, a caption within that platform's norms, and 5–10 relevant hashtags (always include #Recktube).
 - Thumbnail/cover text ≤ 5 words.
+- On-screen text must be a clear, grammatical phrase a stranger understands instantly (e.g. "Scripts that hook viewers", not "One studio no exports"). Never say things like "no exports", "no editing" or "no work" — Recktube does export videos; say what it does instead.
+- Each scene's narration is one complete sentence or phrase (no dangling dashes); keep dashes out of narration — use commas or full stops.
 
 Respond ONLY with JSON:
 {"title":"","hook":"","voiceover":"","cta":"","thumbnailText":"","scenes":[{"durationSec":3,"visual":"","onScreenText":"","narration":""}],"captions":[{"platform":"YouTube Shorts","title":"","caption":"","hashtags":["Recktube"]}]}`;

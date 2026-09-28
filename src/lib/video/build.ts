@@ -78,26 +78,45 @@ function clipBase(trackId: string, kind: ClipKind, name: string, startSec: numbe
  * Short, readable caption chunks (like CapCut/Shorts captions): at most
  * `maxWords` words / `maxChars` characters, breaking early at natural pauses.
  */
+const WEAK_END = /^(a|an|the|to|of|in|on|at|for|with|and|or|but|your|my|our|their|his|her|its|into|from|by|as|is|are|be|that|this|than|then|so|if|no|not|every|each|more|most|just|all)$/i;
+
 export function captionChunks(text: string, maxWords = 5, maxChars = 30): string[] {
-  const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  // "idea—tailored" is two words with a pause between them.
+  const words = text
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .flatMap((w) => w.split(/(?<=[—–])(?=\S)/))
+    .filter(Boolean);
   const out: string[] = [];
   let cur: string[] = [];
   const flush = () => {
-    if (cur.length) out.push(cur.join(" "));
-    cur = [];
+    if (!cur.length) return;
+    // Don't end a line on "to", "your", "with"…: carry it to the next line.
+    const carry: string[] = [];
+    while (cur.length > 2 && WEAK_END.test(cur[cur.length - 1].replace(/[^\p{L}]/gu, ""))) carry.unshift(cur.pop()!);
+    out.push(cur.join(" "));
+    cur = carry;
   };
   for (const w of words) {
-    if (cur.length && (cur.length >= maxWords || [...cur, w].join(" ").length > maxChars)) flush();
+    const pause = /[.!?;:,—–]["”)]?$/.test(w);
+    // A word that closes a phrase may stretch the line a little rather than sit alone.
+    const room = pause ? { words: maxWords + 1, chars: maxChars + 8 } : { words: maxWords, chars: maxChars };
+    if (cur.length && (cur.length >= room.words || [...cur, w].join(" ").length > room.chars)) flush();
     cur.push(w);
     // A pause (comma, period…) ends the chunk once it has a couple of words.
-    if (/[.!?;:,—–]["”)]?$/.test(w) && cur.length >= 2) flush();
+    if (pause && cur.length >= 2) {
+      out.push(cur.join(" "));
+      cur = [];
+    }
   }
-  flush();
+  if (cur.length) out.push(cur.join(" "));
   // Never leave a lone word hanging at the end.
   if (out.length > 1 && !out[out.length - 1].includes(" ") && (out[out.length - 2] + " " + out[out.length - 1]).length <= maxChars + 8) {
     out.splice(out.length - 2, 2, `${out[out.length - 2]} ${out[out.length - 1]}`);
   }
-  return out;
+  // A dash at the edge of a caption reads as a glitch on screen.
+  return out.map((c) => c.replace(/\s*[—–]\s*$/, "").replace(/^\s*[—–]\s*/, "")).filter(Boolean);
 }
 
 /** Spread chunks over [start, start + dur] in proportion to their length. */
