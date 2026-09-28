@@ -25,7 +25,9 @@ const nextConfig = {
     // API responses never render HTML, so they get a lock-down policy.
     return [
       { source: "/:path*", headers: [...security, ...hsts] },
-      { source: "/api/:path*", headers: [{ key: "Content-Security-Policy", value: "default-src 'none'; frame-ancestors 'none'" }] },
+      { source: "/api/:path((?!v1/email/unsubscribe).*)", headers: [{ key: "Content-Security-Policy", value: "default-src 'none'; frame-ancestors 'none'" }] },
+      // The unsubscribe page is the one API route that renders HTML: inline styles and a same-origin form only.
+      { source: "/api/v1/email/unsubscribe", headers: [{ key: "Content-Security-Policy", value: "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" }] },
     ];
   },
 };
