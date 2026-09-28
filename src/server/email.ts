@@ -12,7 +12,11 @@ export interface EmailRequest {
   subject: string;
   text: string;
   html?: string;
-  kind: "verify" | "recovery" | "security" | "digest" | "reminder" | "welcome" | "alert";
+  kind: "verify" | "recovery" | "security" | "digest" | "reminder" | "welcome" | "alert" | "support";
+  /** Display name for the sender, e.g. "Recktube Support" (the address stays the verified one). */
+  fromName?: string;
+  /** Where replies go, e.g. support@recktube.xyz. */
+  replyTo?: string;
 }
 
 export interface EmailResult {
@@ -22,6 +26,12 @@ export interface EmailResult {
 
 let outbox: EmailRequest[] = [];
 
+/** "Recktube <no-reply@x>" → "no-reply@x". */
+function senderAddress(from: string): string {
+  const m = from.match(/<([^>]+)>/);
+  return (m ? m[1] : from).trim();
+}
+
 export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   const env = getServerEnv();
   if (!env.RESEND_API_KEY) return { sent: false, reason: "Email is not configured (RESEND_API_KEY)." };
@@ -30,7 +40,8 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
       method: "POST",
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: env.EMAIL_FROM,
+        from: request.fromName ? `${request.fromName.replace(/[<>"]/g, "")} <${senderAddress(env.EMAIL_FROM)}>` : env.EMAIL_FROM,
+        ...(request.replyTo ? { reply_to: [request.replyTo] } : {}),
         to: [request.to],
         subject: request.subject,
         text: request.text,

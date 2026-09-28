@@ -1,0 +1,28 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { ADMIN_TEMPLATES, missingFields, templateById } from "@/src/server/admin-mail";
+
+const APP = "https://www.recktube.xyz";
+
+describe("admin email templates", () => {
+  it("every template renders a branded email with a subject and reply address", () => {
+    assert.ok(ADMIN_TEMPLATES.length >= 10);
+    for (const t of ADMIN_TEMPLATES) {
+      const fields = Object.fromEntries(t.fields.map((f) => [f.key, f.key === "link" ? `${APP}/x` : `Sample ${f.key}`]));
+      const m = t.build(fields, APP);
+      assert.ok(m.subject.length > 5, t.id);
+      assert.match(m.html, /recktube-logo-120\.png/, t.id);
+      assert.match(m.text, new RegExp(`${t.mailbox}@recktube\\.xyz`), t.id);
+    }
+  });
+  it("escapes user text and reports missing required fields", () => {
+    const t = templateById("support-reply")!;
+    const m = t.build({ name: "<b>x</b>", subject: "Hi", message: "<script>alert(1)</script>" }, APP);
+    assert.ok(!m.html.includes("<script>alert"));
+    assert.deepEqual(missingFields(t, { name: "", subject: "", message: "" }), ["Subject", "Your answer"]);
+  });
+  it("only allows https button links in custom emails", () => {
+    const m = templateById("custom")!.build({ subject: "s", heading: "h", message: "m", button: "Go", link: "javascript:alert(1)" }, APP);
+    assert.ok(!m.html.includes("javascript:"));
+  });
+});
