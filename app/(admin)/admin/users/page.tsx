@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
-import { Loading, PageTitle, th, td, useAdmin, when } from "@/src/components/admin/kit";
+import { deleteAccount, errorText, Loading, PageTitle, th, td, useAdmin, when } from "@/src/components/admin/kit";
 
 interface Row { id: string; email: string; name: string; status: string; verified: boolean; createdAt: string; lastSeen: string | null; projects: number; usage30: number; youtube: boolean; credits: number | null; unlimited: boolean }
 
@@ -14,9 +14,27 @@ export default function AdminUsers() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const { data, error, reload } = useAdmin<{ total: number; page: number; pageSize: number; users: Row[] }>(`/api/v1/admin/users?${new URLSearchParams({ q: query, page: String(page) })}`);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function remove(u: Row) {
+    setDeleting(u.id);
+    setMsg(null);
+    try {
+      if (await deleteAccount(u.id, u.email)) {
+        setMsg({ ok: true, text: `${u.email} was deleted.` });
+        await reload();
+      }
+    } catch (e) {
+      setMsg({ ok: false, text: errorText(e) });
+    }
+    setDeleting(null);
+  }
+
   return (
     <>
       <PageTitle title="Users" sub="Every account. Open one to manage credits, sessions and status." />
+      {msg && <p role="status" className={`mb-3 text-sm ${msg.ok ? "text-success" : "text-destructive"}`}>{msg.text}</p>}
       <form className="mb-4 flex gap-2" onSubmit={(e) => { e.preventDefault(); setPage(1); setQuery(q.trim()); }}>
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-text" aria-hidden="true" />
@@ -28,7 +46,7 @@ export default function AdminUsers() {
         <>
           <div className="overflow-x-auto rounded-xl border border-border bg-surface">
             <table className="w-full min-w-[760px] text-sm">
-              <thead><tr><th className={th}>User</th><th className={th}>Status</th><th className={`${th} text-right`}>Credits</th><th className={`${th} text-right`}>Projects</th><th className={`${th} text-right`}>Gens (30d)</th><th className={th}>Joined</th><th className={th}>Last seen</th></tr></thead>
+              <thead><tr><th className={th}>User</th><th className={th}>Status</th><th className={`${th} text-right`}>Credits</th><th className={`${th} text-right`}>Projects</th><th className={`${th} text-right`}>Gens (30d)</th><th className={th}>Joined</th><th className={th}>Last seen</th><th className={th}><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
                 {data.users.map((u) => (
                   <tr key={u.id} className="border-t border-border hover:bg-muted/40">
@@ -47,6 +65,18 @@ export default function AdminUsers() {
                     <td className={`${td} text-right tabular-nums`}>{u.usage30}</td>
                     <td className={`${td} whitespace-nowrap text-xs text-muted-text`}>{when(u.createdAt)}</td>
                     <td className={`${td} whitespace-nowrap text-xs text-muted-text`}>{when(u.lastSeen)}</td>
+                    <td className={`${td} text-right`}>
+                      <button
+                        type="button"
+                        onClick={() => void remove(u)}
+                        disabled={deleting === u.id}
+                        aria-label={`Delete ${u.email}`}
+                        title="Delete account"
+                        className="rounded-md p-1.5 text-muted-text hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

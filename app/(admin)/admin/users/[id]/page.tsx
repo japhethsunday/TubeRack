@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, Ban, CheckCircle2, LogOut, MailCheck } from "lucide-react";
+import { ArrowLeft, Ban, CheckCircle2, LogOut, MailCheck, Trash2 } from "lucide-react";
 import { api } from "@/src/lib/api";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
-import { CreditEditor, Kpi, Loading, PageTitle, Panel, errorText, th, td, useAdmin, when } from "@/src/components/admin/kit";
+import { CreditEditor, deleteAccount, Kpi, Loading, PageTitle, Panel, errorText, th, td, useAdmin, when } from "@/src/components/admin/kit";
 
 interface Detail {
   user: { id: string; email: string; name: string; status: string; verified: boolean; createdAt: string; admin: boolean };
@@ -20,6 +20,7 @@ interface Detail {
 
 export default function AdminUser() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const { data, error, reload } = useAdmin<Detail>(`/api/v1/admin/users/${id}`);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -32,6 +33,18 @@ export default function AdminUser() {
       await api.post(`/api/v1/admin/users/${id}`, { action });
       await reload();
       setMsg(`${label}: done.`);
+    } catch (e) {
+      setMsg(errorText(e));
+    }
+    setBusy(null);
+  }
+
+  async function remove() {
+    if (!data) return;
+    setBusy("delete");
+    setMsg(null);
+    try {
+      if (await deleteAccount(data.user.id, data.user.email)) router.push("/admin/users");
     } catch (e) {
       setMsg(errorText(e));
     }
@@ -53,6 +66,7 @@ export default function AdminUser() {
                   : <Button size="sm" loading={busy === "reactivate"} onClick={() => void act("reactivate", "Reactivate")}><CheckCircle2 className="size-4" aria-hidden="true" /> Reactivate</Button>}
                 <Button size="sm" variant="outline" loading={busy === "sign-out"} onClick={() => void act("sign-out", "Sign out everywhere")}><LogOut className="size-4" aria-hidden="true" /> Sign out everywhere</Button>
                 {!data.user.verified && <Button size="sm" variant="outline" loading={busy === "verify-email"} onClick={() => void act("verify-email", "Mark verified")}><MailCheck className="size-4" aria-hidden="true" /> Verify email</Button>}
+                <Button size="sm" variant="destructive" loading={busy === "delete"} onClick={() => void remove()}><Trash2 className="size-4" aria-hidden="true" /> Delete account</Button>
               </>
             )}
           />

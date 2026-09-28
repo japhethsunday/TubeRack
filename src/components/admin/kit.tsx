@@ -80,7 +80,22 @@ export function Loading({ error, onRetry }: { error?: string | null; onRetry?: (
   return <p className="text-sm text-muted-text">Loading…</p>;
 }
 
-export const th = "px-3 py-2 text-left text-xs font-medium text-muted-text";
+/**
+ * Permanently delete an account after the admin types its email to confirm.
+ * Returns false if cancelled; throws with the server's reason on failure.
+ */
+export async function deleteAccount(id: string, email: string): Promise<boolean> {
+  const typed = window.prompt(`Permanently delete ${email}?\n\nThis removes the account, its own workspaces, projects, files and credits. It can't be undone.\n\nType the email address to confirm:`);
+  if (typed === null) return false;
+  if (typed.trim().toLowerCase() !== email.toLowerCase()) {
+    window.alert("The email didn't match — nothing was deleted.");
+    return false;
+  }
+  await api.remove(`/api/v1/admin/users/${id}`);
+  return true;
+}
+
+export const th ="px-3 py-2 text-left text-xs font-medium text-muted-text";
 export const td = "px-3 py-2 align-top";
 
 /** Add/remove credits and change the monthly limit for one workspace. */
