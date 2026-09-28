@@ -72,12 +72,12 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           <IconButton icon={Search} label="Search pages" onClick={() => setPalette(true)} />
         </span>
         <div className="ml-auto flex items-center gap-1">
-          {/* Status badges and credits: desktop only (phones see credits in the account menu). */}
+          {/* Status badges: desktop only. Credits show everywhere. */}
           <span className="hidden lg:contents">
             <SyncIndicator />
             <BackendBadge />
-            {session.status === "signed-in" && <CreditsPill />}
           </span>
+          {session.status === "signed-in" && <CreditsPill />}
           {session.status === "signed-in" && (
             <span className="hidden items-center gap-2 rounded-lg px-2 md:flex">
               <span className="max-w-40 truncate text-sm font-medium">{displayName}</span>

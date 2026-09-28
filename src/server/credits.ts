@@ -8,7 +8,12 @@ import { BackendError } from "@/src/server/errors";
  * next refill or an admin top-up. Unlimited accounts are never charged.
  */
 
-export const CREDIT_COST: Record<string, number> = { text: 1, research: 2, transcription: 3, tts: 3, image: 5, video: 20 };
+/**
+ * Pricing: the free monthly 100 credits make one full generated video
+ * ("autovideo", which covers its own voice-overs and images) or 10 images.
+ */
+export const CREDIT_COST: Record<string, number> = { text: 1, research: 2, transcription: 5, tts: 5, image: 10, video: 25, autovideo: 100 };
+export const DEFAULT_MONTHLY_CREDITS = 100;
 export const costOf = (kind: string) => CREDIT_COST[kind] ?? 1;
 
 export interface CreditState {
@@ -24,7 +29,7 @@ export async function creditState(workspaceId: string): Promise<CreditState | nu
   const db = getDb();
   if (!db) return null;
   const rows = await db`
-    INSERT INTO credit_accounts (workspace_id, balance) VALUES (${workspaceId}, 0)
+    INSERT INTO credit_accounts (workspace_id, balance, monthly_grant) VALUES (${workspaceId}, 0, ${DEFAULT_MONTHLY_CREDITS})
     ON CONFLICT (workspace_id) DO UPDATE SET workspace_id = EXCLUDED.workspace_id
     RETURNING id, balance, monthly_grant, unlimited, refilled_at`;
   let r = rows[0] as Record<string, unknown>;

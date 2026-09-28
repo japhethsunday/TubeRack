@@ -44,12 +44,21 @@ export interface ApiOptions {
   signal?: AbortSignal;
 }
 
+/** Set while a generated video is being made: its parts are covered by the video's flat price. */
+let videoPass: string | null = null;
+export function setVideoPass(pass: string | null): void {
+  videoPass = pass;
+}
+
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   let response: Response;
+  const headers: Record<string, string> = {};
+  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+  if (videoPass && path.startsWith("/api/")) headers["x-video-pass"] = videoPass;
   try {
     response = await fetch(path, {
       method: options.method ?? "GET",
-      headers: options.body !== undefined ? { "Content-Type": "application/json" } : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: options.signal,
     });

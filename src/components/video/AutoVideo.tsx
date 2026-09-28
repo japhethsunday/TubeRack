@@ -8,7 +8,7 @@ import { useProductionContext } from "@/src/components/projects/useProductionCon
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Clapperboard, Download, Loader2, TriangleAlert, X } from "lucide-react";
-import { api, ApiError } from "@/src/lib/api";
+import { api, ApiError, setVideoPass } from "@/src/lib/api";
 import { generateProviderImage, retryBusy, synthesizeProviderSpeech } from "@/src/lib/ai-client";
 import { scenesFromSections } from "@/src/lib/script/engine";
 import type { Scene, ScriptSection } from "@/src/lib/script/types";
@@ -157,7 +157,13 @@ export function GenerateVideoDialog({
     setFatal(null);
     setSteps(INITIAL);
     const isCancelled = () => cancelled.current;
+    let pass: string | null = null;
+    let built = false;
     try {
+      // One flat price per generated video; its voice-overs and images are covered by the pass.
+      const paid = await api.post<{ pass: string; cost: number }>("/api/v1/credits/video-pass", {});
+      pass = paid.pass;
+      setVideoPass(pass);
       // 1. Scenes + shot list.
       set("scenes", { state: "running" });
       const scenes: Scene[] = scenesFromSections(writable, wpm).map((s) => ({ ...s, narration: s.scriptText }));
@@ -383,6 +389,7 @@ export function GenerateVideoDialog({
       if (last) last.durationSec = Math.round((last.durationSec + 1.5) * 100) / 100;
       const clips = buildFromScenes(scenes, made);
       video.setClips(project.id, clips);
+      built = true;
       set("build", { state: "done", detail: `${clips.length} clips · ${Math.round(scenes.reduce((n, s) => n + s.durationSec, 0))}s` });
 
       // 6. Thumbnail: text-free art + the exact title as editable text layers.
@@ -404,6 +411,9 @@ export function GenerateVideoDialog({
       setFatal(e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Video generation failed.");
       setSteps((all) => all.map((s) => (s.state === "running" ? { ...s, state: "failed" } : s)));
     } finally {
+      setVideoPass(null);
+      // Nothing usable was made (error or stopped before the edit was built): give the credits back.
+      if (pass && !built) void api.post("/api/v1/credits/video-pass", { refund: pass }).catch(() => {});
       setRunning(false);
     }
   }

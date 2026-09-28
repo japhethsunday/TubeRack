@@ -7,7 +7,7 @@ import { cx } from "@/src/components/ui/cx";
 
 interface Credits { balance: number; monthlyGrant: number; unlimited: boolean; refilledAt: string | null; costs: Record<string, number> }
 
-const COST_LABELS: [string, string][] = [["text", "Ideas, scripts & titles"], ["research", "Research"], ["tts", "Voice-over"], ["transcription", "Transcription"], ["image", "Image"], ["video", "AI video clip"]];
+const COST_LABELS: [string, string][] = [["autovideo", "Full generated video"], ["text", "Ideas, scripts & titles"], ["research", "Research"], ["tts", "Voice-over"], ["transcription", "Transcription"], ["image", "Image"], ["video", "AI video clip"]];
 
 /** Credits pill in the top bar, next to the profile, with a details popover. */
 export function CreditsPill() {

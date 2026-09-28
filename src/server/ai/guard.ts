@@ -1,6 +1,8 @@
 import { assertCredits, spendCredits } from "@/src/server/credits";
 import { isAdmin } from "@/src/server/admin";
 import { featureBlocked } from "@/src/server/admin-ops";
+import { headers } from "next/headers";
+import { VIDEO_PASS_HEADER, verifyVideoPass } from "@/src/server/video-pass";
 import { getDb } from "@/src/server/db";
 import { sharedLimit } from "@/src/server/shared-limit";
 import { requireUser, type SessionUser } from "@/src/server/auth";
@@ -21,6 +23,16 @@ import { IntelligenceNotConfiguredError } from "@/src/lib/ai-gateway/intelligenc
 export interface ProviderCaller {
   user: SessionUser;
   workspaceId: string;
+  /** Part of a generated video already paid for with a video pass: don't charge again. */
+  covered?: boolean;
+}
+
+async function passCovers(workspaceId: string): Promise<boolean> {
+  try {
+    return Boolean(verifyVideoPass((await headers()).get(VIDEO_PASS_HEADER), workspaceId));
+  } catch {
+    return false;
+  }
 }
 
 export async function guardProviderCall(kind?: string): Promise<ProviderCaller> {
@@ -31,13 +43,14 @@ export async function guardProviderCall(kind?: string): Promise<ProviderCaller> 
   await sharedLimit(`ai:${user.id}`, 300, 3600);
   const workspaceId = await defaultWorkspace(user);
   await requireMembership(workspaceId, user, "editor");
+  const covered = await passCovers(workspaceId);
   if (!isAdmin(user)) {
     // Admin feature switches: a paused tool answers with a friendly message.
     const paused = await featureBlocked(kind);
     if (paused) throw new BackendError("FORBIDDEN", paused);
-    await assertCredits(workspaceId, kind);
+    if (!covered) await assertCredits(workspaceId, kind);
   }
-  return { user, workspaceId };
+  return { user, workspaceId, covered };
 }
 
 /**
@@ -55,7 +68,7 @@ export async function recordUsage(
 ): Promise<void> {
   const db = getDb();
   if (!db) return;
-  if (entry.status === "completed" && !isAdmin(caller.user)) await spendCredits(caller.workspaceId, entry.kind, entry.ref).catch(() => {});
+  if (entry.status === "completed" && !caller.covered && !isAdmin(caller.user)) await spendCredits(caller.workspaceId, entry.kind, entry.ref).catch(() => {});
   try {
     await db`
       INSERT INTO usage_events (workspace_id, user_id, kind, units, model, provider, status, ref)
