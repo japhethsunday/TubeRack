@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/src/lib/api";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
+import { Sparkles } from "lucide-react";
 
 export const fmt = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 export const bytes = (b: number) => (b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.round(b / 1e6)} MB`);
@@ -78,6 +79,62 @@ export function Loading({ error, onRetry }: { error?: string | null; onRetry?: (
       </div>
     );
   return <p className="text-sm text-muted-text">Loading…</p>;
+}
+
+/**
+ * AI writing box: an optional brief plus a button that drafts the email.
+ * The draft lands in the editable fields; nothing is sent automatically.
+ */
+export function AiWriter({
+  title,
+  hint,
+  placeholder,
+  requireBrief = false,
+  hasDraft,
+  onWrite,
+}: {
+  title: string;
+  hint: string;
+  placeholder: string;
+  requireBrief?: boolean;
+  hasDraft: boolean;
+  onWrite: (brief: string) => Promise<void>;
+}) {
+  const [brief, setBrief] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function run() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await onWrite(brief.trim());
+    } catch (e) {
+      setErr(errorText(e));
+    }
+    setBusy(false);
+  }
+  return (
+    <div className="rounded-xl bg-gradient-to-r from-fuchsia-500/60 via-violet-500/60 to-sky-500/60 p-px">
+      <div className="space-y-2 rounded-[11px] bg-surface p-3">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <Sparkles className="size-4 text-primary" aria-hidden="true" /> {title}
+        </div>
+        <p className="text-xs text-muted-text">{hint}</p>
+        <textarea
+          rows={2}
+          value={brief}
+          onChange={(e) => setBrief(e.target.value)}
+          maxLength={1200}
+          placeholder={placeholder}
+          className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm"
+        />
+        <Button size="sm" loading={busy} disabled={requireBrief && brief.trim().length < 3} onClick={() => void run()} className="bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 text-white">
+          <Sparkles className="size-4" aria-hidden="true" /> {busy ? "Writing…" : hasDraft ? "Rewrite" : "Write with AI"}
+        </Button>
+        {err && <p role="alert" className="text-xs text-destructive">{err}</p>}
+      </div>
+    </div>
+  );
 }
 
 /**

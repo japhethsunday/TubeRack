@@ -5,7 +5,7 @@ import { ArrowLeft, Eye, Inbox, LifeBuoy, Paperclip, RefreshCw, Reply, Send, Shi
 import { api } from "@/src/lib/api";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
-import { Loading, PageTitle, Panel, errorText, when } from "@/src/components/admin/kit";
+import { AiWriter, Loading, PageTitle, Panel, errorText, when } from "@/src/components/admin/kit";
 
 type Mailbox = "support" | "security";
 interface Summary { id: string; from: string; fromName: string; subject: string; mailbox: Mailbox; receivedAt: string; attachments: number }
@@ -210,13 +210,26 @@ export default function AdminInbox() {
                         </button>
                       ))}
                     </div>
+                    <AiWriter
+                      title="Reply with AI"
+                      hint="Reads this message and the sender's account, then drafts an answer in the Recktube voice. Review it before sending."
+                      placeholder="Optional: guide the reply — e.g. “tell them the export bug is fixed and add 200 credits as a thank-you”"
+                      hasDraft={Boolean(message.trim())}
+                      onWrite={async (instruction) => {
+                        const d = await api.post<{ name: string; message: string }>(`/api/v1/admin/inbox/${open.id}/draft`, { instruction, mailbox: from });
+                        if (d.name) setName(d.name);
+                        setMessage(d.message);
+                        setPreview(null);
+                        setMsg(null);
+                      }}
+                    />
                     <label className="block space-y-1">
                       <span className="text-xs text-muted-text">Greeting name</span>
                       <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Ada" className="h-9 w-full rounded-lg border border-border bg-background px-2.5" />
                     </label>
                     <label className="block space-y-1">
                       <span className="text-xs text-muted-text">Message *</span>
-                      <textarea rows={7} value={message} onChange={(e) => { setMessage(e.target.value); setPreview(null); }} maxLength={8000} placeholder="Thanks for reaching out…" className="w-full rounded-lg border border-border bg-background px-2.5 py-2" />
+                      <textarea rows={10} value={message} onChange={(e) => { setMessage(e.target.value); setPreview(null); }} maxLength={8000} placeholder="Thanks for reaching out…" className="w-full rounded-lg border border-border bg-background px-2.5 py-2" />
                     </label>
                     <div className="flex flex-wrap gap-2">
                       <Button disabled={!message.trim()} loading={busy} onClick={() => void send()}><Send className="size-4" aria-hidden="true" /> Send reply</Button>

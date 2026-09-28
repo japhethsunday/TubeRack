@@ -5,7 +5,7 @@ import { Send, ShieldCheck, LifeBuoy } from "lucide-react";
 import { api } from "@/src/lib/api";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
-import { Loading, PageTitle, Panel, errorText, useAdmin } from "@/src/components/admin/kit";
+import { AiWriter, Loading, PageTitle, Panel, errorText, useAdmin } from "@/src/components/admin/kit";
 
 interface Field { key: string; label: string; multiline?: boolean; placeholder?: string; optional?: boolean; default?: string }
 interface Template { id: string; name: string; mailbox: "support" | "security"; description: string; fields: Field[] }
@@ -135,6 +135,18 @@ export default function AdminEmail() {
                       <span className="block text-[11px] text-success">Recktube user{found.name ? `: ${found.name}` : ""} — name filled in.</span>
                     )}
                   </label>
+                  <AiWriter
+                    title="Write this email with AI"
+                    hint={`Say what it should tell them — the AI fills in the “${t.name}” template using the recipient's account. Review before sending.`}
+                    placeholder="e.g. “Tell Ada her voice-over bug is fixed, thank her for the report and add 300 credits”"
+                    requireBrief
+                    hasDraft={t.fields.some((f) => f.key !== "name" && (fields[f.key] ?? "") !== (f.default ?? "") && Boolean(fields[f.key]))}
+                    onWrite={async (instruction) => {
+                      const r = await api.post<{ fields: Record<string, string> }>("/api/v1/admin/email/draft", { template: t.id, instruction, to: /.+@.+\..+/.test(to) ? to.trim() : "", current: fields });
+                      setFields((f) => ({ ...f, ...r.fields }));
+                      setMsg(null);
+                    }}
+                  />
                   {t.fields.map((f) => (
                     <label key={f.key} className="block space-y-1">
                       <span className="text-xs text-muted-text">{f.label}{f.optional ? "" : " *"}</span>
