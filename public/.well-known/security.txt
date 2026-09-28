@@ -1,0 +1,5 @@
+Contact: mailto:security@recktube.xyz
+Expires: 2027-09-28T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://www.recktube.xyz/.well-known/security.txt
+Policy: https://www.recktube.xyz/privacy

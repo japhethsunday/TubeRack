@@ -15,7 +15,7 @@ const VALID = [
   "data",
 ] as const;
 
-/** Account settings: profile, security, sessions, workspace, billing, data. */
+/** Account settings: profile, security, sessions, workspace, credits, data. */
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -45,7 +45,7 @@ export default async function SettingsPage({
           { id: "security", label: "Security", content: <SecurityPanel /> },
           { id: "sessions", label: "Sessions", content: <SessionsPanel /> },
           { id: "workspace", label: "Workspace", content: <WorkspacePanel /> },
-          { id: "billing", label: "Billing", content: <BillingPanel /> },
+          { id: "billing", label: "Credits", content: <BillingPanel /> },
           { id: "data", label: "Data", content: <DataPanel /> },
         ]}
       />

@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Terms of Service — Recktube", desc
 
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms of Service" updated="September 26, 2026">
+    <LegalPage title="Terms of Service" updated="September 28, 2026">
       <p>These terms apply when you use Recktube. By creating an account you agree to them and to our <Link href="/privacy">Privacy Policy</Link>.</p>
 
       <h2>Your account</h2>

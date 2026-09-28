@@ -186,6 +186,15 @@ export function nicheBriefing(sections: { query: string; result: TrendResult }[]
   return nicheBrief(sections, appUrl());
 }
 
+/** Privacy promise: cached YouTube API data is refreshed or deleted within 30 days. */
+async function purgeStaleYouTubeData(): Promise<{ marketCache: number; trendResults: number }> {
+  const cache = await db()`DELETE FROM niche_market_cache WHERE scanned_at < now() - interval '30 days' RETURNING key`;
+  const trends = await db()`
+    UPDATE trend_watches SET last_results = '{}'::jsonb
+    WHERE last_results <> '{}'::jsonb AND (last_run_at IS NULL OR last_run_at < now() - interval '30 days') RETURNING id`;
+  return { marketCache: cache.length, trendResults: trends.length };
+}
+
 async function calendarReminders(): Promise<{ sent: number }> {
   const today = new Date().toISOString().slice(0, 10);
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
@@ -245,5 +254,6 @@ export async function runDaily() {
     follow: await safe("follow", autoFollowNiches),
     trends: await safe("trends", trendDigests),
     housekeeping: await safe("housekeeping", pruneSharedLimits),
+    retention: await safe("retention", purgeStaleYouTubeData),
   };
 }

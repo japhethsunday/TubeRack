@@ -3,7 +3,7 @@ import { SiteHeader } from "@/src/components/home/SiteHeader";
 import { SiteFooter } from "@/src/components/home/SiteFooter";
 
 /** Operator contact shown on the legal pages. */
-export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "japhethsunday5@gmail.com";
+export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "support@recktube.xyz";
 
 /** Shared shell for the public Privacy Policy and Terms pages. */
 export function LegalPage({ title, updated, children }: { title: string; updated: string; children: ReactNode }) {

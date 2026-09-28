@@ -125,6 +125,11 @@ export function WorkspacePanel() {
 export function BillingPanel() {
   const { session, workspace } = useWorkspace();
   const [usage, setUsage] = useState<UsageRow[] | null>(null);
+  const [credits, setCredits] = useState<{ balance: number; monthlyGrant: number; unlimited: boolean; refilledAt: string | null } | null>(null);
+
+  useEffect(() => {
+    apiFetch<{ balance: number; monthlyGrant: number; unlimited: boolean; refilledAt: string | null }>("/api/v1/credits/me").then(setCredits).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!workspace) return;
@@ -143,12 +148,21 @@ export function BillingPanel() {
 
   return (
     <div className="grid max-w-3xl gap-4">
-      <section aria-label="Current plan" className="rounded-xl border border-border p-5">
+      <section aria-label="Credits" className="rounded-xl border border-border p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">Current plan</h3>
-          <Badge tone="ok">Free</Badge>
+          <h3 className="text-sm font-semibold">Credits</h3>
+          <Badge tone="ok">Free plan</Badge>
         </div>
-        <p className="mt-1 text-sm text-muted-text">All studios included. No payment method on file and no charges.</p>
+        {credits ? (
+          <p className="mt-1 text-sm text-muted-text">
+            {credits.unlimited
+              ? "Your account has unlimited credits."
+              : `${credits.balance.toLocaleString()} of ${credits.monthlyGrant.toLocaleString()} credits left. Your allowance refills automatically every 30 days${credits.refilledAt ? ` (next: ${new Date(new Date(credits.refilledAt).getTime() + 30 * 86_400_000).toLocaleDateString(undefined, { month: "long", day: "numeric" })})` : ""}.`}
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-muted-text">Loading credits…</p>
+        )}
+        <p className="mt-2 text-xs text-muted-text">All studios are included. There is no payment method on file and no charges.</p>
       </section>
       <section aria-label="Usage this month" className="rounded-xl border border-border p-5">
         <h3 className="flex items-center gap-2 text-sm font-semibold">

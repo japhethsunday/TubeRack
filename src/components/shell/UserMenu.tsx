@@ -20,7 +20,7 @@ import { signOut, type SessionInfo } from "@/src/components/auth/useSession";
 const MENU_LINKS = [
   { href: "/settings?tab=profile", icon: User, label: "Profile", blurb: "Name, email, username" },
   { href: "/settings?tab=security", icon: ShieldCheck, label: "Security", blurb: "Password, 2FA, recovery" },
-  { href: "/settings?tab=billing", icon: CreditCard, label: "Billing", blurb: "Plan, credits, invoices" },
+  { href: "/settings?tab=billing", icon: CreditCard, label: "Credits", blurb: "Balance, monthly allowance, usage" },
   { href: "/settings", icon: Settings, label: "All settings", blurb: "Preferences, sessions, data" },
 ];
 
