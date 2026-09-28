@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/src/server/admin";
-import { sendWelcomePreview } from "@/src/server/growth/lifecycle";
+import { sendOfferPreview, sendWelcomePreview } from "@/src/server/growth/lifecycle";
 import { toErrorResponse } from "@/src/server/errors";
 
 export const maxDuration = 60;
@@ -9,7 +9,9 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   try {
     const admin = await requireAdmin(request, "campaigns.create");
-    return NextResponse.json({ data: { sent: await sendWelcomePreview(admin.email, admin.name) } });
+    const which = new URL(request.url).searchParams.get("set");
+    const sent = which === "offers" ? await sendOfferPreview(admin.email, admin.name) : await sendWelcomePreview(admin.email, admin.name);
+    return NextResponse.json({ data: { sent } });
   } catch (error) {
     return toErrorResponse(error);
   }

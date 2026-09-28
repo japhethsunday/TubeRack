@@ -3,6 +3,7 @@ import { getServerEnv } from "@/src/lib/env";
 import { renderEmail } from "@/src/server/email-templates";
 import { sendEmail } from "@/src/server/email";
 import { unsubscribeUrl } from "@/src/server/unsubscribe";
+import { personalCode } from "@/src/server/growth/codes";
 
 /**
  * Automatic lifecycle emails (daily cron). Only for people who opted in to
@@ -170,10 +171,130 @@ async function welcomeSeries(): Promise<number> {
   return sent;
 }
 
+/* ---------------- Personal offers (triggered by what people do) ---------------- */
+
+const OFFER_HOURS = 72;
+const redeemLink = (code: string, c: string) => utm(`/redeem?code=${encodeURIComponent(code)}`, c);
+
+interface Offer {
+  kind: (monthKey: string) => string;
+  /** Once per this many days per person (null = once ever). */
+  everyDays: number | null;
+  credits: number;
+  from: string;
+  where: string;
+  subject: (p: Person) => string;
+  layout: (p: Person, code: string, row: Record<string, unknown>) => Omit<Parameters<typeof renderEmail>[0], "appUrl" | "reason" | "unsubscribeUrl">;
+}
+
+const OWNER_WS = `SELECT m.workspace_id FROM memberships m WHERE m.user_id = u.id AND m.role = 'owner'`;
+const expiresText = `Expires in ${OFFER_HOURS} hours`;
+
+export const OFFERS: Offer[] = [
+  {
+    // Made videos and nearly out of credits: the moment a bonus matters most.
+    kind: (m) => `offer:low:${m}`,
+    everyDays: 30,
+    credits: 50,
+    from: "Japheth from Recktube",
+    where: `${MADE_VIDEO}
+      AND EXISTS (SELECT 1 FROM credit_accounts a WHERE a.workspace_id IN (${OWNER_WS}) AND NOT a.unlimited AND a.balance <= 10)`,
+    subject: () => "You've been busy — here's a bonus 🎁",
+    layout: (p, code) => ({
+      preheader: `+50 free credits to keep creating — expires in ${OFFER_HOURS} hours.`,
+      eyebrow: "Personal bonus",
+      heading: "Keep the videos coming",
+      intro: `${greet(p)}\n\nI noticed you've been making videos with Recktube and your credits are almost used up. I don't want that to slow you down, so I've unlocked a personal bonus on your account.`,
+      blocks: [
+        { type: "banner", highlight: "+50 credits", title: "unlocked for you", sub: "Half a video's worth · added in one tap · just for your account" },
+        { type: "offer", value: "Your personal bonus: +50 credits", code, expires: expiresText, action: { label: "Claim my 50 credits", url: redeemLink(code, "offer-low") } },
+        { type: "text", text: "Your monthly credits also refill automatically every 30 days." },
+        { type: "signature", ...FOUNDER },
+      ],
+    }),
+  },
+  {
+    // Focused on Shorts (most projects are Shorts): tips + a small boost.
+    kind: () => "offer:shorts",
+    everyDays: null,
+    credits: 30,
+    from: "Ada from Recktube",
+    where: `u.created_at < now() - interval '5 days'
+      AND (SELECT count(*) FROM projects pr WHERE pr.workspace_id IN (${OWNER_WS}) AND pr.deleted_at IS NULL
+             AND (pr.platform ILIKE '%short%' OR pr.content_type ILIKE '%short%')) >= 2
+      AND (SELECT count(*) FROM projects pr WHERE pr.workspace_id IN (${OWNER_WS}) AND pr.deleted_at IS NULL
+             AND (pr.platform ILIKE '%short%' OR pr.content_type ILIKE '%short%')) * 2
+          >= (SELECT count(*) FROM projects pr WHERE pr.workspace_id IN (${OWNER_WS}) AND pr.deleted_at IS NULL)`,
+    subject: () => "I noticed you're making Shorts",
+    layout: (p, code) => ({
+      preheader: "3 things the fastest-growing Shorts channels do — plus a bonus for you.",
+      eyebrow: "Shorts",
+      heading: "Your Shorts, but faster-growing",
+      intro: `${greet(p)}\n\nI noticed you're focusing on Shorts — that's exactly where most of our fastest-growing creators started. Here's what they do differently:`,
+      blocks: [
+        { type: "steps", items: [
+          { title: "Hook in the first second", text: "Start with the payoff or a bold question — Script Studio's hooks help." },
+          { title: "Post often", text: "3–5 Shorts a week. Consistency teaches the algorithm who to show you to." },
+          { title: "Ride what's rising", text: "Trend Radar shows what's taking off in your niche this week." },
+        ] },
+        { type: "offer", value: "Shorts bonus: +30 credits", code, expires: expiresText, action: { label: "Claim my bonus", url: redeemLink(code, "offer-shorts") } },
+        { type: "signature", ...GUIDE },
+      ],
+      cta: { label: "See what's trending", url: utm("/intelligence/trends", "offer-shorts") },
+    }),
+  },
+  {
+    // Signed up 10+ days ago and never made a video.
+    kind: () => "offer:idle",
+    everyDays: null,
+    credits: 20,
+    from: "Ada from Recktube",
+    where: `u.created_at < now() - interval '10 days' AND u.created_at > now() - interval '60 days' AND NOT ${MADE_VIDEO}`,
+    subject: () => "Your first video is on us (+20 bonus)",
+    layout: (p, code) => ({
+      preheader: "Your 100 credits are still waiting — plus a little extra.",
+      eyebrow: "Your first video",
+      heading: "Let's make that first video",
+      intro: `${greet(p)}\n\nYou joined Recktube but haven't made your first video yet. Your 100 free credits are still there — and I've added a small bonus to make it an easy start.`,
+      blocks: [
+        { type: "banner", highlight: "100 + 20", title: "credits waiting for you", sub: "Pick an idea, tap Generate video — voice, visuals, music and captions are done for you" },
+        { type: "offer", value: "Starter bonus: +20 credits", code, expires: expiresText, action: { label: "Claim & start", url: redeemLink(code, "offer-idle") } },
+        { type: "signature", ...GUIDE },
+      ],
+      cta: { label: "Make my first video", url: utm("/studio/video", "offer-idle") },
+    }),
+  },
+];
+
+async function personalOffers(): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  const month = new Date().toISOString().slice(0, 7);
+  let sent = 0;
+  for (const offer of OFFERS) {
+    const kind = offer.kind(month);
+    const base = kind.replace(/:\d{4}-\d{2}$/, "");
+    const recent = offer.everyDays
+      ? `AND NOT EXISTS (SELECT 1 FROM lifecycle_sends l WHERE l.user_id = u.id AND l.kind LIKE '${base}%' AND l.sent_at > now() - interval '${offer.everyDays} days')`
+      : `AND NOT EXISTS (SELECT 1 FROM lifecycle_sends l WHERE l.user_id = u.id AND l.kind = '${kind}')`;
+    const rows = await db.unsafe(`SELECT u.id, u.email, u.name FROM users u WHERE ${CONSENT} AND ${offer.where} ${recent} LIMIT ${PER_RUN}`);
+    for (const r of rows) {
+      const p = { id: String(r.id), email: String(r.email), name: String(r.name ?? "") };
+      try {
+        const { code } = await personalCode(p.id, offer.credits, OFFER_HOURS, `${base} offer`);
+        if (await deliver(p, kind, offer.subject(p), offer.layout(p, code, r), offer.from)) sent++;
+      } catch (error) {
+        console.error(`offer ${kind} failed:`, error instanceof Error ? error.message : String(error));
+      }
+    }
+  }
+  return sent;
+}
+
 export async function lifecycleEmails() {
   const db = getDb();
   if (!db) return { skipped: "no database" };
-  const out = { welcome: await welcomeSeries(), gettingStarted: 0, comeback: 0, refill: 0 };
+  const out = { welcome: await welcomeSeries(), offers: await personalOffers(), gettingStarted: 0, comeback: 0, refill: 0 };
 
   // 1) Day 3+: signed up, never started a project.
   const starters = await db.unsafe(
@@ -255,6 +376,19 @@ export async function lifecycleEmails() {
     ) out.refill++;
   }
   return out;
+}
+
+/** Send every offer email to one address, as a preview (sample code, no credits). */
+export async function sendOfferPreview(to: string, name: string): Promise<number> {
+  const p = { id: "preview", email: to, name };
+  let n = 0;
+  for (const offer of OFFERS) {
+    const unsub = unsubscribeUrl(to, "marketing");
+    const mail = renderEmail({ ...offer.layout(p, "BONUS-SAMPLE", {}), appUrl: app(), reason: "Preview of a Recktube offer email (sample code).", unsubscribeUrl: unsub ?? undefined });
+    const res = await sendEmail({ to, subject: `[Preview offer] ${offer.subject(p)}`, ...mail, kind: "marketing", fromName: offer.from, fromAddress: "support@recktube.xyz", replyTo: "support@recktube.xyz", listUnsubscribe: unsub ?? undefined });
+    if (res.sent) n++;
+  }
+  return n;
 }
 
 /** Send every welcome email to one address, as a preview (no records kept). */

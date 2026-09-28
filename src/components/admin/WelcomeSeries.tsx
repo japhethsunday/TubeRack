@@ -15,10 +15,10 @@ const STEPS = [
 
 /** The automatic welcome series: what's sent when, plus a preview to your own inbox. */
 export function WelcomeSeries() {
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"welcome" | "offers" | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   return (
-    <Panel title="Welcome series (automatic)" className="mb-6">
+    <Panel title="Welcome series & offers (automatic)" className="mb-6">
       <p className="text-sm text-muted-text">Sent once to each new creator who opted in to product email. Every email has one-click unsubscribe.</p>
       <ol className="mt-3 space-y-2">
         {STEPS.map((s) => (
@@ -28,25 +28,38 @@ export function WelcomeSeries() {
           </li>
         ))}
       </ol>
-      <Button
-        size="sm"
-        variant="outline"
-        className="mt-3"
-        loading={busy}
-        onClick={async () => {
-          setBusy(true);
-          setMsg(null);
-          try {
-            const r = await api.post<{ sent: number }>("/api/v1/admin/welcome-preview");
-            setMsg(`Sent ${r.sent} preview emails to your inbox.`);
-          } catch (e) {
-            setMsg(errorText(e));
-          }
-          setBusy(false);
-        }}
-      >
-        Send me a preview of all 5
-      </Button>
+      <div className="mt-4 border-t border-border pt-3">
+        <p className="text-sm font-semibold">Personal offers (automatic)</p>
+        <ul className="mt-1 space-y-1 text-xs text-muted-text">
+          <li>• <strong className="text-foreground">Credits almost gone</strong> (made a video, ≤10 left): +50 credit code, max once a month</li>
+          <li>• <strong className="text-foreground">Making Shorts</strong> (mostly Shorts projects): Shorts tips + 30 credit code, once</li>
+          <li>• <strong className="text-foreground">No video after 10 days</strong>: +20 starter code, once</li>
+        </ul>
+        <p className="mt-1 text-xs text-muted-text">Each code works only for that person and expires in 72 hours. Track them in Money → Bonus codes.</p>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {(["welcome", "offers"] as const).map((set) => (
+          <Button
+            key={set}
+            size="sm"
+            variant="outline"
+            loading={busy === set}
+            onClick={async () => {
+              setBusy(set);
+              setMsg(null);
+              try {
+                const r = await api.post<{ sent: number }>(`/api/v1/admin/welcome-preview?set=${set}`);
+                setMsg(`Sent ${r.sent} preview emails to your inbox.`);
+              } catch (e) {
+                setMsg(errorText(e));
+              }
+              setBusy(null);
+            }}
+          >
+            {set === "welcome" ? "Preview welcome emails (5)" : "Preview offer emails (3)"}
+          </Button>
+        ))}
+      </div>
       {msg && <p className="mt-2 text-sm text-muted-text">{msg}</p>}
     </Panel>
   );
