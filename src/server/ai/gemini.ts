@@ -502,6 +502,8 @@ export class GeminiTtsProvider implements TtsProvider {
     voice?: string;
     /** Model of an earlier take (e.g. "google-cloud-tts"): that service goes first, so a multi-part narration keeps one voice. */
     engine?: string;
+    /** Only use `engine` (no fallback to another voice service). */
+    strict?: boolean;
   }): Promise<{ audioBase64: string; mimeType: string; model: string; durationSec: number }> {
     const text = request.text.trim();
     if (!text) throw new Error("Speech synthesis failed: text cannot be empty.");
@@ -535,6 +537,8 @@ export class GeminiTtsProvider implements TtsProvider {
       const i = routes.findIndex((r) => r.name === want);
       // Same service first, with one retry, before any other voice is used.
       if (i >= 0) routes.unshift(routes[i], routes[i]), routes.splice(i + 2, 1);
+      // Strict: a video already has a narrator — never switch to another voice service.
+      if (request.strict && i >= 0) routes.splice(2);
     }
     try {
       if (!routes.length) throw new ProviderNotConfiguredError("tts", "Voice generation is not configured.");

@@ -62,7 +62,7 @@ export async function POST(request: Request) {
         `;
         const workspace = ws[0] as Record<string, unknown>;
         await tx`INSERT INTO memberships (workspace_id, user_id, role) VALUES (${String(workspace.id)}, ${user.id}, 'owner')`;
-        await tx`INSERT INTO credit_accounts (workspace_id, balance) VALUES (${String(workspace.id)}, 0)`;
+        await tx`INSERT INTO credit_accounts (workspace_id, balance, monthly_grant, refilled_at) VALUES (${String(workspace.id)}, 100, 100, now())`;
         return workspace;
       });
       await audit({ userId: user.id, workspaceId: String(row.id), action: "workspace.created", resourceType: "workspace", resourceId: String(row.id) });

@@ -11,6 +11,7 @@ const body = z.object({
   text: z.string().trim().min(1, "Text is required.").max(TTS_MAX_CHARS, `Narration is limited to ${TTS_MAX_CHARS.toLocaleString()} characters.`),
   voice: z.string().trim().max(40).optional(),
   engine: z.string().trim().max(60).optional(),
+  strict: z.boolean().optional(),
 });
 
 /** POST /api/v1/ai/speech — synthesize narration with Gemini TTS (editor+). Returns a stored-file URL for the WAV. */

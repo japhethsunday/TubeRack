@@ -83,9 +83,10 @@ export function generateProviderImage(prompt: string, aspectRatio: "16:9" | "9:1
   return attempt(() => api.post<{ url: string; prompt: string }>("/api/v1/ai/image", { prompt, aspectRatio }));
 }
 
+/** With an engine, the narration stays on that exact voice service (no silent switch to another voice). */
 export function synthesizeProviderSpeech(text: string, voice?: string, engine?: string) {
   return attempt(() =>
-    api.post<{ url: string; mimeType: string; model: string; durationSec?: number }>("/api/v1/ai/speech", { text, voice, engine }),
+    api.post<{ url: string; mimeType: string; model: string; durationSec?: number }>("/api/v1/ai/speech", { text, voice, engine, strict: Boolean(engine) }),
   );
 }
 

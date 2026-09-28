@@ -1,3 +1,4 @@
+import { fastStart } from "@/src/server/media/faststart";
 import { getServerEnv } from "@/src/lib/env";
 
 /**
@@ -125,9 +126,13 @@ export async function downloadStock(id: string): Promise<{ item: StockItem; byte
   let url: string | undefined;
   if (kind === "video") {
     const v = raw.videos ?? {};
-    // Full HD when it isn't huge; otherwise the next size down.
-    const choices = [v.medium, v.small, v.large, v.tiny].filter((f): f is VideoFile => Boolean(f?.url));
-    url = (choices.find((f) => (f.size ?? 0) > 0 && (f.size ?? 0) <= MAX_BYTES) ?? choices[0])?.url;
+    // Small files start playing fast (especially on phones): Full HD only when it's
+    // light, otherwise 720p, which looks sharp in a Short or a 1080p export.
+    const LIGHT = 6 * 1024 * 1024;
+    const fits = (f?: VideoFile) => Boolean(f?.url) && (f!.size ?? 0) > 0 && (f!.size ?? 0) <= MAX_BYTES;
+    const pick = [v.medium && (v.medium.size ?? 0) > 0 && (v.medium.size ?? 0) <= LIGHT ? v.medium : undefined, v.small, v.medium, v.tiny, v.large].find(fits)
+      ?? [v.small, v.medium, v.tiny, v.large].find((f) => f?.url);
+    url = pick?.url;
   } else url = raw.largeImageURL || raw.webformatURL;
   if (!url || !/^https:\/\/([a-z0-9-]+\.)*pixabay\.com\//i.test(url)) throw new Error("This item is no longer available.");
   const res = await fetch(url, { signal: AbortSignal.timeout(90_000) });
@@ -135,5 +140,6 @@ export async function downloadStock(id: string): Promise<{ item: StockItem; byte
   const bytes = new Uint8Array(await res.arrayBuffer());
   if (bytes.byteLength === 0) throw new Error("The file came back empty.");
   if (bytes.byteLength > MAX_BYTES) throw new Error("This clip is too large. Please choose another one.");
-  return kind === "video" ? { item, bytes, mime: "video/mp4", ext: "mp4" } : { item, bytes, mime: "image/jpeg", ext: "jpg" };
+  // Index at the front, so the clip starts playing before it's fully downloaded.
+  return kind === "video" ? { item, bytes: fastStart(bytes), mime: "video/mp4", ext: "mp4" } : { item, bytes, mime: "image/jpeg", ext: "jpg" };
 }

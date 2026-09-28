@@ -66,7 +66,7 @@ export async function POST(request: Request) {
         INSERT INTO memberships (workspace_id, user_id, role) VALUES (${String(workspace.id)}, ${String(user.id)}, 'owner')
       `;
       await tx`
-        INSERT INTO credit_accounts (workspace_id, balance) VALUES (${String(workspace.id)}, 0)
+        INSERT INTO credit_accounts (workspace_id, balance, monthly_grant, refilled_at) VALUES (${String(workspace.id)}, 100, 100, now())
       `;
       return { user, workspace };
     });

@@ -45,7 +45,7 @@ export async function defaultWorkspace(user: SessionUser): Promise<string> {
     const ws = await tx`INSERT INTO workspaces (name, slug, owner_id) VALUES ('My workspace', ${slug}, ${user.id}) RETURNING id`;
     const id = String((ws[0] as { id: string }).id);
     await tx`INSERT INTO memberships (workspace_id, user_id, role) VALUES (${id}, ${user.id}, 'owner')`;
-    await tx`INSERT INTO credit_accounts (workspace_id, balance) VALUES (${id}, 0)`;
+    await tx`INSERT INTO credit_accounts (workspace_id, balance, monthly_grant, refilled_at) VALUES (${id}, 100, 100, now())`;
     return id;
   });
   return created;

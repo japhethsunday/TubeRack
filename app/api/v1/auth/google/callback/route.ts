@@ -96,7 +96,7 @@ export async function GET(request: Request) {
         `;
         const workspaceId = String((workspaces[0] as { id: string }).id);
         await tx`INSERT INTO memberships (workspace_id, user_id, role) VALUES (${workspaceId}, ${id}, 'owner')`;
-        await tx`INSERT INTO credit_accounts (workspace_id, balance) VALUES (${workspaceId}, 0)`;
+        await tx`INSERT INTO credit_accounts (workspace_id, balance, monthly_grant, refilled_at) VALUES (${workspaceId}, 100, 100, now())`;
         return id;
       });
       created = true;

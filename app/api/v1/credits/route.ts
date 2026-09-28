@@ -16,7 +16,7 @@ import { rateLimited } from "@/src/server/errors";
 
 async function accountFor(db: NonNullable<ReturnType<typeof getDb>>, workspaceId: string) {
   const rows = await db`
-    INSERT INTO credit_accounts (workspace_id, balance) VALUES (${workspaceId}, 0)
+    INSERT INTO credit_accounts (workspace_id, balance, monthly_grant, refilled_at) VALUES (${workspaceId}, 100, 100, now())
     ON CONFLICT (workspace_id) DO UPDATE SET updated_at = now()
     RETURNING id, workspace_id, balance, created_at, updated_at
   `;

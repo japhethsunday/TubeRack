@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     if (!db) throw backendUnavailable("Database");
     const result = await db.begin(async (tx) => {
       const accounts = await tx`
-        INSERT INTO credit_accounts (workspace_id, balance) VALUES (${workspaceId}, 0)
+        INSERT INTO credit_accounts (workspace_id, balance, monthly_grant, refilled_at) VALUES (${workspaceId}, 100, 100, now())
         ON CONFLICT (workspace_id) DO UPDATE SET updated_at = now()
         RETURNING id, balance
       `;

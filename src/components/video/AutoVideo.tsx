@@ -198,12 +198,12 @@ export function GenerateVideoDialog({
       let engine: string | undefined;
       const voiceScene = async (scene: Scene) => {
         // Voice services refuse bursts ("too many requests"): wait and try again
-        // rather than leave the scene silent. Last try lets any voice answer.
+        // with the same narrator, so one video never mixes voices.
         let out = await synthesizeProviderSpeech(sceneSpeech(scene), undefined, engine);
         for (const wait of [3000, 8000, 15000]) {
           if (out.ok || isCancelled()) break;
           await new Promise((r) => setTimeout(r, wait));
-          out = await synthesizeProviderSpeech(sceneSpeech(scene), undefined, wait === 15000 ? undefined : engine);
+          out = await synthesizeProviderSpeech(sceneSpeech(scene), undefined, engine); // same narrator every time
         }
         if (out.ok && !engine) engine = out.data.model;
         if (!out.ok) {
