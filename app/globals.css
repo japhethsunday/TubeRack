@@ -343,6 +343,16 @@ body {
   .su-panel, .su-panel-r { clip-path: none; animation: su-slide-left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 }
 
+/* ---------- In-app support assistant ---------- */
+@keyframes support-pop { from { opacity: 0; transform: translateY(16px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes support-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes support-ring { 0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.55); } 100% { box-shadow: 0 0 0 16px rgba(139, 92, 246, 0); } }
+@keyframes support-dot { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-4px); opacity: 1; } }
+.support-panel { animation: support-pop 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: bottom right; }
+.support-in { animation: support-in 0.25s ease-out both; }
+.support-ring { animation: support-ring 2.4s ease-out infinite; }
+.support-dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; background: var(--color-muted-text, #888); animation: support-dot 1s ease-in-out infinite; }
+
 /* ---------- Home page motion ---------- */
 @keyframes home-orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes home-pulse-ring {

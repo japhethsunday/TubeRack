@@ -67,6 +67,16 @@ function checkLimit(request: Request, limitClass: LimitClass): Response | null {
   return null;
 }
 
+const IMMUTABLE = new Set(["id", "workspace_id", "user_id", "owner_id", "actor_id", "created_at"]);
+
+/** A record may only point at a project in its own workspace (no cross-account links). */
+async function assertSameWorkspaceProject(body: Record<string, unknown>, user: SessionUser, workspaceId: string): Promise<void> {
+  const pid = body.project_id;
+  if (pid === undefined || pid === null || pid === "") return;
+  const auth = await authorizeResource("projects", parseId(String(pid), "project"), user, "editor");
+  if (auth.workspaceId !== workspaceId) throw notFound("Project");
+}
+
 function identifiers(table: TableName, columns: string[]): { cols: string[] } {
   const allowed = new Set([...TABLES[table].columns, "workspace_id", "updated_at"]);
   const cols = columns.filter((c) => allowed.has(c));
@@ -176,6 +186,7 @@ export function collectionHandlers(config: ResourceConfig & { scopeColumn: "work
         const ctx = await resolveWorkspace(request, user, config.writeRole ?? "editor");
         workspaceId = ctx.workspaceId;
         (body as Record<string, unknown>).workspace_id = workspaceId;
+        await assertSameWorkspaceProject(body, user, workspaceId);
       } else if (config.scopeColumn === "project_id") {
         const projectId = parseId(url.searchParams.get("projectId") ?? (body.project_id as string) ?? "", "project");
         const auth = await authorizeResource("projects", projectId, user, config.writeRole ?? "editor");
@@ -271,7 +282,10 @@ export function itemHandlers(config: ResourceConfig & { scope: "workspace" | "pr
       const user = await requireUser();
       const body = await parseBody(request, config.patchSchema as never) as Record<string, unknown>;
       const { row, workspaceId } = await resolve(request, user, config.writeRole ?? "editor");
-      const { cols } = identifiers(table, Object.keys(body));
+      // Ownership columns are never editable: a record can't be moved into another workspace, project or account.
+      if (config.scope === "project") delete body.project_id;
+      else if (workspaceId) await assertSameWorkspaceProject(body, user, workspaceId);
+      const { cols } = identifiers(table, Object.keys(body).filter((k) => !IMMUTABLE.has(k)));
       if (cols.length === 0) throw validationError("No writable fields provided.");
       const db = getDb();
       if (!db) {

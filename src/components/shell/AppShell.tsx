@@ -1,5 +1,6 @@
 "use client";
 
+import { SupportWidget } from "@/src/components/support/SupportWidget";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -153,6 +154,7 @@ export function AppShell({
           <AppFooter />
         </div>
       </div>
+      <SupportWidget />
     </ToastProvider>
   );
 }
