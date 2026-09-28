@@ -58,7 +58,9 @@ export function authUrl(origin: string, state: string): string {
     response_type: "code",
     scope: YOUTUBE_SCOPES.join(" "),
     access_type: "offline",
-    prompt: "consent",
+    // select_account makes Google show the account/channel chooser every time,
+    // so a second channel (brand account) under the same email can be picked.
+    prompt: "select_account consent",
     include_granted_scopes: "true",
     state,
   });
