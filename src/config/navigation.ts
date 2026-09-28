@@ -335,6 +335,9 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
+/** The only menu items shown on phones/tablets. Desktop shows everything; hidden pages still open by link. */
+export const MOBILE_NAV_SLUGS = new Set(["dashboard", "projects", "youtube", "content-creator", "channel-creator", "paying-niches", "trends", "script", "video", "settings", "billing"]);
+
 export const ALL_NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((s) => s.items);
 
 /** Routes the command menu + search can actually navigate to. */

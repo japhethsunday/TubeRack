@@ -484,7 +484,7 @@ function Editor({
   const editorPanel = (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 max-lg:hidden">
           <Search className="size-4 shrink-0 text-muted-text" aria-hidden="true" />
           <label htmlFor="script-search" className="sr-only">Search within script</label>
           <input
@@ -507,7 +507,7 @@ function Editor({
             <Redo2 className="size-4" aria-hidden="true" />
             <span className="sr-only">Redo</span>
           </Button>
-          <label className="flex items-center gap-1 text-xs text-muted-text">
+          <label className="flex items-center gap-1 text-xs text-muted-text max-lg:hidden">
             WPM
             <select value={wpm} onChange={(e) => setWpm(Number(e.target.value))} aria-label="Speaking rate" className="h-8 rounded-md border border-border bg-surface px-1 text-xs">
               {[130, 140, 150, 160, 170].map((r) => (
@@ -517,7 +517,8 @@ function Editor({
           </label>
           <Button size="sm" variant="outline" onClick={onGenerate}>
             <Sparkles className="size-4" aria-hidden="true" />
-            Assemble…
+            <span className="max-lg:hidden">Assemble…</span>
+            <span className="lg:hidden">Write with AI</span>
           </Button>
           <Button size="sm" onClick={() => setShowVideo(true)} disabled={sections.every((s) => !s.text.trim())} title="Voice-over, visuals and captions from this script">
             <Clapperboard className="size-4" aria-hidden="true" />
@@ -526,6 +527,7 @@ function Editor({
           <Button
             size="sm"
             variant="outline"
+            className="max-lg:hidden"
             onClick={() => {
               const now = new Date().toISOString();
               commit(addSection(sections, "custom", "New section", undefined, now));
@@ -537,7 +539,7 @@ function Editor({
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-text" aria-live="polite">
-        <span>{totalWords} words · {formatDuration(totalSec)} estimated · {wpm} wpm (estimate, not exact)</span>
+        <span>{totalWords} words · {formatDuration(totalSec)} estimated<span className="max-lg:hidden"> · {wpm} wpm (estimate, not exact)</span></span>
         <SaveStatus updatedAt={initial.updatedAt} savedAt={savedAt} />
       </div>
       {query.trim() && matches.length > 0 && (
@@ -617,21 +619,13 @@ function Editor({
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Script Studio — {project.name}</h1>
           <p className="mt-0.5 text-xs text-muted-text">{initial.format} · {initial.tone} · {initial.complexity} · target ~{initial.targetWords} words</p>
         </div>
-        <Link href={`/studio/storyboard?project=${project.id}`} className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
+        <Link href={`/studio/storyboard?project=${project.id}`} className="max-lg:hidden inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
           Continue to Storyboard
         </Link>
       </div>
 
-      <div className="lg:hidden">
-        <Tabs
-          defaultId="editor"
-          tabs={[
-            { id: "editor", label: "Editor", content: editorPanel },
-            { id: "context", label: "Context", content: contextPanel },
-            { id: "tools", label: `Tools (${suggestions.length})`, content: toolsPanel },
-          ]}
-        />
-      </div>
+      {/* Phones: just the script. Research context and analysis tools stay on desktop. */}
+      <div className="lg:hidden">{editorPanel}</div>
       <div className={cx("hidden gap-4 lg:grid lg:grid-cols-[260px_minmax(0,1fr)_320px]")}>
         <div>{contextPanel}</div>
         <div className="min-w-0">{editorPanel}</div>

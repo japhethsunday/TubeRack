@@ -127,7 +127,7 @@ export function AppShell({
                 </button>
               </div>
               <div className="h-[calc(100%-4rem)]">
-                <Sidebar onNavigate={() => setNavOpen(false)} />
+                <Sidebar mobile onNavigate={() => setNavOpen(false)} />
               </div>
             </aside>
           </div>
@@ -139,11 +139,16 @@ export function AppShell({
           </header>
           <div className="flex flex-1 items-start gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
             <main id="main" className="min-w-0 flex-1" tabIndex={-1}>
-              <Suspense fallback={null}>
-                <BackButton />
-              </Suspense>
+              {/* Back bar and next-step strip: desktop only; the phone tab bar handles navigation. */}
+              <div className="hidden lg:contents">
+                <Suspense fallback={null}>
+                  <BackButton />
+                </Suspense>
+              </div>
               <AccountNotice />
-              <NextStepBar />
+              <div className="hidden lg:contents">
+                <NextStepBar />
+              </div>
               <div key={pathname} className="ui-page">
                 {children}
               </div>

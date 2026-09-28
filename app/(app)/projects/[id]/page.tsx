@@ -80,7 +80,42 @@ export default function ProjectOverviewPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6">
+    <>
+    {/* Phones: one simple card. Desktop keeps the full project page below. */}
+    <div className="space-y-4 lg:hidden">
+      <section className="rounded-2xl border border-border bg-surface p-5">
+        <p className="text-xs text-muted-text">{project.contentType} · {project.platform}</p>
+        <h1 className="mt-1 text-xl font-bold leading-snug">{project.name}</h1>
+        <p className="mt-1 text-xs text-muted-text">{stageLabel(project.currentStage)} · updated {timeAgo(project.updatedAt)}</p>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-gradient-to-r from-fuchsia-500 to-violet-600" style={{ width: `${progress}%` }} />
+        </div>
+        <p className="mt-1 text-right text-xs tabular-nums text-muted-text">{progress}% complete</p>
+        <Link
+          href={stageHref(project.currentStage, project.id)}
+          onClick={() => touch(project.id)}
+          className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground active:scale-[0.99]"
+        >
+          {continueLabelFor(project)}
+          <ArrowRight className="size-5" aria-hidden="true" />
+        </Link>
+      </section>
+      <div className="grid grid-cols-2 gap-2">
+        <Link href={`/studio/video?project=${project.id}`} onClick={() => touch(project.id)} className="flex h-12 items-center justify-center rounded-xl border border-border bg-surface text-sm font-semibold active:bg-muted">
+          Generate video
+        </Link>
+        <Link href={`/studio/script?project=${project.id}`} onClick={() => touch(project.id)} className="flex h-12 items-center justify-center rounded-xl border border-border bg-surface text-sm font-semibold active:bg-muted">
+          Edit script
+        </Link>
+      </div>
+      <div className="[&_button]:h-12 [&_button]:w-full [&_button]:justify-center">
+        <ProjectPublish projectId={project.id} projectName={project.name} topic={project.topic} />
+      </div>
+      <button type="button" onClick={() => openEditor(project.name, project.description)} className="w-full py-2 text-sm font-medium text-muted-text">
+        Rename or edit details
+      </button>
+    </div>
+    <div className="mx-auto hidden w-full max-w-6xl space-y-6 lg:block">
       <Breadcrumb
         trail={[
           { label: "Dashboard", href: "/dashboard" },
@@ -363,5 +398,6 @@ export default function ProjectOverviewPage() {
         </Drawer>
       )}
     </div>
+    </>
   );
 }

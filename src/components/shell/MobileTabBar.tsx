@@ -2,21 +2,35 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clapperboard, FolderKanban, LayoutDashboard, Lightbulb, Menu } from "lucide-react";
+import { FolderKanban, LayoutDashboard, Lightbulb, Plus, UserRound } from "lucide-react";
 import { cx } from "@/src/components/ui/cx";
 
-const TABS = [
+const LEFT = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard, match: ["/dashboard"] },
-  { href: "/content-creator", label: "Create", icon: Lightbulb, match: ["/content-creator", "/channel-creator", "/intelligence", "/video-recreator"] },
-  { href: "/projects", label: "Projects", icon: FolderKanban, match: ["/projects", "/storage", "/activity"] },
-  { href: "/studio/video", label: "Studio", icon: Clapperboard, match: ["/studio"] },
+  { href: "/content-creator", label: "Ideas", icon: Lightbulb, match: ["/content-creator", "/channel-creator", "/intelligence", "/video-recreator"] },
 ];
+const RIGHT = [{ href: "/projects", label: "Projects", icon: FolderKanban, match: ["/projects", "/storage", "/activity", "/studio/script"] }];
 
-/** Phone and tablet navigation: an app-style tab bar. Hidden from lg up, so desktop is unchanged. */
+/** Phone and tablet navigation: an app-style tab bar with a big Create button. Hidden from lg up, so desktop is unchanged. */
 export function MobileTabBar({ onMore }: { onMore: () => void }) {
   const path = usePathname();
   const on = (m: string[]) => m.some((p) => path === p || path.startsWith(`${p}/`));
-  const anyOn = TABS.some((t) => on(t.match));
+  const creating = path.startsWith("/studio/video");
+  const tab = (t: (typeof LEFT)[number]) => {
+    const active = on(t.match);
+    return (
+      <li key={t.href}>
+        <Link
+          href={t.href}
+          aria-current={active ? "page" : undefined}
+          className={cx("flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors active:scale-95", active ? "text-primary" : "text-muted-text")}
+        >
+          <t.icon className="size-[22px]" aria-hidden="true" strokeWidth={active ? 2.4 : 1.9} />
+          {t.label}
+        </Link>
+      </li>
+    );
+  };
   return (
     <nav
       aria-label="Main"
@@ -24,32 +38,25 @@ export function MobileTabBar({ onMore }: { onMore: () => void }) {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul className="mx-auto grid h-16 max-w-xl grid-cols-5">
-        {TABS.map((t) => {
-          const active = on(t.match);
-          return (
-            <li key={t.href}>
-              <Link
-                href={t.href}
-                aria-current={active ? "page" : undefined}
-                className={cx(
-                  "flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors active:scale-95",
-                  active ? "text-primary" : "text-muted-text",
-                )}
-              >
-                <t.icon className="size-[22px]" aria-hidden="true" strokeWidth={active ? 2.4 : 1.9} />
-                {t.label}
-              </Link>
-            </li>
-          );
-        })}
-        <li>
-          <button
-            type="button"
-            onClick={onMore}
-            className={cx("flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] font-medium active:scale-95", anyOn ? "text-muted-text" : "text-primary")}
+        {LEFT.map(tab)}
+        <li className="flex items-start justify-center">
+          <Link
+            href="/studio/video"
+            aria-label="Create video"
+            aria-current={creating ? "page" : undefined}
+            className="-mt-5 flex flex-col items-center gap-1 text-[11px] font-semibold text-primary active:scale-95"
           >
-            <Menu className="size-[22px]" aria-hidden="true" />
-            More
+            <span className="flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white shadow-lg shadow-violet-900/40 ring-4 ring-background">
+              <Plus className="size-7" aria-hidden="true" strokeWidth={2.5} />
+            </span>
+            Create
+          </Link>
+        </li>
+        {RIGHT.map(tab)}
+        <li>
+          <button type="button" onClick={onMore} className="flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-text active:scale-95">
+            <UserRound className="size-[22px]" aria-hidden="true" />
+            Account
           </button>
         </li>
       </ul>

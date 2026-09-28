@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { NAV_SECTIONS, ALL_NAV_ITEMS, type NavItem } from "@/src/config/navigation";
+import { NAV_SECTIONS, ALL_NAV_ITEMS, MOBILE_NAV_SLUGS, type NavItem } from "@/src/config/navigation";
 import { Badge } from "@/src/components/ui/Badge";
 import { cx } from "@/src/components/ui/cx";
 
@@ -103,10 +103,11 @@ function Item({
   );
 }
 
-function NavList({ onNavigate, activeFor, collapsed = false }: { onNavigate?: () => void; activeFor: (item: NavItem) => boolean; collapsed?: boolean }) {
+function NavList({ onNavigate, activeFor, collapsed = false, mobile = false }: { onNavigate?: () => void; activeFor: (item: NavItem) => boolean; collapsed?: boolean; mobile?: boolean }) {
+  const sections = mobile ? NAV_SECTIONS.map((s) => ({ ...s, items: s.items.filter((i) => MOBILE_NAV_SLUGS.has(i.slug)) })).filter((s) => s.items.length) : NAV_SECTIONS;
   return (
     <nav aria-label="Primary" className={cx("flex h-full flex-col overflow-y-auto overflow-x-hidden py-4", collapsed ? "gap-3 px-2" : "gap-6 px-3")}>
-      {NAV_SECTIONS.map((section, si) => (
+      {sections.map((section, si) => (
         <div key={section.title}>
           {collapsed ? (
             si > 0 && <div className="mx-2 mb-2 border-t border-border" aria-hidden="true" />
@@ -131,16 +132,16 @@ function NavList({ onNavigate, activeFor, collapsed = false }: { onNavigate?: ()
   );
 }
 
-function SidebarLive({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed?: boolean }) {
+function SidebarLive({ onNavigate, collapsed, mobile }: { onNavigate?: () => void; collapsed?: boolean; mobile?: boolean }) {
   const activeFor = useActiveFor();
-  return <NavList onNavigate={onNavigate} activeFor={activeFor} collapsed={collapsed} />;
+  return <NavList onNavigate={onNavigate} activeFor={activeFor} collapsed={collapsed} mobile={mobile} />;
 }
 
 /** Hierarchized sidebar nav: primary work first, pipeline second, system last. */
-export function Sidebar({ onNavigate, collapsed = false }: { onNavigate?: () => void; collapsed?: boolean }) {
+export function Sidebar({ onNavigate, collapsed = false, mobile = false }: { onNavigate?: () => void; collapsed?: boolean; mobile?: boolean }) {
   return (
-    <Suspense fallback={<NavList activeFor={() => false} collapsed={collapsed} />}>
-      <SidebarLive onNavigate={onNavigate} collapsed={collapsed} />
+    <Suspense fallback={<NavList activeFor={() => false} collapsed={collapsed} mobile={mobile} />}>
+      <SidebarLive onNavigate={onNavigate} collapsed={collapsed} mobile={mobile} />
     </Suspense>
   );
 }

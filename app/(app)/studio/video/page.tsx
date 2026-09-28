@@ -38,6 +38,8 @@ import { Modal } from "@/src/components/ui/overlays";
 import { useNextStep } from "@/src/components/projects/NextStep";
 import { stageLabel } from "@/src/lib/projects/storage";
 import { GenerateVideoDialog } from "@/src/components/video/AutoVideo";
+import { ProjectPublish } from "@/src/components/video/ProjectPublish";
+import { ProjectSave } from "@/src/components/video/ProjectSave";
 import { Portal } from "@/src/components/ui/Portal";
 import { Input } from "@/src/components/ui/fields";
 import { newTrack, sceneSegments, buildFromScenes, captionsFromNarration, durationOf, validateComposition, healthOf } from "@/src/lib/video/build";
@@ -114,6 +116,9 @@ function Studio() {
     };
   }, []);
   const [showAutoVideo, setShowAutoVideo] = useState(false);
+  // Phones start on the simple screen; the full timeline editor is opt-in.
+  const [fullEditor, setFullEditor] = useState(false);
+  const [mobileSave, setMobileSave] = useState(false);
   // Phone layout: which bottom sheet is open.
   const [sheet, setSheet] = useState<null | "media" | "text" | "elements" | "edit" | "tools">(null);
   const [presetId, setPresetId] = useState("youtube");
@@ -694,6 +699,9 @@ function Studio() {
         </button>
       </div>
       <div className="flex-1" />
+      {/* The simple phone screen has its own big buttons; these belong to the full editor. */}
+      {(isDesktop || fullEditor) && (
+        <>
       {scriptSections.some((x) => x.text.trim()) && (
         <Button size="sm" variant="ghost" title="Voice-over, visuals and captions from this project's script" onClick={() => setShowAutoVideo(true)}>
           <Clapperboard className="size-4" aria-hidden="true" />
@@ -735,6 +743,8 @@ function Studio() {
           <span className="sr-only lg:hidden">Next step: {stageLabel(step.next)}</span>
         </button>
       )}
+        </>
+      )}
     </header>
   );
 
@@ -771,6 +781,40 @@ function Studio() {
             </aside>
           </div>
           <div className="isolate h-[36vh] min-h-[220px] shrink-0 border-t border-border">{TimelineBlock()}</div>
+        </>
+      ) : !fullEditor ? (
+        // Phones: a simple screen — watch, generate, save, publish. The full timeline stays one tap away.
+        <>
+          <main className="isolate h-[48vh] shrink-0 [@media(max-height:500px)]:h-[52vh]">{PreviewBlock("viewer")}</main>
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            {clips.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-text">No video yet. Generate one from your script: voice, visuals, music and captions are added for you.</p>
+            ) : (
+              <p className="text-center text-xs text-muted-text">{fmtTimecode(duration, 30, false)} · tap ▶ to watch</p>
+            )}
+            <Button className="h-12 w-full justify-center text-base" onClick={() => setShowAutoVideo(true)}>
+              <Clapperboard className="size-5" aria-hidden="true" /> {clips.length ? "Generate again" : "Generate video"}
+            </Button>
+            {clips.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 [&_button]:h-11 [&_button]:w-full [&_button]:justify-center">
+                <Button variant="outline" onClick={() => setMobileSave((v) => !v)}>
+                  <Download className="size-4" aria-hidden="true" /> Save to phone
+                </Button>
+                <ProjectPublish projectId={project.id} projectName={project.name} topic={project.topic} />
+              </div>
+            )}
+            {mobileSave && clips.length > 0 && (
+              <div className="rounded-xl border border-border p-3">
+                <ProjectSave projectId={project.id} projectName={project.name} />
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-2 pt-1 text-sm">
+              <Link href={`/studio/script?project=${project.id}`} className="font-medium text-primary">Edit script</Link>
+              <button type="button" onClick={() => setFullEditor(true)} className="font-medium text-muted-text underline-offset-2 hover:underline">
+                Open full editor
+              </button>
+            </div>
+          </div>
         </>
       ) : (
         <>

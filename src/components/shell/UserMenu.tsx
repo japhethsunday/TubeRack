@@ -14,6 +14,7 @@ import {
   Gauge,
 } from "lucide-react";
 import { Avatar } from "@/src/components/ui/Avatar";
+import { CreditsPill } from "@/src/components/shell/CreditsPill";
 import { Drawer, Modal } from "@/src/components/ui/overlays";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
@@ -60,6 +61,10 @@ export function UserMenu({ user, onClose }: { user: SessionInfo | null; onClose:
                 <Check className="size-4 text-success" aria-label="Current workspace" />
               </li>
             </ul>
+          </div>
+
+          <div className="lg:hidden">
+            <CreditsPill />
           </div>
 
           {user?.is_admin && (

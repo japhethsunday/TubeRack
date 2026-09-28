@@ -90,7 +90,7 @@ export function Pagination({
 
 export function Breadcrumb({ trail }: { trail: { label: string; href?: string }[] }) {
   return (
-    <nav aria-label="Breadcrumb">
+    <nav aria-label="Breadcrumb" className="max-lg:hidden">
       <ol className="flex flex-wrap items-center gap-1.5 text-sm">
         {trail.map((t, i) => {
           const last = i === trail.length - 1;
