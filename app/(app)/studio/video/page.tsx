@@ -3,7 +3,7 @@
 import { sceneSpeech } from "@/src/lib/script/engine";
 import { synthesizeProviderSpeech } from "@/src/lib/ai-client";
 import { BLUR_BACKGROUND } from "@/src/lib/video/compositor";
-import { isChunked } from "@/src/lib/media/chunked";
+import { isChunked, streamableUrl } from "@/src/lib/media/chunked";
 import { sanitizeSvg } from "@/src/lib/security/svg";
 import { presetForProject } from "@/src/lib/video/presets";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -329,7 +329,9 @@ function Studio() {
   const mediaUrl = (a: MediaAsset): string | null => {
     const local = mediaApi.blobUrlFor(a.id);
     if (local) return local;
-    return a.source === "provider-output" && !isChunked(a.payload) && /^(https?:|\/)/.test(a.payload) ? a.payload : null;
+    if (a.source === "provider-output" && !isChunked(a.payload) && /^(https?:|\/)/.test(a.payload)) return a.payload;
+    return streamableUrl(a.payload); // uploads play straight from the cloud while the device copy downloads
+
   };
   /** Delete a clip; on the main video track later clips close the gap (CapCut-style magnetic track). */
   const removeClip = (list: TimelineClip[], id: string) => {

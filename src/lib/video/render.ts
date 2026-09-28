@@ -1,6 +1,6 @@
 "use client";
 import { mixGain, MUSIC_DUCK, trackVolume, voiceRanges } from "@/src/lib/video/mix";
-import { chunkedParts, isChunked } from "@/src/lib/media/chunked";
+import { chunkedParts, isChunked, streamableUrl } from "@/src/lib/media/chunked";
 import { sharedBlob } from "@/src/lib/video/media-cache";
 import { loadAudio } from "@/src/lib/video/audio-load";
 
@@ -155,7 +155,7 @@ export function assetUrl(a: RenderAsset | null, kind: string): string | null {
   }
   // Multi-part uploads play from the reassembled copy on this device.
   if (a.source === "provider-output") return isChunked(a.payload) ? a.blobUrl : a.blobUrl ?? (a.payload || null);
-  return a.blobUrl;
+  return a.blobUrl ?? streamableUrl(a.payload);
 }
 
 async function decode(ctx: BaseAudioContext, url: string): Promise<AudioBuffer> {

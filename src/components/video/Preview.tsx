@@ -7,6 +7,7 @@ import { sceneAt } from "@/src/lib/video/build";
 import type { Composition, TimelineClip } from "@/src/lib/video/types";
 import { drawComposition, sourceTime, transitionState } from "@/src/lib/video/compositor";
 import { assetUrl, loadImage, type RenderAsset } from "@/src/lib/video/render";
+import { streamableUrl } from "@/src/lib/media/chunked";
 import { mixGain } from "@/src/lib/video/mix";
 import { sharedBlob } from "@/src/lib/video/media-cache";
 import { renderMusic, renderSfx, musicRecipe, speakText, stopSpeech, unlockWebAudio, type MusicMood, type SfxType } from "@/src/lib/media/audio";
@@ -169,7 +170,7 @@ export function Preview({
     for (const c of comp.clips) {
       if (c.kind !== "voice" && c.kind !== "music" && c.kind !== "sfx") continue;
       const a = assetFor(c.assetId);
-      const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl : null);
+      const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl ?? streamableUrl(a.payload) : null);
       // Very long tracks stream instead of downloading whole.
       if (url && !url.startsWith("{") && !((a?.durationSec ?? 0) > LONG_AUDIO_SEC)) void cachedAudio(url).catch(() => {});
     }
@@ -309,7 +310,7 @@ export function Preview({
       voiceAudioRef.current?.stop();
       voiceAudioRef.current = null;
       const a = voice ? s.assetFor(voice.assetId) : null;
-      const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl : null);
+      const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl ?? streamableUrl(a.payload) : null);
       if (voice && url) {
         const clip = voice;
         voiceAudioRef.current = playCached(url, {
@@ -339,7 +340,7 @@ export function Preview({
       musicRef.current = null;
       if (music) {
         const a = s.assetFor(music.assetId);
-        const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl : null);
+        const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl ?? streamableUrl(a.payload) : null);
         if (url) {
           const clip = music;
           const h = playCached(url, {
@@ -398,7 +399,7 @@ export function Preview({
       if (sfxFired.current.has(key)) continue;
       sfxFired.current.add(key);
       const a = s.assetFor(clip.assetId);
-      const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl : null);
+      const url = a && (a.source === "provider-output" ? a.payload : a.source === "upload-session" ? a.blobUrl ?? streamableUrl(a.payload) : null);
       if (url) {
         playCached(url, { volume: mixGain(s.comp, clip, t) * s.volume, rate: 1, at: () => 0, el: players.current?.sfx });
       } else if (a) {

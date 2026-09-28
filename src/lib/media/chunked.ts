@@ -80,3 +80,12 @@ export async function downloadStored(
 export function isStoredUpload(payload: string): boolean {
   return SINGLE.test(payload) || isChunked(payload);
 }
+
+/**
+ * A single stored file that can play straight from the cloud (the browser
+ * streams it), so nobody waits for a full download before playback starts.
+ * Multi-part files still need reassembling on the device.
+ */
+export function streamableUrl(payload: string): string | null {
+  return SINGLE.test(payload) ? payload : null;
+}

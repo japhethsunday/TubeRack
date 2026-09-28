@@ -216,8 +216,10 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     );
     if (!missing.length) return;
     for (const a of missing) fetching.current.add(a.id);
-    void (async () => {
-      for (const a of missing) {
+    // Up to three at a time instead of one after another.
+    const queue = [...missing];
+    const worker = async () => {
+      for (let a = queue.shift(); a; a = queue.shift()) {
         try {
           let file: Blob | null = await loadLocal(a.id);
           if (!file && cloud && isStoredUpload(a.payload)) {
@@ -243,7 +245,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
           });
         }
       }
-    })();
+    };
+    void Promise.all([worker(), worker(), worker()]);
   }, [ready, cloud, bundle.assets, wanted]);
 
   useEffect(() => {

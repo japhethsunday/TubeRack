@@ -1,7 +1,7 @@
 "use client";
 
 import { useMedia } from "@/src/components/media/MediaProvider";
-import { isChunked, isStoredUpload } from "@/src/lib/media/chunked";
+import { isChunked, streamableUrl } from "@/src/lib/media/chunked";
 import { useEffect, useState } from "react";
 import { filmstripFor } from "@/src/lib/video/media-cache";
 import { Film, ImagePlus, Music2, Plus, Type, Captions, AlertTriangle, CheckCircle2, OctagonX, Download } from "lucide-react";
@@ -105,8 +105,9 @@ export function MediaPanel({
   const availability = (a: MediaAsset): { text: string; warn: boolean } | null => {
     if (a.id in downloads) return { text: `Downloading ${Math.round(downloads[a.id] * 100)}%`, warn: false };
     if (blobUrlFor(a.id)) return null;
+    if (streamableUrl(a.payload)) return null; // plays from the cloud right away
     if (a.source === "upload-session") return { text: "On another device", warn: true };
-    if (isChunked(a.payload) || (a.kind === "video" && isStoredUpload(a.payload))) return { text: "Preparing on this device…", warn: false };
+    if (isChunked(a.payload)) return { text: "Preparing on this device…", warn: false };
     return null;
   };
   if (usable.length === 0) {

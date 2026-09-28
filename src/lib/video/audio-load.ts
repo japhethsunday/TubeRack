@@ -1,6 +1,6 @@
 "use client";
 
-import { chunkedParts, downloadChunked } from "@/src/lib/media/chunked";
+import { chunkedParts, downloadChunked, streamableUrl } from "@/src/lib/media/chunked";
 import { sharedBlob } from "@/src/lib/video/media-cache";
 import type { RenderAsset } from "@/src/lib/video/render";
 
@@ -60,6 +60,8 @@ async function bytesFor(a: RenderAsset): Promise<ArrayBuffer> {
     if (chunkedParts(a.payload)) return (await downloadChunked(a.payload, a.mime)).arrayBuffer();
     if (/^(https?:|\/|data:)/.test(a.payload)) return fetchBytes(a.payload);
   }
+  const stored = streamableUrl(a.payload);
+  if (stored) return fetchBytes(stored); // an upload not yet copied to this device
   throw new Error(a.source === "upload-session" ? "the file isn't on this device yet — open it once in Media to download it" : "no stored file");
 }
 

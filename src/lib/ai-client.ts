@@ -31,15 +31,31 @@ export function isBusyError(error: unknown): boolean {
 }
 
 /**
- * Overloads are usually over in seconds: wait and retry a couple of times
- * (8 s, then 20 s) before surfacing the error.
+ * Failures that usually clear up by themselves: provider overload, too many
+ * requests at once, timeouts, dropped connections and brief server errors.
+ * Never retried: signed out, no credits, paused tools, bad input.
  */
-export async function retryBusy<T>(call: () => Promise<T>, waits = [8000, 20000]): Promise<T> {
+export function isTransientError(error: unknown): boolean {
+  if (isBusyError(error)) return true;
+  if (error instanceof ApiError) {
+    if (["UNAUTHORIZED", "FORBIDDEN", "VALIDATION_ERROR", "NOT_FOUND", "CONFLICT", "BACKEND_UNAVAILABLE"].includes(error.code)) return false;
+    if (error.code === "RATE_LIMITED" || error.code === "NETWORK_ERROR") return true;
+    if (error.status >= 500) return true;
+  }
+  const msg = error instanceof Error ? error.message : String(error);
+  return /timed? ?out|timeout|too many requests|rate limit|429|503|502|504|temporarily|unavailable right now|network|fetch failed|ECONNRESET/i.test(msg);
+}
+
+/**
+ * Most provider hiccups are over in seconds: wait and retry (4 s, 10 s, 20 s)
+ * before surfacing the error, so users rarely see a failure at all.
+ */
+export async function retryBusy<T>(call: () => Promise<T>, waits = [4000, 10000, 20000]): Promise<T> {
   for (let i = 0; ; i++) {
     try {
       return await call();
     } catch (error) {
-      if (i >= waits.length || !isBusyError(error)) throw error;
+      if (i >= waits.length || !isTransientError(error)) throw error;
       await new Promise((r) => setTimeout(r, waits[i]));
     }
   }
