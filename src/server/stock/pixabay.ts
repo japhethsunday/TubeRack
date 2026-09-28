@@ -115,6 +115,15 @@ export async function searchStock(input: { kind: StockKind; query: string; orien
 
 const MAX_BYTES = 80 * 1024 * 1024;
 
+/** Details of a stock item by id (no download). */
+export async function stockItem(id: string): Promise<StockItem | null> {
+  const m = /^([vp])(\d{1,12})$/.exec(id);
+  if (!m) return null;
+  const kind: StockKind = m[1] === "v" ? "video" : "photo";
+  const [raw] = await call(kind, { id: m[2] });
+  return raw ? toStockItem(kind, raw) : null;
+}
+
 /** Download a stock file by id (re-read from Pixabay; client URLs are never fetched). */
 export async function downloadStock(id: string): Promise<{ item: StockItem; bytes: Uint8Array; mime: string; ext: "mp4" | "jpg" }> {
   const m = /^([vp])(\d{1,12})$/.exec(id);

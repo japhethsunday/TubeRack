@@ -6,6 +6,7 @@ import { api } from "@/src/lib/api";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
 import { Loading, PageTitle, Panel, errorText, useAdmin } from "@/src/components/admin/kit";
+import { StorageCleaner } from "@/src/components/admin/StorageCleaner";
 
 export default function AdminSystem() {
   const { data, error, reload } = useAdmin<{ services: { name: string; ok: boolean }[] }>("/api/v1/admin/overview");
@@ -28,6 +29,9 @@ export default function AdminSystem() {
   return (
     <>
       <PageTitle title="System" sub="Service health and maintenance tools." />
+      <div className="mb-6">
+        <StorageCleaner />
+      </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Services">
           {!data ? <Loading error={error} onRetry={() => void reload()} /> : (

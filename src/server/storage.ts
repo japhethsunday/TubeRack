@@ -178,3 +178,49 @@ async function signFresh(key: string, expiresIn: number, downloadAs?: string): P
   // Supabase: &download=<name> sets Content-Disposition: attachment.
   return downloadAs ? `${url}${url.includes("?") ? "&" : "?"}download=${encodeURIComponent(downloadAs)}` : url;
 }
+
+export interface StoredObject { name: string; size: number; createdAt: string }
+
+/** List the files directly under a folder (e.g. "<workspace>/generated/"), all pages. */
+export async function storageList(prefix: string): Promise<StoredObject[]> {
+  return (await storageListAll(prefix)).files;
+}
+
+/** Files and sub-folders directly under a folder. */
+export async function storageListAll(prefix: string, search?: string): Promise<{ files: StoredObject[]; folders: string[] }> {
+  const env = getServerEnv();
+  if (!isStorageConfigured(env)) return { files: [], folders: [] };
+  const base = env.SUPABASE_URL!.replace(/\/$/, "");
+  const out: StoredObject[] = [];
+  const folders: string[] = [];
+  for (let offset = 0; offset < 50_000; offset += 1000) {
+    const res = await fetch(`${base}/storage/v1/object/list/${encodeURIComponent(env.SUPABASE_BUCKET)}`, {
+      method: "POST",
+      headers: { ...authHeaders(env), "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix, limit: 1000, offset, sortBy: { column: "name", order: "asc" }, ...(search ? { search } : {}) }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) throw new Error(`storage list failed (${res.status})`);
+    const rows = (await res.json()) as { name: string; id: string | null; created_at?: string; metadata?: { size?: number } | null }[];
+    for (const r of rows) {
+      if (r.id) out.push({ name: r.name, size: Number(r.metadata?.size ?? 0), createdAt: r.created_at ?? "" });
+      else folders.push(r.name);
+    }
+    if (rows.length < 1000) break;
+  }
+  return { files: out, folders };
+}
+
+/** Delete many files in one call (full keys). */
+export async function storageDeleteMany(keys: string[]): Promise<void> {
+  const env = getServerEnv();
+  if (!isStorageConfigured(env) || !keys.length) return;
+  const base = env.SUPABASE_URL!.replace(/\/$/, "");
+  const res = await fetch(`${base}/storage/v1/object/${encodeURIComponent(env.SUPABASE_BUCKET)}`, {
+    method: "DELETE",
+    headers: { ...authHeaders(env), "Content-Type": "application/json" },
+    body: JSON.stringify({ prefixes: keys }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(`storage delete failed (${res.status})`);
+}

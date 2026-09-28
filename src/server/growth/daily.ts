@@ -1,3 +1,4 @@
+import { cleanStorage } from "@/src/server/storage-cleaner";
 import { lifecycleEmails } from "@/src/server/growth/lifecycle";
 import { runDueCampaigns } from "@/src/server/growth/campaigns";
 import { getDb } from "@/src/server/db";
@@ -256,6 +257,7 @@ export async function runDaily() {
     follow: await safe("follow", autoFollowNiches),
     trends: await safe("trends", trendDigests),
     housekeeping: await safe("housekeeping", pruneSharedLimits),
+    storage: await safe("storage", () => cleanStorage({ dryRun: false })),
     retention: await safe("retention", purgeStaleYouTubeData),
     lifecycle: await safe("lifecycle", lifecycleEmails),
     campaigns: await safe("campaigns", runDueCampaigns),

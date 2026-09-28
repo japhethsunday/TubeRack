@@ -4,7 +4,9 @@ import { z } from "zod";
 import { guardProviderCall, storeGenerated } from "@/src/server/ai/guard";
 import { toErrorResponse, BackendError } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
-import { downloadStock } from "@/src/server/stock/pixabay";
+import { getDb } from "@/src/server/db";
+import { storedFileExists } from "@/src/server/storage-cleaner";
+import { downloadStock, stockItem } from "@/src/server/stock/pixabay";
 
 export const maxDuration = 120;
 
@@ -17,6 +19,18 @@ export async function POST(request: Request) {
     // Each import stores a file: cap per user per day.
     await sharedLimit(`stock-import:${caller.user.id}`, 150, 86400);
     const { id } = await parseBody(request, body);
+    // Already saved in this workspace? Reuse that file instead of storing another copy.
+    const db = getDb();
+    if (db) {
+      const [prev] = await db`
+        SELECT payload, mime, file_size FROM media_assets
+        WHERE workspace_id = ${caller.workspaceId} AND ${`stock:${id}`} = ANY(tags) AND payload LIKE '/api/v1/generated/%' AND status = 'ready'
+        ORDER BY updated_at DESC LIMIT 1`;
+      if (prev && (await storedFileExists(caller.workspaceId, String(prev.payload)))) {
+        const meta = await stockItem(id).catch(() => null);
+        return NextResponse.json({ data: { url: String(prev.payload), mime: String(prev.mime), fileSize: Number(prev.file_size ?? 0), item: meta, reused: true } });
+      }
+    }
     let file;
     try {
       file = await downloadStock(id);
