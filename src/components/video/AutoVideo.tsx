@@ -230,8 +230,51 @@ export function GenerateVideoDialog({
         voiced += 1;
         set("voice", { detail: `${voiced}/${scenes.length}` });
       };
+      // Short scripts (Shorts, promos): ONE continuous take for the whole video.
+      // It flows naturally (no stop-start between scenes), keeps one narrator,
+      // and is a single request instead of one per scene. Each scene then gets
+      // its share of the recording in proportion to its words.
+      const fullText = scenes.map((sc) => sceneSpeech(sc).trim()).filter(Boolean).join("\n\n");
+      if (scenes.length > 1 && fullText.length > 0 && fullText.length <= 3500) {
+        let out = await synthesizeProviderSpeech(fullText);
+        for (const wait of [3000, 8000, 15000]) {
+          if (out.ok || isCancelled()) break;
+          await new Promise((r) => setTimeout(r, wait));
+          out = await synthesizeProviderSpeech(fullText);
+        }
+        const dur = out.ok ? await audioDuration(out.data.url) : 0;
+        if (out.ok && dur > 1) {
+          engine = out.data.model;
+          const weights = scenes.map((sc) => sceneSpeech(sc).trim().length + 12);
+          const total = weights.reduce((a, b) => a + b, 0);
+          let used = 0;
+          scenes.forEach((sc, i) => {
+            const share = i === scenes.length - 1 ? dur - used : Math.round(((dur * weights[i]) / total) * 100) / 100;
+            sc.durationSec = Math.max(1, Math.round(share * 100) / 100);
+            used += sc.durationSec;
+          });
+          scenes[scenes.length - 1].durationSec = Math.round((scenes[scenes.length - 1].durationSec + 0.35) * 100) / 100;
+          const asset = media.addAsset({
+            projectId: project.id,
+            sceneIds: scenes.map((sc) => sc.id),
+            kind: "voice",
+            source: "provider-output",
+            status: "ready",
+            title: "Voice-over — full narration",
+            payload: out.data.url,
+            mime: out.data.mimeType,
+            durationSec: dur,
+            tags: ["auto-video", "continuous"],
+            approval: "approved",
+          });
+          made.push(asset);
+          void keepLocal(asset, out.data.url);
+          voiced = scenes.length;
+          set("voice", { detail: "1 continuous take" });
+        }
+      }
       for (const scene of scenes) {
-        if (engine || isCancelled()) break;
+        if (voiced >= scenes.length || engine || isCancelled()) break;
         await voiceScene(scene);
       }
       const rest = scenes.slice(voiced);
@@ -248,8 +291,10 @@ export function GenerateVideoDialog({
           await voiceScene(sc);
         }
       }
-      const voiceOk = made.filter((a) => a.kind === "voice").length;
-      set("voice", { state: voiceOk === scenes.length ? "done" : voiceOk ? "partial" : "failed", detail: voiceOk === scenes.length ? `${voiceOk} takes` : `${voiceOk}/${scenes.length} — ${voiceErrors[0] ?? "failed"}` });
+      // Scenes with a voice (one continuous take covers them all).
+      const voiceOk = scenes.filter((sc) => made.some((a) => a.kind === "voice" && a.sceneIds.includes(sc.id))).length;
+      const continuous = made.some((a) => a.kind === "voice" && a.sceneIds.length > 1);
+      set("voice", { state: voiceOk === scenes.length ? "done" : voiceOk ? "partial" : "failed", detail: voiceOk === scenes.length ? (continuous ? "1 continuous take" : `${voiceOk} takes`) : `${voiceOk}/${scenes.length} — ${voiceErrors[0] ?? "failed"}` });
       putScenes(project.id, scenes); // durations now match the voice
 
       // 3. Visuals: free stock footage per scene, AI images for the rest (or only one kind).

@@ -414,3 +414,13 @@ describe("build: no black scenes", () => {
     assert.ok(images.every((c) => c.assetId === "img1"));
   });
 });
+
+describe("build: one continuous narration", () => {
+  it("each scene plays its own stretch of the shared recording", async () => {
+    const { buildFromScenes } = await import("@/src/lib/video/build");
+    const scene = (id: string, n: number, d: number) => ({ id, number: n, title: `S${n}`, scriptText: "Words here.", narration: "Words here.", visual: "", onScreenText: "", durationSec: d }) as unknown as import("@/src/lib/script/types").Scene;
+    const voice = { id: "v1", kind: "voice", status: "ready", approval: "approved", sceneIds: ["a", "b", "c"], title: "Voice", source: "provider-output", payload: "/v.wav", mime: "audio/wav", durationSec: 9 } as unknown as import("@/src/lib/media/types").MediaAsset;
+    const clips = buildFromScenes([scene("a", 1, 3), scene("b", 2, 2), scene("c", 3, 4)], [voice]).filter((c) => c.kind === "voice");
+    assert.deepEqual(clips.map((c) => [c.startSec, c.inSec, c.durationSec]), [[0, 0, 3], [3, 3, 2], [5, 5, 4]]);
+  });
+});

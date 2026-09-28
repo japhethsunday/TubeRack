@@ -228,7 +228,8 @@ function voiceFor(sceneId: string, assets: MediaAsset[]): MediaAsset | undefined
  */
 export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): TimelineClip[] {
   const clips: TimelineClip[] = [];
-  for (const seg of sceneSegments(scenes)) {
+  const segments = sceneSegments(scenes);
+  for (const seg of segments) {
     const scene = scenes.find((s) => s.id === seg.sceneId);
     // Stock/AI video clips for the scene win over a still. They are muted so the
     // voice-over stays clear, and play one after another (cycling only when
@@ -278,7 +279,21 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
       });
     }
     const voice = voiceFor(seg.sceneId, assets);
-    if (voice) {
+    if (voice && voice.sceneIds.length > 1) {
+      // One continuous narration shared by several scenes: each scene plays
+      // its own stretch of the same recording, so the voice flows unbroken.
+      const firstStart = segments.find((x) => voice.sceneIds.includes(x.sceneId))?.startSec ?? seg.startSec;
+      const inSec = Math.round((seg.startSec - firstStart) * 100) / 100;
+      const left = (voice.durationSec ?? Infinity) - inSec;
+      if (left > 0.05) {
+        clips.push({
+          ...clipBase("track_voice", "voice", voice.title, seg.startSec, Math.round(Math.min(seg.durationSec, left) * 100) / 100),
+          sceneId: seg.sceneId,
+          assetId: voice.id,
+          inSec,
+        });
+      }
+    } else if (voice) {
       clips.push({
         ...clipBase("track_voice", "voice", voice.title, seg.startSec, Math.min(seg.durationSec, voice.durationSec ?? seg.durationSec)),
         sceneId: seg.sceneId,

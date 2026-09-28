@@ -91,7 +91,7 @@ Rules:
 - Hook in the first 2 seconds that stops the scroll (a pain creators feel, or a surprising outcome). No clickbait lies.
 - Only real features and facts from above. No invented stats, user counts, testimonials, prices or guarantees.
 - 5–9 scenes; durations add up to about ${input.lengthSec}s. Each scene: what's on screen (screen recording of the app, b-roll, text animation…), short bold on-screen text (≤ 6 words), and the voice-over line.
-- Voice-over: natural, energetic, spoken English; the scenes' narration joined together.
+- Voice-over: natural, energetic, spoken English; the scenes' narration joined together must read as ONE flowing script (it is recorded in a single take). Aim for about ${Math.round(input.lengthSec * 2.4)} words in total so the video really lasts about ${input.lengthSec}s; each scene's narration is 1–2 complete sentences (roughly 8–25 words), never a fragment.
 - End with a clear CTA to try Recktube free at recktube.xyz.
 - Captions for YouTube Shorts, TikTok and Instagram Reels: a title/first line, a caption within that platform's norms, and 5–10 relevant hashtags (always include #Recktube).
 - Thumbnail/cover text ≤ 5 words.
