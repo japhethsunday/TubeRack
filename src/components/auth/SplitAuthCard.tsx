@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Eye, EyeOff, FileText, Mic, Sparkles, type LucideIcon } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, FileText, Mic, Search, Sparkles, type LucideIcon } from "lucide-react";
 import { FloatingCard, RotatingWord, STAGES } from "@/src/components/auth/AuthLayout";
 import { CircuitBackdrop } from "@/src/components/auth/CircuitBackdrop";
 import { BrandMark } from "@/src/components/ui/BrandMark";
@@ -169,16 +169,53 @@ export function SplitAuthCard({
 }
 
 /** Brand gradient button look shared by the auth screens. */
-export const gradientButton = "auth-sheen group h-11 w-full rounded-full bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 text-white";
+export const gradientButton = "auth-cta group h-11 w-full rounded-full";
 
 /** Single glass card over the circuit backdrop (password reset, code entry). */
 export function GlassAuthCard({ title, subtitle, children, footer }: { title: string; subtitle: string; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
     <main id="main" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
       <CircuitBackdrop />
-      <div className="relative w-full max-w-md">
+      <div className="relative grid w-full max-w-5xl items-center gap-12 lg:grid-cols-[minmax(0,1fr)_28rem]">
+        {/* Brand side (desktop): product glimpses, rotating headline, pipeline. */}
+        <div className="relative hidden min-w-0 lg:block" aria-hidden="true">
+          <div className="relative h-72">
+            <FloatingCard className="left-0 top-0 w-64 bg-[#1b1330]/85!" delay="0s" tilt="-3deg">
+              <p className="flex items-center gap-2 text-xs font-medium text-white/70"><Sparkles className="size-3.5 text-fuchsia-300" /> Video analysis</p>
+              <p className="mt-1.5 text-sm leading-snug">Lead with the payoff — your hook buries the result 12s in.</p>
+            </FloatingCard>
+            <FloatingCard className="right-4 top-20 w-56 bg-[#1b1330]/85!" delay="-2s" tilt="4deg">
+              <p className="flex items-center gap-2 text-xs font-medium text-white/70"><FileText className="size-3.5 text-sky-300" /> Script draft</p>
+              <p className="mt-1.5 text-sm">9 sections · 1,240 words</p>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="auth-progress h-full rounded-full bg-gradient-to-r from-sky-400 to-violet-400" /></div>
+            </FloatingCard>
+            <FloatingCard className="bottom-2 left-10 w-60 bg-[#1b1330]/85!" delay="-4s" tilt="2deg">
+              <p className="flex items-center gap-2 text-xs font-medium text-white/70"><Search className="size-3.5 text-emerald-300" /> YouTube research</p>
+              <p className="mt-1.5 text-sm">12 live results · real view counts</p>
+            </FloatingCard>
+            <FloatingCard className="bottom-0 right-0 w-44 bg-[#1b1330]/85!" delay="-1s" tilt="-5deg">
+              <p className="flex items-center gap-2 text-xs font-medium text-white/70"><Mic className="size-3.5 text-amber-300" /> Voiceover</p>
+              <p className="mt-1.5 flex items-center gap-1.5 text-sm"><CheckCircle2 className="size-3.5 text-emerald-300" /> Take ready</p>
+            </FloatingCard>
+          </div>
+          <div className="mt-10 space-y-5">
+            <h2 className="text-4xl font-semibold leading-[1.1] tracking-tight">
+              Make better <RotatingWord />
+              <br />
+              <span className="text-muted-text">From idea to published.</span>
+            </h2>
+            <div className="relative overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_15%,black_85%,transparent)]">
+              <ul className="auth-marquee flex w-max gap-2">
+                {[...STAGES, ...STAGES].map((s, i) => (
+                  <li key={`${s}-${i}`} className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-muted-text">{s}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      <div className="relative w-full max-w-md justify-self-center">
         <Link href="/" aria-label="Recktube home" className="otp-in mx-auto mb-6 flex w-fit items-center gap-2">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white">
+          <span className="auth-cta flex size-9 items-center justify-center rounded-xl">
             <BrandMark className="size-[18px]" />
           </span>
           <span className="font-semibold tracking-tight">Recktube</span>
@@ -189,6 +226,7 @@ export function GlassAuthCard({ title, subtitle, children, footer }: { title: st
           <div className="mt-6 text-left">{children}</div>
         </div>
         {footer && <div className="otp-in mt-5 text-center text-sm text-muted-text" style={{ animationDelay: "400ms" }}>{footer}</div>}
+      </div>
       </div>
     </main>
   );
