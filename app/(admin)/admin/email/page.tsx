@@ -18,6 +18,7 @@ export default function AdminEmail() {
   const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [mailbox, setMailbox] = useState<"support" | "security" | null>(null);
   const t = useMemo(() => data?.find((x) => x.id === id) ?? null, [data, id]);
 
   // Live preview, debounced.
@@ -29,13 +30,16 @@ export default function AdminEmail() {
     return () => window.clearTimeout(timer);
   }, [t, fields]);
 
+  const box = mailbox ?? t?.mailbox ?? "support";
+  const address = `${box}@recktube.xyz`;
+
   async function send() {
-    if (!t || !window.confirm(`Send "${preview?.subject ?? t.name}" to ${to}?`)) return;
+    if (!t || !window.confirm(`Send "${preview?.subject ?? t.name}" from ${address} to ${to}?`)) return;
     setBusy(true);
     setMsg(null);
     try {
-      await api.post("/api/v1/admin/email", { template: t.id, to: to.trim(), fields });
-      setMsg({ ok: true, text: `Sent to ${to.trim()}. Replies go to ${t.mailbox}@recktube.xyz.` });
+      await api.post("/api/v1/admin/email", { template: t.id, to: to.trim(), fields, mailbox: box });
+      setMsg({ ok: true, text: `Sent from ${address} to ${to.trim()}. Replies go to ${address}.` });
     } catch (e) {
       setMsg({ ok: false, text: errorText(e) });
     }
@@ -53,7 +57,7 @@ export default function AdminEmail() {
                 {data.map((x) => (
                   <li key={x.id}>
                     <button
-                      onClick={() => { setId(x.id); setMsg(null); }}
+                      onClick={() => { setId(x.id); setMsg(null); setMailbox(null); }}
                       className={cx("flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left", id === x.id ? "bg-primary/15" : "hover:bg-muted")}
                     >
                       {x.mailbox === "security" ? <ShieldCheck className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" /> : <LifeBuoy className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />}
@@ -67,8 +71,25 @@ export default function AdminEmail() {
               </ul>
             </Panel>
             {t && (
-              <Panel title={`From: Recktube ${t.mailbox === "security" ? "Security" : "Support"}`}>
+              <Panel title={`From: Recktube ${box === "security" ? "Security" : "Support"}`}>
                 <div className="space-y-3 text-sm">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-text">Send from</span>
+                    <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1" role="radiogroup" aria-label="Send from">
+                      {(["support", "security"] as const).map((m) => (
+                        <button
+                          key={m}
+                          role="radio"
+                          aria-checked={box === m}
+                          onClick={() => setMailbox(m)}
+                          className={cx("flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium", box === m ? "bg-primary/15 text-primary" : "text-muted-text hover:bg-muted")}
+                        >
+                          {m === "security" ? <ShieldCheck className="size-3.5" aria-hidden="true" /> : <LifeBuoy className="size-3.5" aria-hidden="true" />}
+                          {m}@recktube.xyz
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <label className="block space-y-1">
                     <span className="text-xs text-muted-text">To</span>
                     <input type="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="creator@example.com" className="h-9 w-full rounded-lg border border-border bg-background px-2.5" />

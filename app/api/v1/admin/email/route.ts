@@ -23,6 +23,8 @@ const body = z.object({
   to: z.union([emailSchema, z.literal("")]).default(""),
   fields: z.record(z.string(), z.string().max(4000)).default({}),
   preview: z.boolean().default(false),
+  /** Which mailbox it comes from; defaults to the template's own. */
+  mailbox: z.enum(["support", "security"]).optional(),
 });
 
 /** POST /api/v1/admin/email — preview or send a branded email (sends are audited). */
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
     if (!input.to) throw validationError("Add the recipient's email address.");
     const missing = missingFields(t, input.fields);
     if (missing.length) throw validationError(`Fill in: ${missing.join(", ")}.`);
-    const security = t.mailbox === "security";
+    const security = (input.mailbox ?? t.mailbox) === "security";
     const res = await sendEmail({
       to: input.to,
       subject: mail.subject,
@@ -47,8 +49,9 @@ export async function POST(request: Request) {
       kind: security ? "security" : "support",
       fromName: security ? "Recktube Security" : "Recktube Support",
       replyTo: security ? SECURITY_ADDRESS : SUPPORT_ADDRESS,
+      fromAddress: security ? SECURITY_ADDRESS : SUPPORT_ADDRESS,
     });
-    await audit({ userId: admin.id, action: "admin.email.sent", metadata: { template: t.id, to: input.to, sent: res.sent } });
+    await audit({ userId: admin.id, action: "admin.email.sent", metadata: { template: t.id, to: input.to, from: security ? SECURITY_ADDRESS : SUPPORT_ADDRESS, sent: res.sent } });
     if (!res.sent) throw validationError(res.reason);
     return NextResponse.json({ data: res });
   } catch (error) {

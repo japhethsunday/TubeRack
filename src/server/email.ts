@@ -17,6 +17,8 @@ export interface EmailRequest {
   fromName?: string;
   /** Where replies go, e.g. support@recktube.xyz. */
   replyTo?: string;
+  /** Send from this verified address instead of EMAIL_FROM's (falls back to EMAIL_FROM if refused). */
+  fromAddress?: string;
 }
 
 export interface EmailResult {
@@ -35,12 +37,14 @@ function senderAddress(from: string): string {
 export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   const env = getServerEnv();
   if (!env.RESEND_API_KEY) return { sent: false, reason: "Email is not configured (RESEND_API_KEY)." };
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
+  const name = (request.fromName ?? "").replace(/[<>"]/g, "").trim();
+  const from = (address: string) => (name ? `${name} <${address}>` : address === senderAddress(env.EMAIL_FROM) ? env.EMAIL_FROM : address);
+  const post = (sender: string) =>
+    fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: request.fromName ? `${request.fromName.replace(/[<>"]/g, "")} <${senderAddress(env.EMAIL_FROM)}>` : env.EMAIL_FROM,
+        from: sender,
         ...(request.replyTo ? { reply_to: [request.replyTo] } : {}),
         to: [request.to],
         subject: request.subject,
@@ -49,6 +53,13 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
       }),
       signal: AbortSignal.timeout(10000),
     });
+  try {
+    let response = await post(from(request.fromAddress ?? senderAddress(env.EMAIL_FROM)));
+    // A mailbox address the provider refuses (domain not verified) → retry from EMAIL_FROM.
+    if (!response.ok && request.fromAddress && (response.status === 403 || response.status === 422)) {
+      console.error("email send from mailbox refused:", response.status);
+      response = await post(from(senderAddress(env.EMAIL_FROM)));
+    }
     if (!response.ok) {
       console.error("email send failed:", response.status);
       return { sent: false, reason: `Email provider rejected the message (${response.status}).` };
