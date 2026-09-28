@@ -233,10 +233,19 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
     // Stock/AI video clips for the scene win over a still. They are muted so the
     // voice-over stays clear, and play one after another (cycling only when
     // they are all shorter than the scene together).
-    const sceneVideos = assets.filter(
-      (a) => a.kind === "video" && a.status === "ready" && (a.approval === "approved" || a.approval === "used") && a.sceneIds.includes(seg.sceneId),
-    );
-    const image = sceneVideos.length ? undefined : approvedImageFor(seg.sceneId, assets);
+    const videosOf = (id: string) =>
+      assets.filter((a) => a.kind === "video" && a.status === "ready" && (a.approval === "approved" || a.approval === "used") && a.sceneIds.includes(id));
+    // A scene whose picture couldn't be made borrows the nearest scene's
+    // visual (earlier first) instead of showing a black screen.
+    let visualScene = seg.sceneId;
+    if (!videosOf(seg.sceneId).length && !approvedImageFor(seg.sceneId, assets)) {
+      const idx = scenes.findIndex((s) => s.id === seg.sceneId);
+      const order = scenes.map((s, i) => ({ s, d: Math.abs(i - idx) + (i > idx ? 0.5 : 0) })).filter((x) => x.s.id !== seg.sceneId).sort((a, b) => a.d - b.d);
+      const donor = order.find((x) => videosOf(x.s.id).length || approvedImageFor(x.s.id, assets));
+      if (donor) visualScene = donor.s.id;
+    }
+    const sceneVideos = videosOf(visualScene);
+    const image = sceneVideos.length ? undefined : approvedImageFor(visualScene, assets);
     // Scene changes blend (short crossfade) instead of hard-cutting; the very
     // last picture fades out so the video ends cleanly.
     const blend = seg.number > 1 ? { transitionIn: "fade", transitionSec: 0.4 } : {};

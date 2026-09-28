@@ -6,6 +6,7 @@ import { Download, Film, X, RotateCcw, Check, AlertTriangle, MonitorPlay, Loader
 import type { Composition, HealthState, ValidationIssue } from "@/src/lib/video/types";
 import { estimateBitrate, renderComposition, renderSupport, RenderError, type ExportQuality, type RenderAsset } from "@/src/lib/video/render";
 import { safeFileName, saveVideo } from "@/src/lib/download";
+import { isTouchDevice, keepAwake } from "@/src/lib/wake-lock";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
 
@@ -98,20 +99,35 @@ export function ExportStudio({
     setError("");
     setWarnings([]);
     setProgress({ ratio: 0, message: "Preparing…", eta: undefined });
-    try {
-      const out = await renderComposition({
+    // Phones pause pages whose screen switches off; keep it on while exporting.
+    const release = keepAwake();
+    const run = (h: number) => {
+      const size = h === height ? { width, height } : { width: Math.round((width * h) / height / 2) * 2, height: h };
+      return renderComposition({
         comp,
         duration,
-        width,
-        height,
+        ...size,
         fps: settings.fps,
         quality: settings.quality,
         audioKbps: settings.audioKbps,
         range,
         assetFor,
         signal: ac.signal,
-        onProgress: (p) => setProgress({ ratio: p.phase === "preparing" ? p.ratio * 0.05 : p.phase === "rendering" ? 0.05 + p.ratio * 0.93 : 0.99, message: p.message, eta: p.etaSec }),
+        // Loading files is real work too: give it 15% of the bar so it visibly moves.
+        onProgress: (p) => setProgress({ ratio: p.phase === "preparing" ? p.ratio * 0.15 : p.phase === "rendering" ? 0.15 + p.ratio * 0.83 : 0.99, message: p.message, eta: p.etaSec }),
       });
+    };
+    try {
+      let out;
+      try {
+        out = await run(height);
+      } catch (e) {
+        // Phones can run out of memory at full size: try once more at 720p before giving up.
+        if (ac.signal.aborted || !isTouchDevice() || height <= 720) throw e;
+        setProgress({ ratio: 0, message: "Retrying at 720p for this device…", eta: undefined });
+        out = await run(720);
+        out.warnings.unshift("Exported at 720p: this device didn't have enough memory for the full size.");
+      }
       setWarnings(out.warnings);
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
       urlRef.current = URL.createObjectURL(out.blob);
@@ -122,6 +138,7 @@ export function ExportStudio({
       setError(e instanceof RenderError || e instanceof Error ? e.message : "Export failed.");
       setState(ac.signal.aborted ? "idle" : "failed");
     } finally {
+      release();
       abort.current = null;
     }
   }
@@ -196,7 +213,7 @@ export function ExportStudio({
             <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-sky-500 transition-[width] duration-300" style={{ width: `${progress.ratio * 100}%` }} />
           </div>
           <Button size="sm" variant="outline" className="w-full" onClick={() => abort.current?.abort()}><X className="size-3.5" aria-hidden="true" /> Cancel export</Button>
-          <p className="text-[11px] text-muted-text">Keep this tab open. You can keep working in other tabs.</p>
+          <p className="text-[11px] text-muted-text">Keep this screen open until it finishes. On phones, switching apps can pause the export.</p>
         </div>
       ) : (
         <Button className="w-full" disabled={health === "blocked" || !support.ok || span <= 0} onClick={() => void start()}>

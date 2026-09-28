@@ -402,3 +402,15 @@ describe("captions: natural line breaks", () => {
     assert.ok(chunks.includes("tailored to your niche"), JSON.stringify(chunks));
   });
 });
+
+describe("build: no black scenes", () => {
+  it("a scene without a picture borrows the nearest scene's visual", async () => {
+    const { buildFromScenes } = await import("@/src/lib/video/build");
+    const scene = (id: string, n: number) => ({ id, number: n, title: `S${n}`, scriptText: "Hello there friend.", narration: "Hello there friend.", visual: "", onScreenText: "", durationSec: 3 }) as unknown as import("@/src/lib/script/types").Scene;
+    const img = { id: "img1", kind: "image", status: "ready", approval: "approved", sceneIds: ["a"], title: "pic", source: "provider-output", payload: "/x.png", mime: "image/png" } as unknown as import("@/src/lib/media/types").MediaAsset;
+    const clips = buildFromScenes([scene("a", 1), scene("b", 2)], [img]);
+    const images = clips.filter((c) => c.kind === "image");
+    assert.equal(images.length, 2);
+    assert.ok(images.every((c) => c.assetId === "img1"));
+  });
+});

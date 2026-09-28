@@ -9,6 +9,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Clapperboard, Download, Loader2, TriangleAlert, X } from "lucide-react";
 import { api, ApiError, setVideoPass } from "@/src/lib/api";
+import { keepAwake } from "@/src/lib/wake-lock";
 import { generateProviderImage, retryBusy, synthesizeProviderSpeech } from "@/src/lib/ai-client";
 import { scenesFromSections } from "@/src/lib/script/engine";
 import type { Scene, ScriptSection } from "@/src/lib/script/types";
@@ -159,6 +160,7 @@ export function GenerateVideoDialog({
     const isCancelled = () => cancelled.current;
     let pass: string | null = null;
     let built = false;
+    const release = keepAwake(); // phones pause pages whose screen switches off
     try {
       // One flat price per generated video; its voice-overs and images are covered by the pass.
       const paid = await api.post<{ pass: string; cost: number }>("/api/v1/credits/video-pass", {});
@@ -411,6 +413,7 @@ export function GenerateVideoDialog({
       setFatal(e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Video generation failed.");
       setSteps((all) => all.map((s) => (s.state === "running" ? { ...s, state: "failed" } : s)));
     } finally {
+      release();
       setVideoPass(null);
       // Nothing usable was made (error or stopped before the edit was built): give the credits back.
       if (pass && !built) void api.post("/api/v1/credits/video-pass", { refund: pass }).catch(() => {});
@@ -510,7 +513,7 @@ export function GenerateVideoDialog({
               </>
             )}
           </div>
-          {!finished && <p className="text-xs text-muted-text">Takes about 1–3 minutes depending on length. Keep this tab open.</p>}
+          {!finished && <p className="text-xs text-muted-text">Takes about 1–3 minutes depending on length. Keep this screen open: switching apps can pause it.</p>}
         </div>
       )}
     </Modal>
