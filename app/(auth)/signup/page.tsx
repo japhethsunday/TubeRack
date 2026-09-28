@@ -4,7 +4,7 @@ import { GoogleButton } from "@/src/components/auth/GoogleButton";
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Lock, Mail, User } from "lucide-react";
-import { GlowField as Field, SplitAuthCard, stagger } from "@/src/components/auth/SplitAuthCard";
+import { GlowField as Field, GlassAuthCard, stagger } from "@/src/components/auth/SplitAuthCard";
 import { PasswordStrength } from "@/src/components/auth/PasswordStrength";
 import { AuthBoundaryNotice } from "@/src/components/auth/AuthBoundaryNotice";
 import { fieldErrors } from "@/src/components/auth/form";
@@ -20,6 +20,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [terms, setTerms] = useState(false);
+  const [marketing, setMarketing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
@@ -39,7 +40,7 @@ export default function SignupPage() {
     setErrors({});
     setLoading(true);
     try {
-      await api.post("/api/v1/auth/signup", { name, email, password, confirm, terms });
+      await api.post("/api/v1/auth/signup", { name, email, password, confirm, terms, marketing });
       setSentTo(email);
       setLoading(false);
       return;
@@ -57,14 +58,10 @@ export default function SignupPage() {
   }
 
   return (
-    <SplitAuthCard
-      panelSide="left"
-      panelTitle="Hello, creator!"
-      panelText="Enter your details and start building your channel — from idea to published video, all in one studio."
-      switchLabel="I have an account — Sign in"
-      switchHref="/login"
-      title="Sign up"
+    <GlassAuthCard
+      title="Create your account"
       subtitle="One account for every studio. Free to start."
+      footer={<>Already have an account? <Link href="/login" className="font-medium text-foreground hover:text-primary">Sign in</Link></>}
     >
             {sentTo ? (
               <div role="status" className="otp-in space-y-3 text-sm">
@@ -98,6 +95,9 @@ export default function SignupPage() {
                       Read the <Link href="/terms" target="_blank" className="underline">Terms</Link> and <Link href="/privacy" target="_blank" className="underline">Privacy Policy</Link>.
                     </p>
                     {errors.terms && <p role="alert" className="mt-1 text-xs text-destructive">{errors.terms}</p>}
+                    <div className="mt-2">
+                      <Checkbox label="Email me creator tips, product news and offers (optional)" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} />
+                    </div>
                   </div>
                   {formError && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{formError}</p>}
                   <div className="su-from-right" style={stagger(7)}>
@@ -106,12 +106,9 @@ export default function SignupPage() {
                       {!loading && <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />}
                     </Button>
                   </div>
-                  <p className="su-from-right text-center text-xs text-muted-text md:hidden" style={stagger(8)}>
-                    Already have an account? <Link href="/login" className="font-medium text-primary">Sign in</Link>
-                  </p>
                 </form>
               </>
             )}
-    </SplitAuthCard>
+    </GlassAuthCard>
   );
 }

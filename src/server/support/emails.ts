@@ -55,6 +55,26 @@ export function sendTranscript(to: string, name: string, subject: string, lines:
   return send(to, `Your Recktube Support conversation: ${subject}`, mail);
 }
 
+/** The assistant decided this answer is worth keeping: email the question + answer. */
+export function sendAnswerCopy(to: string, name: string, subject: string, question: string, answer: string): Promise<EmailResult> {
+  const clean = answer.replace(/\s*(I've|I have|We've|We have) (also )?emailed (you )?a copy[^.]*\.?\s*$/i, "").trim();
+  const mail = renderEmail({
+    preheader: clean.slice(0, 120),
+    eyebrow: "Recktube Support",
+    heading: subject || "Your answer from Recktube Support",
+    intro: `${hi(name)} here's a copy of the answer from Recktube Support so you have it handy.`,
+    blocks: [
+      { type: "callout", title: "You asked", text: question.slice(0, 600) },
+      ...paragraphs(clean),
+      { type: "text", text: "Need more help? Reply to this email or continue in the support chat.\n\nThe Recktube team" },
+    ],
+    cta: { label: "Continue in Recktube", url: chatUrl() },
+    reason: `You're receiving this because you asked Recktube Support for help. Replies reach ${SUPPORT_ADDRESS}.`,
+    appUrl: app(),
+  });
+  return send(to, `Recktube Support: ${subject || "your answer"}`, mail);
+}
+
 /** A teammate's answer, sent when the admin replies in the console. */
 export function sendTeamReply(to: string, name: string, subject: string, message: string): Promise<EmailResult> {
   const mail = renderEmail({

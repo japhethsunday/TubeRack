@@ -10,6 +10,7 @@ import {
   LogOut,
   Plus,
   Check,
+  Gift,
 } from "lucide-react";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Drawer, Modal } from "@/src/components/ui/overlays";
@@ -21,6 +22,7 @@ const MENU_LINKS = [
   { href: "/settings?tab=profile", icon: User, label: "Profile", blurb: "Name, email, username" },
   { href: "/settings?tab=security", icon: ShieldCheck, label: "Security", blurb: "Password, 2FA, recovery" },
   { href: "/settings?tab=billing", icon: CreditCard, label: "Credits", blurb: "Balance, monthly allowance, usage" },
+  { href: "/invite", icon: Gift, label: "Invite friends", blurb: "You both get 100 credits" },
   { href: "/settings", icon: Settings, label: "All settings", blurb: "Preferences, sessions, data" },
 ];
 

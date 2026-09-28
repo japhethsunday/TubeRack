@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Mail } from "lucide-react";
+import { api } from "@/src/lib/api";
 import { Select } from "@/src/components/ui/fields";
 import { Switch } from "@/src/components/ui/choices";
 import { Button } from "@/src/components/ui/Button";
@@ -106,6 +107,48 @@ export function PreferencesPanel() {
   );
 }
 
+/** Account-level email choices, stored on the server (apply on every device). */
+function EmailPrefs() {
+  const [prefs, setPrefs] = useState<{ marketing: boolean; briefs: boolean } | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    api.get<{ marketing: boolean; briefs: boolean }>("/api/v1/users/me/email-prefs").then(setPrefs).catch(() => setMsg("Couldn't load your email settings."));
+  }, []);
+  async function save(patch: Partial<{ marketing: boolean; briefs: boolean }>) {
+    setMsg(null);
+    try {
+      setPrefs(await api.put<{ marketing: boolean; briefs: boolean }>("/api/v1/users/me/email-prefs", patch));
+      setMsg("Saved.");
+    } catch {
+      setMsg("Couldn't save. Try again.");
+    }
+  }
+  const rows: { key: "marketing" | "briefs"; label: string; blurb: string }[] = [
+    { key: "marketing", label: "Product news, tips & offers", blurb: "New features, creator tips and occasional offers from Recktube. Unsubscribe any time." },
+    { key: "briefs", label: "Trend briefs & alerts", blurb: "Daily niche briefs and breakout alerts by email." },
+  ];
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold">Email</h3>
+      <ul className="divide-y divide-border rounded-xl border border-border" aria-label="Email preferences">
+        {rows.map((r) => (
+          <li key={r.key} className="flex items-center justify-between gap-4 p-4">
+            <div className="flex items-start gap-3">
+              <Mail className="mt-0.5 size-4 shrink-0 text-muted-text" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-medium">{r.label}</p>
+                <p className="text-xs text-muted-text">{r.blurb}</p>
+              </div>
+            </div>
+            <Switch label={r.label} checked={prefs?.[r.key] ?? false} disabled={!prefs} onCheckedChange={(v) => void save({ [r.key]: v })} />
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-muted-text">{msg ?? "Saved to your account — applies on every device. Account and security emails are always sent."}</p>
+    </div>
+  );
+}
+
 export function NotificationsPanel() {
   const [prefs, setPrefs] = useState<Record<NotificationKey, boolean>>({
     "generation-completed": true,
@@ -124,6 +167,8 @@ export function NotificationsPanel() {
 
   return (
     <div className="max-w-3xl space-y-4">
+      <EmailPrefs />
+      <h3 className="pt-2 text-sm font-semibold">In-app notifications</h3>
       <ul className="divide-y divide-border rounded-xl border border-border" aria-label="Notification preferences">
         {NOTIFICATION_PREFS.map((n) => (
           <li key={n.key} className="flex items-center justify-between gap-4 p-4">

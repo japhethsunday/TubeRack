@@ -10,6 +10,8 @@ import { rateLimited } from "@/src/server/errors";
 import { audit } from "@/src/server/audit";
 import { randomToken, hashToken } from "@/src/server/crypto";
 import { sendAccountExistsEmail, sendVerificationEmail } from "@/src/server/email";
+import { cookies } from "next/headers";
+import { ATTR_COOKIES, attributeSignup } from "@/src/server/growth/referrals";
 
 const signupSchema = z
   .object({
@@ -18,6 +20,7 @@ const signupSchema = z
     password: passwordSchema,
     confirm: z.string().min(1),
     terms: z.literal(true, { message: "Accept the terms to create an account." }),
+    marketing: z.boolean().default(false),
   })
   .refine((v) => v.password === v.confirm, { message: "Passwords do not match.", path: ["confirm"] });
 
@@ -67,6 +70,18 @@ export async function POST(request: Request) {
       `;
       return { user, workspace };
     });
+    // Where they came from + who invited them + marketing consent (best-effort, never blocks sign-up).
+    try {
+      const jar = await cookies();
+      await attributeSignup(String(result.user.id), {
+        ref: jar.get(ATTR_COOKIES.ref)?.value,
+        source: jar.get(ATTR_COOKIES.source)?.value,
+        campaign: jar.get(ATTR_COOKIES.campaign)?.value,
+        marketing: body.marketing,
+      });
+    } catch (error) {
+      console.error("signup attribution failed:", error instanceof Error ? error.message : String(error));
+    }
 
     // Verification email; its link signs the new user in.
     try {

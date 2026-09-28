@@ -8,6 +8,7 @@ import { hashPassword, randomToken, safeEqual } from "@/src/server/crypto";
 import { linkOrigin, sendWelcomeEmail } from "@/src/server/email";
 import { audit } from "@/src/server/audit";
 import { sanitizeReturnTo } from "@/src/lib/auth/session";
+import { ATTR_COOKIES, attributeSignup, rewardReferral } from "@/src/server/growth/referrals";
 import { limiterFor, clientKey } from "@/src/server/rate-limit";
 
 interface GoogleProfile {
@@ -99,6 +100,16 @@ export async function GET(request: Request) {
         return id;
       });
       created = true;
+      try {
+        await attributeSignup(userId, {
+          ref: store.get(ATTR_COOKIES.ref)?.value,
+          source: store.get(ATTR_COOKIES.source)?.value || "google",
+          campaign: store.get(ATTR_COOKIES.campaign)?.value,
+        });
+        await rewardReferral(userId);
+      } catch (error) {
+        console.error("google signup attribution failed:", error instanceof Error ? error.message : String(error));
+      }
       await sendWelcomeEmail(request, email, name).catch(() => undefined);
     }
 

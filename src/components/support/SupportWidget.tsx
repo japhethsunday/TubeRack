@@ -12,7 +12,7 @@ interface Msg { id: string; role: Role; body: string; createdAt: string }
 interface Conversation { id: string; status: "open" | "handoff" | "resolved"; subject: string; messages: Msg[] }
 interface Summary { id: string; status: string; subject: string; updatedAt: string; userUnread: boolean }
 
-const SUGGESTIONS = ["Why are my credits low?", "My export or generation failed", "How do I connect YouTube?", "How do credits work?"];
+const SUGGESTIONS = ["A generation or export failed", "Questions about my credits", "Connecting my YouTube channel", "Growing and monetising my channel"];
 
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Please try again.");
 const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -158,7 +158,8 @@ export function SupportWidget() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open Recktube Support"
-          className="support-launch fixed bottom-5 right-5 z-[70] flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white shadow-xl shadow-violet-900/40 transition-transform hover:scale-105"
+          style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+          className="support-launch fixed right-5 z-[70] flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white shadow-xl shadow-violet-900/40 transition-transform hover:scale-105"
         >
           <span className="support-ring absolute inset-0 rounded-full" aria-hidden="true" />
           <Headset className="relative size-6" aria-hidden="true" />
@@ -186,7 +187,7 @@ export function SupportWidget() {
                 <p className="text-sm font-semibold">Recktube Support</p>
                 <p className="flex items-center gap-1.5 text-[11px] text-white/80">
                   <span className={cx("size-1.5 rounded-full", status === "handoff" ? "bg-amber-300" : "bg-emerald-300")} />
-                  {status === "handoff" ? "With the team — we'll reply here and by email" : "Answers instantly from your account"}
+                  {status === "handoff" ? "With the team — we'll reply here and by email" : "Online · typically replies in seconds"}
                 </p>
               </div>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close support" className="rounded-md p-1 hover:bg-white/15">
@@ -223,7 +224,8 @@ export function SupportWidget() {
                 {!conv?.messages.length && (
                   <div className="support-in space-y-3">
                     <div className="rounded-2xl rounded-bl-md bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
-                      Hi{firstName ? ` ${firstName}` : ""}! 👋 I can see your credits, projects, exports and YouTube connection, so ask me anything about your account. If I can&apos;t fix it, I&apos;ll pass you to the team.
+                      <p className="font-medium">Hello{firstName ? ` ${firstName}` : ""}, welcome to Recktube Support.</p>
+                      <p className="mt-1 text-muted-text">How can we help you today? Choose a topic or type your question — we&apos;ll look into your account and, if needed, bring in a member of our team.</p>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {SUGGESTIONS.map((s) => (
@@ -265,6 +267,7 @@ export function SupportWidget() {
 
               <form
                 className="flex items-end gap-2 p-3"
+                style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
                 onSubmit={(e) => {
                   e.preventDefault();
                   void send(draft);
@@ -284,7 +287,7 @@ export function SupportWidget() {
                   }}
                   placeholder={status === "resolved" ? "Ask something else…" : "Type your question…"}
                   aria-label="Message Recktube Support"
-                  className="max-h-32 min-h-[42px] flex-1 resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-sm"
+                  className="max-h-32 min-h-[42px] flex-1 resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-base sm:text-sm"
                 />
                 <button
                   type="submit"

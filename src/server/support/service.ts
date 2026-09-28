@@ -3,7 +3,7 @@ import { backendUnavailable, notFound, validationError } from "@/src/server/erro
 import type { SessionUser } from "@/src/server/auth";
 import { accountSnapshot } from "@/src/server/support/snapshot";
 import { assistantTurn, type ChatLine } from "@/src/server/support/assistant";
-import { alertTeam, sendHandoffConfirmation } from "@/src/server/support/emails";
+import { alertTeam, sendAnswerCopy, sendHandoffConfirmation } from "@/src/server/support/emails";
 
 /** Support conversations. Every read and write is scoped to the owner. */
 
@@ -132,7 +132,25 @@ export async function chat(user: SessionUser, workspaceId: string | null, conver
         updated_at = now()
     WHERE id = ${id}`;
   if (turn.action === "handoff") await handOff(user, id, turn.subject, turn.handoffSummary);
+  else if (turn.email && user.emailVerifiedAt) await emailAnswer(user, id, turn.subject, text, turn.reply);
   return getConversation(user.id, id);
+}
+
+/** The assistant chose to email this answer: at most 3 a day per user, never twice in a row. */
+async function emailAnswer(user: SessionUser, conversationId: string, subject: string, question: string, answer: string): Promise<void> {
+  const d = db();
+  try {
+    const [recent] = await d`
+      SELECT count(*) AS n FROM support_messages m JOIN support_conversations c ON c.id = m.conversation_id
+      WHERE c.user_id = ${user.id} AND m.role = 'system' AND m.meta->>'emailed' = 'true' AND m.created_at > now() - interval '1 day'`;
+    if (Number(recent?.n ?? 0) >= 3) return;
+    const res = await sendAnswerCopy(user.email, user.name, subject, question, answer);
+    if (res.sent) {
+      await d`INSERT INTO support_messages (conversation_id, role, body, meta) VALUES (${conversationId}, 'system', ${`A copy was emailed to ${user.email}.`}, ${JSON.stringify({ emailed: true })})`;
+    }
+  } catch (error) {
+    console.error("support answer email failed:", error instanceof Error ? error.message : String(error));
+  }
 }
 
 /** The user asks for a person directly. */

@@ -151,12 +151,12 @@ export function BillingPanel() {
       <section aria-label="Credits" className="rounded-xl border border-border p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">Credits</h3>
-          <Badge tone="ok">Free plan</Badge>
+          <Badge tone="ok">{credits?.unlimited ? "Unlimited" : "Free plan"}</Badge>
         </div>
         {credits ? (
           <p className="mt-1 text-sm text-muted-text">
             {credits.unlimited
-              ? "Your account has unlimited credits."
+              ? "Your account has unlimited credits — every tool is included and nothing is deducted."
               : `${credits.balance.toLocaleString()} of ${credits.monthlyGrant.toLocaleString()} credits left. Your allowance refills automatically every 30 days${credits.refilledAt ? ` (next: ${new Date(new Date(credits.refilledAt).getTime() + 30 * 86_400_000).toLocaleDateString(undefined, { month: "long", day: "numeric" })})` : ""}.`}
           </p>
         ) : (

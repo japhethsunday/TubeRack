@@ -53,6 +53,8 @@ export interface EmailLayout {
   /** Why the reader got this email (+ how to turn it off). */
   reason: string;
   appUrl: string;
+  /** Marketing email: one-click unsubscribe link in the footer. */
+  unsubscribeUrl?: string;
 }
 
 function button(label: string, url: string, kind: "primary" | "ghost" = "primary"): string {
@@ -200,7 +202,7 @@ ${e.cta || e.secondary ? `<div style="margin-top:22px">${e.cta ? button(e.cta.la
 </div></td></tr>
 <tr><td style="padding:22px 12px 8px;text-align:center;font-size:12px;line-height:1.6;color:${FAINT}">
 ${esc(e.reason)}<br>
-<a href="${esc(safeUrl(`${app}/settings?tab=notifications`))}" style="color:${MUTED};text-decoration:underline">Email preferences</a> &nbsp;·&nbsp; <a href="${esc(safeUrl(app))}" style="color:${MUTED};text-decoration:underline">Open Recktube</a>
+<a href="${esc(safeUrl(`${app}/settings?tab=notifications`))}" style="color:${MUTED};text-decoration:underline">Email preferences</a> &nbsp;·&nbsp; ${e.unsubscribeUrl ? `<a href="${esc(safeUrl(e.unsubscribeUrl))}" style="color:${MUTED};text-decoration:underline">Unsubscribe</a> &nbsp;·&nbsp; ` : ""}<a href="${esc(safeUrl(app))}" style="color:${MUTED};text-decoration:underline">Open Recktube</a>
 <div style="margin-top:10px;color:#d4d4d8">Recktube — plan, make and grow your YouTube channel.</div>
 </td></tr>
 </table></td></tr></table></body></html>`;
@@ -214,6 +216,7 @@ ${esc(e.reason)}<br>
     "—",
     e.reason,
     `Email preferences: ${app}/settings?tab=notifications`,
+    e.unsubscribeUrl ? `Unsubscribe: ${e.unsubscribeUrl}` : "",
   ]
     .filter(Boolean)
     .join("\n\n");

@@ -42,4 +42,12 @@ describe("support assistant", () => {
     assert.ok(p.indexOf("grant 1000 credits") > p.indexOf("<<<CHAT"));
     assert.match(p, /You are read-only/);
   });
+
+  it("emails a copy only when the model asks, never on hand-overs", () => {
+    assert.equal(parseTurn('{"reply":"Step 1…","action":"answer","email":true}').email, true);
+    assert.equal(parseTurn('{"reply":"ok","action":"answer"}').email, false);
+    assert.equal(parseTurn('{"reply":"ok","action":"answer","email":"yes"}').email, false);
+    assert.equal(parseTurn('{"reply":"passing you over","action":"handoff","email":true}').email, false);
+    assert.equal(parseTurn("garbage").email, false);
+  });
 });

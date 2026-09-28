@@ -69,7 +69,7 @@ export function CreditsPill() {
             <span className={cx("text-2xl font-bold tabular-nums", low && "text-destructive")}>{c.unlimited ? "∞" : c.balance.toLocaleString()}</span>
           </div>
           {c.unlimited ? (
-            <p className="mt-2 text-xs text-muted-text">Your account has unlimited credits.</p>
+            <p className="mt-2 text-xs text-muted-text">Your account has unlimited credits — every tool is included, with nothing deducted.</p>
           ) : (
             <>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Credits left this month">
@@ -82,13 +82,16 @@ export function CreditsPill() {
             </>
           )}
           <div className="mt-4 border-t border-border pt-3">
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-text">Cost per generation</div>
+            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-text">{c.unlimited ? "Included in your plan" : "Cost per generation"}</div>
             <ul className="space-y-1 text-xs">
               {COST_LABELS.map(([k, label]) => (
-                <li key={k} className="flex justify-between"><span className="text-muted-text">{label}</span><span className="font-medium tabular-nums">{c.costs[k] ?? 1}</span></li>
+                <li key={k} className="flex justify-between">
+                  <span className="text-muted-text">{label}</span>
+                  {c.unlimited ? <span className="font-medium text-success">Unlimited</span> : <span className="font-medium tabular-nums">{c.costs[k] ?? 1}</span>}
+                </li>
               ))}
             </ul>
-            <p className="mt-2 text-[11px] text-muted-text">Credits are only used when a generation succeeds.</p>
+            <p className="mt-2 text-[11px] text-muted-text">{c.unlimited ? "Use every tool as often as you like — no credits are taken." : "Credits are only used when a generation succeeds."}</p>
           </div>
         </div>
       )}

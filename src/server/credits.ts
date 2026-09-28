@@ -62,14 +62,14 @@ export async function spendCredits(workspaceId: string, kind: string, ref?: stri
 }
 
 /** Admin adjustment: add (positive) or remove (negative) credits, with a reason. */
-export async function adjustCredits(workspaceId: string, delta: number, reason: string): Promise<CreditState | null> {
+export async function adjustCredits(workspaceId: string, delta: number, reason: string, kind?: string): Promise<CreditState | null> {
   const db = getDb();
   if (!db) return null;
   await creditState(workspaceId);
   const rows = await db`
     UPDATE credit_accounts SET balance = GREATEST(0, balance + ${delta}), updated_at = now()
     WHERE workspace_id = ${workspaceId} RETURNING id, balance`;
-  if (rows[0]) await db`INSERT INTO credit_transactions (account_id, kind, amount, balance_after, ref) VALUES (${String(rows[0].id)}, ${delta >= 0 ? "admin:add" : "admin:remove"}, ${delta}, ${Number(rows[0].balance)}, ${reason})`;
+  if (rows[0]) await db`INSERT INTO credit_transactions (account_id, kind, amount, balance_after, ref) VALUES (${String(rows[0].id)}, ${kind ?? (delta >= 0 ? "admin:add" : "admin:remove")}, ${delta}, ${Number(rows[0].balance)}, ${reason})`;
   return creditState(workspaceId);
 }
 

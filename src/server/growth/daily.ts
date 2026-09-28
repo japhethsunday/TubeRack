@@ -1,3 +1,5 @@
+import { lifecycleEmails } from "@/src/server/growth/lifecycle";
+import { runDueCampaigns } from "@/src/server/growth/campaigns";
 import { getDb } from "@/src/server/db";
 import { pruneSharedLimits } from "@/src/server/shared-limit";
 import { getServerEnv } from "@/src/lib/env";
@@ -255,5 +257,7 @@ export async function runDaily() {
     trends: await safe("trends", trendDigests),
     housekeeping: await safe("housekeeping", pruneSharedLimits),
     retention: await safe("retention", purgeStaleYouTubeData),
+    lifecycle: await safe("lifecycle", lifecycleEmails),
+    campaigns: await safe("campaigns", runDueCampaigns),
   };
 }

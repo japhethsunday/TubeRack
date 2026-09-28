@@ -13,7 +13,9 @@ export interface EmailRequest {
   subject: string;
   text: string;
   html?: string;
-  kind: "verify" | "recovery" | "security" | "digest" | "reminder" | "welcome" | "alert" | "support";
+  kind: "verify" | "recovery" | "security" | "digest" | "reminder" | "welcome" | "alert" | "support" | "marketing";
+  /** Marketing: the per-send one-click unsubscribe link (overrides the briefs link). */
+  listUnsubscribe?: string;
   /** Display name for the sender, e.g. "Recktube Support" (the address stays the verified one). */
   fromName?: string;
   /** Where replies go, e.g. support@recktube.xyz. */
@@ -45,7 +47,10 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   // everything that isn't account/security mail (Gmail & Yahoo sender rules).
   const replyTo = request.replyTo ?? "support@recktube.xyz";
   const headers: Record<string, string> = { ...(request.headers ?? {}) };
-  if (["digest", "alert", "reminder"].includes(request.kind)) {
+  if (request.listUnsubscribe) {
+    headers["List-Unsubscribe"] = `<${request.listUnsubscribe}>, <mailto:support@recktube.xyz?subject=unsubscribe>`;
+    headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+  } else if (["digest", "alert", "reminder"].includes(request.kind)) {
     const url = unsubscribeUrl(request.to);
     headers["List-Unsubscribe"] = url ? `<${url}>, <mailto:support@recktube.xyz?subject=unsubscribe>` : "<mailto:support@recktube.xyz?subject=unsubscribe>";
     if (url) headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";

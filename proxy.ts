@@ -9,6 +9,24 @@ import { NextResponse, type NextRequest } from "next/server";
 const CANONICAL_HOST = "www.recktube.xyz";
 const LEGACY_HOSTS = new Set(["tube-rack.vercel.app"]);
 
+/**
+ * Remember where a visitor came from (?ref=invite code, ?utm_source/utm_campaign)
+ * for 30 days, first touch wins, so sign-up can credit the right campaign or friend.
+ */
+function rememberAttribution(request: NextRequest, response: NextResponse) {
+  const q = request.nextUrl.searchParams;
+  const opts = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", maxAge: 30 * 86400 };
+  const ref = (q.get("ref") ?? "").toUpperCase();
+  if (/^[A-Z2-9]{6,12}$/.test(ref) && !request.cookies.get("rt_ref")) response.cookies.set("rt_ref", ref, opts);
+  const clean = (v: string | null) => (v ?? "").toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 60);
+  const src = clean(q.get("utm_source"));
+  if (src && !request.cookies.get("rt_src")) {
+    response.cookies.set("rt_src", src, opts);
+    const cmp = clean(q.get("utm_campaign"));
+    if (cmp) response.cookies.set("rt_cmp", cmp, opts);
+  }
+}
+
 export function proxy(request: NextRequest) {
   const host = request.headers.get("host")?.toLowerCase() ?? "";
   if (LEGACY_HOSTS.has(host)) {
@@ -46,6 +64,7 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("Content-Security-Policy", csp);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
+  rememberAttribution(request, response);
   return response;
 }
 

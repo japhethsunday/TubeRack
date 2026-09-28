@@ -4,7 +4,7 @@ import { GoogleButton } from "@/src/components/auth/GoogleButton";
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Lock, Mail } from "lucide-react";
-import { GlowField, SplitAuthCard, stagger } from "@/src/components/auth/SplitAuthCard";
+import { GlowField, GlassAuthCard, stagger } from "@/src/components/auth/SplitAuthCard";
 import { AuthBoundaryNotice } from "@/src/components/auth/AuthBoundaryNotice";
 import { AccountStateBanner } from "@/src/components/auth/AccountStateBanner";
 import { fieldErrors } from "@/src/components/auth/form";
@@ -60,14 +60,10 @@ export function LoginForm({ returnTo, expired, externalError }: { returnTo: stri
   }
 
   return (
-    <SplitAuthCard
-      panelSide="right"
-      panelTitle="Welcome back!"
-      panelText="Sign in to pick up where you left off — your projects, ideas and drafts are waiting."
-      switchLabel="New here? Create an account"
-      switchHref="/signup"
-      title="Sign in"
-      subtitle="Welcome back to your studio."
+    <GlassAuthCard
+      title="Welcome back"
+      subtitle="Sign in to pick up where you left off."
+      footer={<>New to Recktube? <Link href="/signup" className="font-medium text-foreground hover:text-primary">Create an account</Link></>}
     >
       {expired && (
         <div className="mb-4">
@@ -118,12 +114,9 @@ export function LoginForm({ returnTo, expired, externalError }: { returnTo: stri
               {!loading && <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />}
             </Button>
           </div>
-          <p className="su-from-left text-center text-xs text-muted-text md:hidden" style={stagger(5)}>
-            New to Recktube? <Link href="/signup" className="font-medium text-primary">Create an account</Link>
-          </p>
         </form>
         </>
       )}
-    </SplitAuthCard>
+    </GlassAuthCard>
   );
 }

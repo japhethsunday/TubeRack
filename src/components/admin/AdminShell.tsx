@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Activity, Coins, FolderKanban, Gauge, Headset, Inbox, LogOut, Mail, Megaphone, Menu, ScrollText, Server, Users } from "lucide-react";
+import { Activity, Clapperboard, Coins, FolderKanban, Gauge, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, Users } from "lucide-react";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { cx } from "@/src/components/ui/cx";
 
@@ -16,6 +16,9 @@ const NAV = [
   { href: "/admin/support", label: "Support chats", icon: Headset },
   { href: "/admin/inbox", label: "Inbox", icon: Inbox },
   { href: "/admin/email", label: "Email", icon: Mail },
+  { href: "/admin/growth", label: "Growth", icon: Rocket },
+  { href: "/admin/campaigns", label: "Campaigns", icon: Send },
+  { href: "/admin/promo", label: "Promo videos", icon: Clapperboard },
   { href: "/admin/messages", label: "Announcements", icon: Megaphone },
   { href: "/admin/security", label: "Security log", icon: ScrollText },
   { href: "/admin/system", label: "System", icon: Server },
