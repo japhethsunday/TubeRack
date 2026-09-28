@@ -1,5 +1,7 @@
 "use client";
 
+import { ProjectPreview } from "@/src/components/video/ProjectPreview";
+import { ProjectPublish } from "@/src/components/video/ProjectPublish";
 import { sceneSpeech } from "@/src/lib/script/engine";
 import { useProductionContext } from "@/src/components/projects/useProductionContext";
 import { useRef, useState } from "react";
@@ -389,7 +391,7 @@ export function GenerateVideoDialog({
   const needsConfirm = existingClips > 0 && !replaceOk;
 
   return (
-    <Modal title="Generate video from script" description={`${writable.length} scenes · ${aspect} · voice-over, visuals, music, captions and thumbnail`} onClose={() => { cancelled.current = true; onClose(); }}>
+    <Modal wide={finished} title={finished ? "Your video is ready" : "Generate video from script"} description={`${writable.length} scenes · ${aspect} · voice-over, visuals, music, captions and thumbnail`} onClose={() => { cancelled.current = true; onClose(); }}>
       {writable.length === 0 ? (
         <p className="text-sm text-muted-text">Write the script first — every section with text becomes a scene.</p>
       ) : (
@@ -443,11 +445,20 @@ export function GenerateVideoDialog({
             ))}
           </ol>
           {fatal && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{fatal}</p>}
-          <div className="flex justify-end gap-2">
+          {finished && (
+            <section aria-label="Your video" className="space-y-3 rounded-xl border border-success/30 bg-success/5 p-3">
+              <p className="text-sm font-semibold">Your video is ready. Watch it, post it, or fine-tune it.</p>
+              <ProjectPreview projectId={project.id} />
+            </section>
+          )}
+          <div className="flex flex-wrap justify-end gap-2 max-sm:[&>*]:flex-1">
             {finished ? (
-              <Button onClick={() => router.push(`/studio/video?project=${project.id}`)}>
-                <Clapperboard className="size-4" aria-hidden="true" /> Open in Video Studio
-              </Button>
+              <>
+                <Button variant="outline" onClick={() => router.push(`/studio/video?project=${project.id}`)}>
+                  <Clapperboard className="size-4" aria-hidden="true" /> Edit in Video Studio
+                </Button>
+                <ProjectPublish projectId={project.id} projectName={project.name} topic={project.topic} />
+              </>
             ) : (
               <>
                 <Button variant="outline" onClick={() => { cancelled.current = true; onClose(); }}>{running ? "Stop" : "Cancel"}</Button>
