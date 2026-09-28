@@ -299,13 +299,25 @@ export async function fetchPreview(sources: string[], range: string | null, id: 
 
 /** Download the track's audio (size-capped) so it can be stored with the project. */
 export async function downloadTrack(track: LibraryTrack, maxBytes = 25 * 1024 * 1024): Promise<{ bytes: Uint8Array; mime: string; ext: "mp3" | "wav" }> {
-  const res = await fetch(jamendoFiles.get(track.id) ?? track.previewUrl, { headers: { "User-Agent": UA }, redirect: "follow", signal: AbortSignal.timeout(60_000) });
-  if (!res.ok) throw new Error(`Track download failed (${res.status})`);
-  const len = Number(res.headers.get("content-length") ?? 0);
-  if (len > maxBytes) throw new Error("This track is too large to add.");
-  const buf = new Uint8Array(await res.arrayBuffer());
-  if (buf.byteLength > maxBytes) throw new Error("This track is too large to add.");
-  if (buf.byteLength < 10_000) throw new Error("The track file was empty.");
-  const ext = track.fileType === "wav" ? "wav" : "mp3";
-  return { bytes: buf, mime: ext === "wav" ? "audio/wav" : "audio/mpeg", ext };
+  // The full download link is refused for some tracks or servers; the streaming
+  // file of the same track is the fallback, so a picked track (almost) never fails.
+  const sources = [...new Set([jamendoFiles.get(track.id), track.previewUrl].filter((u): u is string => Boolean(u)))];
+  let last: Error = new Error("No audio file for this track.");
+  for (const url of sources) {
+    try {
+      const res = await fetch(url, { headers: { "User-Agent": UA }, redirect: "follow", signal: AbortSignal.timeout(60_000) });
+      if (!res.ok) throw new Error(`Track download failed (${res.status})`);
+      const len = Number(res.headers.get("content-length") ?? 0);
+      if (len > maxBytes) throw new Error("This track is too large to add.");
+      const buf = new Uint8Array(await res.arrayBuffer());
+      if (buf.byteLength > maxBytes) throw new Error("This track is too large to add.");
+      if (buf.byteLength < 10_000) throw new Error("The track file was empty.");
+      const ext = track.fileType === "wav" ? "wav" : "mp3";
+      return { bytes: buf, mime: ext === "wav" ? "audio/wav" : "audio/mpeg", ext };
+    } catch (error) {
+      last = error instanceof Error ? error : new Error(String(error));
+      console.warn(`[music] download ${track.id} from ${new URL(url).host} failed:`, last.message);
+    }
+  }
+  throw last;
 }

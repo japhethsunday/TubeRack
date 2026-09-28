@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       file = await downloadTrack(track);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
+      console.error(`[music] import ${id} failed:`, message);
       throw new BackendError("BACKEND_UNAVAILABLE", /license|large|empty/i.test(message) ? message : "Couldn't fetch this track right now. Please try another one.");
     }
     const url = await storeGenerated(caller, file.bytes, file.mime, file.ext);

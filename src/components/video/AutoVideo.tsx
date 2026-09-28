@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { Check, Clapperboard, Download, Loader2, TriangleAlert, X } from "lucide-react";
 import { api, ApiError, setVideoPass } from "@/src/lib/api";
 import { keepAwake } from "@/src/lib/wake-lock";
+import { MUSIC_MOODS, musicRecipe } from "@/src/lib/media/audio";
 import { generateProviderImage, retryBusy, synthesizeProviderSpeech } from "@/src/lib/ai-client";
 import { scenesFromSections } from "@/src/lib/script/engine";
 import type { Scene, ScriptSection } from "@/src/lib/script/types";
@@ -372,9 +373,30 @@ export function GenerateVideoDialog({
             }
           }
         } catch {
-          // Library busy: the video is still made, without music.
+          // Library busy: fall back to a built-in soundtrack below.
         }
-        set("music", added ? { state: "done", detail: added } : { state: "partial", detail: "Couldn't add music — add it later from the Music tab" });
+        if (!added) {
+          // Never leave a video silent: a built-in soundtrack in a matching mood, made on this device.
+          const mood = MUSIC_MOODS.find((m) => m.toLowerCase() === musicMood.toLowerCase()) ?? MUSIC_MOODS.find((m) => musicMood.toLowerCase().includes(m.toLowerCase())) ?? "Corporate";
+          const recipe = musicRecipe(mood, 60);
+          made.push(
+            media.addAsset({
+              projectId: project.id,
+              sceneIds: [],
+              kind: "music",
+              source: "local-draft",
+              status: "ready",
+              title: `${mood} soundtrack (built-in)`,
+              payload: JSON.stringify({ mood, seconds: recipe.seconds, bpm: recipe.bpm }),
+              mime: "application/x-tuberack-music",
+              durationSec: recipe.seconds,
+              tags: ["auto-video", "music", mood.toLowerCase()],
+              approval: "approved",
+            }),
+          );
+          added = `${mood} (built-in)`;
+        }
+        set("music", { state: "done", detail: added });
       }
       if (isCancelled()) return;
 
@@ -484,35 +506,48 @@ export function GenerateVideoDialog({
               <ProjectPreview projectId={project.id} />
             </section>
           )}
+          {finished ? (
+            // Clear hierarchy: one big main action, two equal secondary ones — labels never wrap.
+            <div className="space-y-2">
+              <div className="[&_button]:h-12 [&_button]:w-full [&_button]:justify-center [&_button]:gap-2 [&_button]:rounded-xl [&_button]:text-base [&_button]:font-semibold [&_button]:shadow-lg [&_button]:shadow-primary/20">
+                <ProjectPublish projectId={project.id} projectName={project.name} topic={project.topic} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSaving((v) => !v)}
+                  aria-pressed={saving}
+                  className={cx(
+                    "flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border text-sm font-semibold transition-colors active:scale-[0.98]",
+                    saving ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface hover:bg-muted",
+                  )}
+                >
+                  <Download className="size-4 shrink-0" aria-hidden="true" /> Save to phone
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/studio/video?project=${project.id}`)}
+                  className="flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-border bg-surface text-sm font-semibold transition-colors hover:bg-muted active:scale-[0.98]"
+                >
+                  <Clapperboard className="size-4 shrink-0" aria-hidden="true" /> Edit video
+                </button>
+              </div>
+            </div>
+          ) : (
+          <div className="flex flex-wrap justify-end gap-2 max-sm:[&>*]:flex-1">
+            <Button variant="outline" onClick={() => { cancelled.current = true; onClose(); }}>{running ? "Stop" : "Cancel"}</Button>
+            <Button disabled={running || needsConfirm} onClick={() => void run()}>
+              {running ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Clapperboard className="size-4" aria-hidden="true" />}
+              {running ? "Generating…" : fatal ? "Try again" : "Generate video"}
+            </Button>
+          </div>
+          )}
           {finished && saving && (
             <section aria-label="Save to your device" className="rounded-xl border border-border p-3">
               <p className="mb-2 text-sm font-semibold">Save to your phone or computer</p>
               <ProjectSave projectId={project.id} projectName={project.name} />
             </section>
           )}
-          <div className="flex flex-wrap justify-end gap-2 max-sm:[&>*]:flex-1">
-            {finished ? (
-              <>
-                <Button variant="outline" onClick={() => router.push(`/studio/video?project=${project.id}`)}>
-                  <Clapperboard className="size-4" aria-hidden="true" /> Edit in Video Studio
-                </Button>
-                {!saving && (
-                  <Button variant="outline" onClick={() => setSaving(true)}>
-                    <Download className="size-4" aria-hidden="true" /> Save to device
-                  </Button>
-                )}
-                <ProjectPublish projectId={project.id} projectName={project.name} topic={project.topic} />
-              </>
-            ) : (
-              <>
-                <Button variant="outline" onClick={() => { cancelled.current = true; onClose(); }}>{running ? "Stop" : "Cancel"}</Button>
-                <Button disabled={running || needsConfirm} onClick={() => void run()}>
-                  {running ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Clapperboard className="size-4" aria-hidden="true" />}
-                  {running ? "Generating…" : fatal ? "Try again" : "Generate video"}
-                </Button>
-              </>
-            )}
-          </div>
           {!finished && <p className="text-xs text-muted-text">Takes about 1–3 minutes depending on length. Keep this screen open: switching apps can pause it.</p>}
         </div>
       )}
