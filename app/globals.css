@@ -214,6 +214,108 @@ body {
   mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
 }
 
+/* ---------- Auth: glass code entry (password reset) ---------- */
+@keyframes otp-pop {
+  0% { opacity: 0; transform: translateY(-70%) scale(0.4) rotate(-12deg); filter: blur(4px); }
+  60% { opacity: 1; transform: translateY(6%) scale(1.12) rotate(3deg); filter: blur(0); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes otp-caret { 0%, 45% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes otp-wave {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-10px) scale(1.06); }
+}
+@keyframes otp-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-primary) 55%, transparent); }
+  100% { box-shadow: 0 0 0 14px transparent; }
+}
+@keyframes otp-badge {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-6px) rotate(4deg); }
+}
+@keyframes otp-sweep {
+  from { transform: translateX(-60%) rotate(18deg); }
+  to { transform: translateX(260%) rotate(18deg); }
+}
+@keyframes otp-in {
+  from { opacity: 0; transform: perspective(900px) rotateX(18deg) translateY(24px) scale(0.96); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes otp-check { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+.otp-in { animation: otp-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.otp-badge { animation: otp-badge 4s ease-in-out infinite; }
+.otp-badge-ring { animation: otp-ring 1.8s ease-out infinite; }
+.otp-glass { position: relative; overflow: hidden; }
+.otp-glass::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: 0;
+  width: 35%;
+  height: 200%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  animation: otp-sweep 5s ease-in-out infinite;
+  pointer-events: none;
+}
+.otp-cell { transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s, background-color 0.2s; }
+.otp-cell[data-active="true"] {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-primary) 22%, transparent), 0 10px 30px -10px color-mix(in oklab, var(--color-primary) 70%, transparent);
+  transform: translateY(-3px);
+}
+.otp-cell[data-filled="true"] { border-color: color-mix(in oklab, var(--color-primary) 60%, var(--color-border)); }
+.otp-digit { display: inline-block; animation: otp-pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1.2) both; }
+.otp-caret { animation: otp-caret 1s steps(1) infinite; }
+.otp-success .otp-cell { border-color: var(--color-success); background-color: color-mix(in oklab, var(--color-success) 12%, transparent); animation: otp-wave 0.6s ease-in-out both; }
+.otp-error .otp-cell { border-color: var(--color-destructive); }
+.otp-check { stroke-dasharray: 24; animation: otp-check 0.5s 0.15s ease-out both; }
+
+/* ---------- Auth: sign-up card (glass split panel + circuit backdrop) ---------- */
+@keyframes su-trace { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -1000; } }
+@keyframes su-node { 0%, 100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 1; transform: scale(1.6); } }
+@keyframes su-panel-in {
+  from { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); }
+  to { clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%); }
+}
+@keyframes su-panel-out {
+  from { clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%); }
+  to { clip-path: polygon(0 0, 200% 0, 200% 100%, 0 100%); }
+}
+@keyframes su-slide-right {
+  from { opacity: 0; transform: translateX(40px); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes su-slide-left {
+  from { opacity: 0; transform: translateX(-40px); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes su-border {
+  from { background-position: 0% 50%; }
+  to { background-position: 300% 50%; }
+}
+@keyframes su-card-glow {
+  0%, 100% { box-shadow: 0 30px 80px -30px color-mix(in oklab, var(--color-primary) 45%, transparent); }
+  50% { box-shadow: 0 30px 90px -20px color-mix(in oklab, var(--color-primary) 70%, transparent); }
+}
+.su-trace { stroke-dasharray: 60 940; animation: su-trace 7s linear infinite; }
+.su-node { transform-box: fill-box; transform-origin: center; animation: su-node 2.6s ease-in-out infinite; }
+.su-card { animation: otp-in 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both, su-card-glow 6s ease-in-out 0.8s infinite; }
+.su-panel { clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%); animation: su-panel-in 0.9s 0.15s cubic-bezier(0.7, 0, 0.2, 1) both; }
+.su-panel-leave { animation: su-panel-out 0.55s cubic-bezier(0.7, 0, 0.2, 1) both; }
+.su-from-right { animation: su-slide-right 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.su-from-left { animation: su-slide-left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.su-field { position: relative; border-radius: 0.75rem; padding: 1px; background: var(--color-border); transition: background 0.3s; }
+.su-field:focus-within {
+  background: linear-gradient(90deg, #d946ef, #7c3aed, #0ea5e9, #d946ef);
+  background-size: 300% 100%;
+  animation: su-border 3s linear infinite;
+  box-shadow: 0 0 22px -6px color-mix(in oklab, var(--color-primary) 80%, transparent);
+}
+.su-field[data-invalid="true"] { background: var(--color-destructive); }
+@media (max-width: 767px) {
+  .su-panel { clip-path: none; animation: su-slide-left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+}
+
 /* ---------- Home page motion ---------- */
 @keyframes home-orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes home-pulse-ring {

@@ -95,4 +95,4 @@ export function authError(code: AuthErrorCode): AuthErrorContent {
  * One fixed message is used for both cases.
  */
 export const FORGOT_SUBMITTED_MESSAGE =
-  "If an account exists for that address, a reset link is on its way. It expires in 60 minutes.";
+  "If an account exists for that address, a 6-digit code is on its way. It expires in 15 minutes.";

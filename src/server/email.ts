@@ -137,18 +137,22 @@ export async function sendAccountExistsEmail(request: Request, to: string): Prom
   return sendEmail({ to, subject: "Your Recktube account", kind: "security", ...mail });
 }
 
-export async function sendRecoveryEmail(request: Request, to: string, token: string): Promise<EmailResult> {
-  const url = `${linkOrigin(request)}/reset-password?token=${encodeURIComponent(token)}`;
-  const mail = actionEmail({
+/** 6-digit password reset code (15 minutes, one use). */
+export async function sendRecoveryCodeEmail(request: Request, to: string, code: string): Promise<EmailResult> {
+  const mail = renderEmail({
+    preheader: `Your Recktube reset code is ${code}. It expires in 15 minutes.`,
     eyebrow: "Security",
-    heading: "Reset your password",
-    preheader: "Your password reset link (valid for 60 minutes).",
-    body: "Someone asked to reset the password for this Recktube account. The link expires in 60 minutes and works once.",
-    action: "Choose a new password",
-    url,
-    footer: "If you did not ask for this, ignore this email — your password stays the same.",
+    heading: "Your password reset code",
+    intro: "Enter this code on the reset page to choose a new password. It expires in 15 minutes and works once.",
+    blocks: [
+      { type: "code", text: code },
+      { type: "text", text: "Never share this code. Recktube will never ask you for it." },
+    ],
+    cta: { label: "Open the reset page", url: `${linkOrigin(request)}/forgot-password?email=${encodeURIComponent(to)}` },
+    reason: "If you did not ask for this, ignore this email — your password stays the same.",
+    appUrl: linkOrigin(request),
   });
-  return sendEmail({ to, subject: "Reset your Recktube password", kind: "recovery", ...mail });
+  return sendEmail({ to, subject: `${code} is your Recktube reset code`, kind: "recovery", ...mail });
 }
 
 /** Welcome, sent once the email is verified: what to do first. */
