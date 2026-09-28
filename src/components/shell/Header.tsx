@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Menu, Bell, CircleHelp, Command } from "lucide-react";
+import { Menu, Bell, CircleHelp, Command, Search } from "lucide-react";
+import { BrandMark } from "@/src/components/ui/BrandMark";
 import { IconButton } from "@/src/components/ui/IconButton";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Drawer } from "@/src/components/ui/overlays";
@@ -48,8 +49,8 @@ export function Header({ onMenu }: { onMenu: () => void }) {
 
   return (
     <>
-      <div className="flex h-16 items-center gap-2 border-b border-border bg-surface px-4 backdrop-blur-xl">
-        <span className="lg:hidden">
+      <div className="flex h-14 items-center gap-1.5 border-b border-border bg-surface px-3 backdrop-blur-xl sm:h-16 sm:gap-2 sm:px-4">
+        <span className="hidden">
           <IconButton icon={Menu} label="Open navigation" onClick={onMenu} />
         </span>
         <button
@@ -62,7 +63,14 @@ export function Header({ onMenu }: { onMenu: () => void }) {
           <span className="flex-1 text-left">Search pages…</span>
           <kbd className="rounded border border-border px-1.5 py-0.5 text-[10px]">⌘K</kbd>
         </button>
-        <span className="sm:hidden" aria-hidden="true" />
+        <Link href="/dashboard" className="flex items-center gap-2 sm:hidden" aria-label="Recktube home">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white shadow-lg shadow-violet-900/30">
+            <BrandMark className="size-[18px]" />
+          </span>
+        </Link>
+        <span className="sm:hidden">
+          <IconButton icon={Search} label="Search pages" onClick={() => setPalette(true)} />
+        </span>
         <div className="ml-auto flex items-center gap-1">
           <SyncIndicator />
           <BackendBadge />
@@ -72,7 +80,9 @@ export function Header({ onMenu }: { onMenu: () => void }) {
               <span className="max-w-40 truncate text-sm font-medium">{displayName}</span>
             </span>
           )}
-          <ThemeToggle />
+          <span className="hidden sm:inline-flex">
+            <ThemeToggle />
+          </span>
           <Tooltip tip="Notifications">
             <span className="relative inline-flex">
               <IconButton icon={Bell} label={unread ? `Notifications (${unread} unread)` : "Notifications"} onClick={() => setDrawer("notifications")} />
@@ -83,9 +93,11 @@ export function Header({ onMenu }: { onMenu: () => void }) {
               )}
             </span>
           </Tooltip>
-          <Tooltip tip="Help and support">
-            <IconButton icon={CircleHelp} label="Help and support" onClick={() => setDrawer("help")} />
-          </Tooltip>
+          <span className="hidden sm:inline-flex">
+            <Tooltip tip="Help and support">
+              <IconButton icon={CircleHelp} label="Help and support" onClick={() => setDrawer("help")} />
+            </Tooltip>
+          </span>
           {session.status === "signed-out" ? (
             <span className="ml-1 flex items-center gap-1.5">
               <Link href="/login" className="hidden h-9 items-center rounded-lg px-3 text-sm font-medium hover:bg-muted sm:inline-flex">

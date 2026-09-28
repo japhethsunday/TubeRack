@@ -10,6 +10,9 @@ import { AppFooter } from "@/src/components/shell/AppFooter";
 import { Clapperboard, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { cx } from "@/src/components/ui/cx";
 import { Sidebar } from "@/src/components/shell/Sidebar";
+import { MobileTabBar } from "@/src/components/shell/MobileTabBar";
+import { MobileTables } from "@/src/components/shell/MobileTables";
+import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
 import { Header } from "@/src/components/shell/Header";
 import { AccountNotice } from "@/src/components/shell/AccountNotice";
 import { BackButton } from "@/src/components/shell/BackButton";
@@ -107,10 +110,12 @@ export function AppShell({
               role="dialog"
               aria-modal="true"
               aria-label="Navigation"
-              className="ui-drawer-left absolute left-0 top-0 h-full w-72 bg-elevated shadow-xl"
+              className="ui-drawer-left absolute left-0 top-0 h-full w-[min(20rem,85vw)] bg-elevated shadow-xl"
+              style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
             >
               <div className="flex h-16 items-center justify-between border-b border-border px-4">
-                <span className="text-sm font-semibold">Recktube</span>
+                <span className="flex-1 text-sm font-semibold">Recktube</span>
+                <ThemeToggle />
                 <button
                   type="button"
                   onClick={() => setNavOpen(false)}
@@ -129,10 +134,10 @@ export function AppShell({
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-40">
+          <header className="sticky top-0 z-40 bg-surface pt-[env(safe-area-inset-top)] lg:bg-transparent lg:pt-0">
             <Header onMenu={() => setNavOpen(true)} />
           </header>
-          <div className="flex flex-1 items-start gap-6 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex flex-1 items-start gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
             <main id="main" className="min-w-0 flex-1" tabIndex={-1}>
               <Suspense fallback={null}>
                 <BackButton />
@@ -152,8 +157,12 @@ export function AppShell({
             )}
           </div>
           <AppFooter />
+          {/* Room for the phone tab bar */}
+          <div aria-hidden="true" className="h-[calc(4rem+env(safe-area-inset-bottom))] lg:hidden" />
         </div>
       </div>
+      <MobileTabBar onMore={() => setNavOpen(true)} />
+      <MobileTables />
       <SupportWidget />
     </ToastProvider>
   );

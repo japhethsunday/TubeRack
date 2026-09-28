@@ -2,12 +2,22 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import "@/app/globals.css";
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0b0714" },
+    { media: "(prefers-color-scheme: light)", color: "#f8f6fc" },
+  ],
+};
 
 export const metadata: Metadata = {
   title: "Recktube — AI Video Production Platform",
   description:
     "AI video production and YouTube intelligence: research, scripts, voice, visuals, packaging, and analytics in one workspace.",
+  appleWebApp: { capable: true, title: "Recktube", statusBarStyle: "black-translucent" },
+  icons: { apple: "/apple-touch-icon.png" },
 };
 
 const THEME_INIT = `(function(){try{var t=localStorage.getItem("tuberack-theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}})();`;

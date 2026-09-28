@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Activity, Clapperboard, Coins, FolderKanban, Gauge, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, Users } from "lucide-react";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { cx } from "@/src/components/ui/cx";
+import { MobileTables } from "@/src/components/shell/MobileTables";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: Gauge },
@@ -67,11 +68,11 @@ export function AdminShell({ email, children }: { email: string; children: React
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button aria-label="Close menu" className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
-          <aside className="relative flex h-full w-64 flex-col border-r border-border bg-surface">{sidebar}</aside>
+          <aside className="relative flex h-full w-[min(18rem,85vw)] flex-col overflow-y-auto border-r border-border bg-surface pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">{sidebar}</aside>
         </div>
       )}
       <div className="lg:pl-60">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center pt-[env(safe-area-inset-top)] lg:h-14 lg:pt-0 gap-3 border-b border-border bg-background/90 px-4 backdrop-blur lg:px-8">
           <button className="rounded-md p-1.5 text-muted-text hover:bg-muted lg:hidden" aria-label="Open menu" onClick={() => setOpen(true)}>
             <Menu className="size-5" />
           </button>
@@ -80,7 +81,8 @@ export function AdminShell({ email, children }: { email: string; children: React
             <span className="size-1.5 rounded-full bg-success" /> Secure admin session
           </span>
         </header>
-        <main className="mx-auto w-full max-w-7xl p-4 lg:p-8">{children}</main>
+        <MobileTables />
+        <main className="mx-auto w-full max-w-7xl p-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-4 lg:p-8">{children}</main>
       </div>
     </div>
   );

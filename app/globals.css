@@ -459,3 +459,104 @@ a[class*="rounded-2xl"][class*="border"]:hover {
 
 /* Long lists: the browser skips drawing items that are off-screen. */
 .cv-auto { content-visibility: auto; contain-intrinsic-size: auto 320px; }
+
+/* ---------- Phones and tablets only (below lg). Desktop is untouched. ---------- */
+@media (max-width: 1023.98px) {
+  body:has(.mobile-tabbar) {
+    --tabbar: calc(4rem + env(safe-area-inset-bottom));
+  }
+  html,
+  body {
+    overflow-x: clip;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+  /* Stop iOS zooming into fields on focus. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  /* Wide content scrolls inside its own box instead of pushing the page sideways. */
+  main table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  main pre,
+  main img,
+  main video,
+  main canvas,
+  main iframe {
+    max-width: 100%;
+  }
+  main pre {
+    overflow-x: auto;
+  }
+  main :where(h1, h2, h3, p, a, span, li, td, dd) {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Phones: tables become stacked cards (labels come from MobileTables). */
+@media (max-width: 639.98px) {
+  table.m-stack {
+    display: block;
+    min-width: 0 !important;
+    width: 100%;
+    overflow: visible;
+  }
+  table.m-stack thead {
+    display: none;
+  }
+  table.m-stack tbody,
+  table.m-stack tr {
+    display: block;
+    width: 100%;
+  }
+  table.m-stack tr {
+    border-top: 1px solid var(--color-border);
+    padding: 0.625rem 0.25rem;
+  }
+  table.m-stack tr:first-child {
+    border-top: 0;
+  }
+  table.m-stack td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    padding: 0.25rem 0.75rem !important;
+    text-align: right !important;
+    border: 0 !important;
+  }
+  table.m-stack td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    max-width: 45%;
+    text-align: left;
+    font-size: 0.75rem;
+    color: var(--color-muted-text);
+  }
+  table.m-stack td[data-label=""]::before,
+  table.m-stack td:first-child::before {
+    content: none;
+  }
+  table.m-stack td:first-child {
+    display: block;
+    text-align: left !important;
+    font-weight: 500;
+  }
+  table.m-stack td[data-label=""]:not(:first-child) {
+    justify-content: flex-end;
+  }
+  table.m-stack td:first-child > * {
+    text-align: left;
+  }
+  /* Wrapper boxes built for sideways scrolling no longer need it. */
+  div:has(> table.m-stack) {
+    overflow-x: visible !important;
+  }
+}

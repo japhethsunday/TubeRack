@@ -158,7 +158,7 @@ export function SupportWidget() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open Recktube Support"
-          style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+          style={{ bottom: "calc(1.25rem + var(--tabbar, env(safe-area-inset-bottom)))" }}
           className="support-launch fixed right-5 z-[70] flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white shadow-xl shadow-violet-900/40 transition-transform hover:scale-105"
         >
           <span className="support-ring absolute inset-0 rounded-full" aria-hidden="true" />

@@ -740,7 +740,7 @@ function Studio() {
     // Portal: the page-transition wrapper is transformed, which would trap a
     // fixed full-screen layer inside it.
     <Portal>
-    <div className="dark studio-theme fixed inset-0 z-[60] flex flex-col bg-background text-foreground">
+    <div className="dark studio-theme fixed inset-0 z-[60] flex flex-col bg-background pt-[env(safe-area-inset-top)] text-foreground lg:pt-0">
       {topBar}
       {isDesktop ? (
         <>

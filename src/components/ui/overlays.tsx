@@ -40,7 +40,7 @@ export function Modal({
 
   return (
     <Portal>
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 max-sm:items-end max-sm:p-0">
       <div
         aria-hidden="true"
         onClick={onClose}
@@ -53,7 +53,7 @@ export function Modal({
         aria-label={title}
         tabIndex={-1}
         className={cx(
-          "ui-modal relative max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-border bg-elevated p-6 shadow-2xl",
+          "ui-modal relative max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-border bg-elevated p-6 shadow-2xl max-sm:max-h-[88dvh] max-sm:rounded-b-none max-sm:p-5 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
           wide ? "max-w-2xl" : "max-w-md",
         )}
       >
@@ -111,7 +111,7 @@ export function Drawer({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="ui-drawer absolute right-0 top-0 flex h-full w-full max-w-sm flex-col border-l border-border bg-elevated p-6 shadow-2xl"
+        className="ui-drawer absolute right-0 top-0 flex h-full w-full max-w-sm flex-col border-l border-border bg-elevated p-6 shadow-2xl max-sm:p-5 max-sm:pt-[calc(1.25rem+env(safe-area-inset-top))] max-sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
