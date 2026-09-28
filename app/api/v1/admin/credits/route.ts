@@ -28,6 +28,8 @@ const body = z.object({
   unlimited: z.boolean().optional(),
   /** Email the owner about added credits / unlimited (default on). */
   notify: z.boolean().optional(),
+  /** Set the balance back to the monthly allowance. */
+  reset: z.boolean().optional(),
 });
 
 /** POST /api/v1/admin/credits — add/remove credits or change a monthly limit (audited). */
@@ -38,9 +40,16 @@ export async function POST(request: Request) {
     const workspaceId = parseId(input.workspaceId, "workspace");
     const [ws] = await adminDb()`SELECT id FROM workspaces WHERE id = ${workspaceId}`;
     if (!ws) throw notFound("Workspace");
-    if (input.delta === undefined && input.monthlyGrant === undefined && input.unlimited === undefined) throw validationError("Nothing to change.");
+    if (input.delta === undefined && input.monthlyGrant === undefined && input.unlimited === undefined && !input.reset) throw validationError("Nothing to change.");
     let state = null;
-    const [before] = await adminDb()`SELECT unlimited FROM credit_accounts WHERE workspace_id = ${workspaceId}`;
+    const [before] = await adminDb()`SELECT unlimited, balance, monthly_grant FROM credit_accounts WHERE workspace_id = ${workspaceId}`;
+    if (input.reset) {
+      if (!before) throw notFound("Credit account");
+      const diff = Number(before.monthly_grant) - Number(before.balance);
+      state = diff ? await adjustCredits(workspaceId, diff, input.reason?.trim() || "Reset to monthly allowance") : state;
+      await audit({ userId: admin.id, workspaceId, action: "admin.credits.reset", resourceType: "credit_accounts", resourceId: workspaceId, metadata: { from: Number(before.balance), to: Number(before.monthly_grant) } });
+      return NextResponse.json({ data: { ...(state ?? {}), emailed: 0 } });
+    }
     if (input.delta) state = await adjustCredits(workspaceId, input.delta, input.reason?.trim() || "Admin adjustment");
     if (input.monthlyGrant !== undefined || input.unlimited !== undefined) state = await setCreditPlan(workspaceId, { monthlyGrant: input.monthlyGrant, unlimited: input.unlimited });
     await audit({ userId: admin.id, workspaceId, action: "admin.credits.change", resourceType: "credit_accounts", resourceId: workspaceId, metadata: { delta: input.delta, monthlyGrant: input.monthlyGrant, unlimited: input.unlimited, reason: input.reason } });

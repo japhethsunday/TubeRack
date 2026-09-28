@@ -203,6 +203,7 @@ export function CreditEditor({ workspaceId, balance, monthlyGrant, unlimited, on
           <input type="number" min={0} value={grant} onChange={(e) => setGrant(e.target.value)} className="h-9 w-28 rounded-lg border border-border bg-background px-2" />
         </label>
         <Button size="sm" variant="outline" loading={busy === "grant"} onClick={() => void send("grant", { monthlyGrant: Math.max(0, Math.floor(Number(grant) || 0)) })}>Save limit</Button>
+        <Button size="sm" variant="outline" loading={busy === "reset"} onClick={() => window.confirm(`Reset this balance to the monthly allowance (${monthlyGrant.toLocaleString()} credits)?`) && void send("reset", { reset: true })}>Reset credits</Button>
         <Button size="sm" variant="ghost" loading={busy === "unlimited"} onClick={() => void send("unlimited", { unlimited: !unlimited })}>{unlimited ? "Remove unlimited" : "Make unlimited"}</Button>
       </div>
       {msg && <p className={cx("text-xs", msg.ok ? "text-success" : "text-destructive")}>{msg.text}</p>}
