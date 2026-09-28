@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Kpi, Loading, PageTitle, Panel, th, td, useAdmin } from "@/src/components/admin/kit";
+import { WelcomeSeries } from "@/src/components/admin/WelcomeSeries";
 
 interface Growth {
   totals: { users: number; new30: number; new7: number; optedIn: number; verified: number };
@@ -20,6 +21,7 @@ export default function AdminGrowth() {
   return (
     <>
       <PageTitle title="Growth" sub="Where new creators come from, how invites perform, and who's opted in to product email." />
+      <WelcomeSeries />
       {!data ? <Loading error={error} onRetry={() => void reload()} /> : (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">

@@ -93,6 +93,11 @@ export function CreditsPill() {
             </ul>
             <p className="mt-2 text-[11px] text-muted-text">{c.unlimited ? "Use every tool as often as you like — no credits are taken." : "Credits are only used when a generation succeeds."}</p>
           </div>
+          {!c.unlimited && (
+            <a href="/redeem" className="mt-3 flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/50 py-2 text-xs font-semibold text-primary hover:bg-primary/10">
+              🎁 Have a bonus code? Redeem it
+            </a>
+          )}
         </div>
       )}
     </div>

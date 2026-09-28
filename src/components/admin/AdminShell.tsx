@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Activity, Calculator, Clapperboard, Coins, FileDown, FolderKanban, Gauge, Gift, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, ShieldUser, Tags, ToggleRight, TriangleAlert, Users, Wallet } from "lucide-react";
+import { Activity, Calculator, Clapperboard, Coins, FileDown, FolderKanban, Gauge, Gift, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, ShieldUser, Tags, ToggleRight, Ticket, TriangleAlert, Users, Wallet } from "lucide-react";
 import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { cx } from "@/src/components/ui/cx";
@@ -14,6 +14,7 @@ export const NAV = [
   { href: "/admin/users", label: "Users", icon: Users, group: "People", need: "users.list" },
   { href: "/admin/credits", label: "Credits", icon: Coins, group: "Money", need: "credits.list" },
   { href: "/admin/bulk-credits", label: "Bulk credits", icon: Gift, group: "Money", need: "bulk.view" },
+  { href: "/admin/codes", label: "Bonus codes", icon: Ticket, group: "Money", need: "credits.list" },
   { href: "/admin/revenue", label: "Revenue", icon: Wallet, group: "Money", need: "revenue.view" },
   { href: "/admin/plans", label: "Plans & pricing", icon: Tags, group: "Money", need: "plans.view" },
   { href: "/admin/costs", label: "AI costs", icon: Calculator, group: "Money", need: "costs.view" },

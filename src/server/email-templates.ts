@@ -38,6 +38,9 @@ export type EmailBlock =
   | { type: "callout"; title: string; text: string; action?: { label: string; url: string } }
   | { type: "steps"; items: { title: string; text: string }[] }
   | { type: "code"; text: string }
+  | { type: "banner"; highlight: string; title: string; sub?: string }
+  | { type: "offer"; code: string; value: string; expires?: string; action?: { label: string; url: string } }
+  | { type: "signature"; name: string; role: string }
   | { type: "divider" };
 
 export interface EmailLayout {
@@ -143,6 +146,21 @@ ${b.action ? `<div style="margin-top:14px"><a href="${esc(safeUrl(b.action.url))
         .join("");
     case "code":
       return `<div style="margin:8px 0 20px;padding:16px;border-radius:12px;background:${PAGE};border:1px dashed ${LINE};text-align:center;font-family:Menlo,Consolas,monospace;font-size:26px;font-weight:800;letter-spacing:.3em;color:${TEXT}">${esc(b.text)}</div>`;
+    case "banner":
+      // Bold promo banner (dark gradient, bright highlight), like a hero ad.
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 22px;border-radius:16px;background:#1e1b4b;background-image:linear-gradient(120deg,#1e1b4b 0%,#4c1d95 55%,#0369a1 100%)"><tr><td style="padding:24px 24px 22px">
+<div style="font-size:22px;line-height:1.25;font-weight:900;letter-spacing:-.01em;color:#ffffff;text-transform:uppercase"><span style="color:#d9f99d">${esc(b.highlight)}</span> ${esc(b.title)}</div>
+${b.sub ? `<div style="margin-top:8px;font-size:13px;line-height:1.5;color:#c7d2fe">${esc(b.sub)}</div>` : ""}
+</td></tr></table>`;
+    case "offer":
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 22px;border-radius:16px;border:2px dashed #a78bfa;background:${PRIMARY_SOFT}"><tr><td align="center" style="padding:22px 18px">
+<div style="font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:${PRIMARY}">${esc(b.value)}</div>
+<div style="margin:10px 0 6px;font-family:Menlo,Consolas,monospace;font-size:28px;font-weight:900;letter-spacing:.18em;color:${TEXT}">${esc(b.code)}</div>
+${b.expires ? `<div style="font-size:13px;font-weight:700;color:#b91c1c">&#9203; ${esc(b.expires)}</div>` : ""}
+${b.action ? `<div style="margin-top:16px"><a href="${esc(safeUrl(b.action.url))}" style="display:inline-block;padding:13px 26px;border-radius:999px;background:${PRIMARY};background-image:linear-gradient(90deg,#c026d3,#6d28d9);color:#ffffff;font-size:15px;font-weight:800;text-decoration:none">${esc(b.action.label)}</a></div>` : ""}
+</td></tr></table>`;
+    case "signature":
+      return `<div style="margin:22px 0 4px;font-size:15px;line-height:1.5;color:${TEXT}">Warm regards,<br><strong>${esc(b.name)}</strong><br><span style="color:${MUTED};font-size:13px">${esc(b.role)}</span></div>`;
     case "divider":
       return `<div style="margin:24px 0;border-top:1px solid ${LINE}"></div>`;
   }
@@ -170,6 +188,12 @@ function blockText(b: EmailBlock): string {
       return b.items.map((s, i) => `${i + 1}. ${s.title} — ${s.text}`).join("\n");
     case "code":
       return b.text;
+    case "banner":
+      return `${b.highlight.toUpperCase()} ${b.title.toUpperCase()}${b.sub ? `\n${b.sub}` : ""}`;
+    case "offer":
+      return `${b.value}\nYour code: ${b.code}${b.expires ? `\n${b.expires}` : ""}${b.action ? `\n${b.action.label}: ${b.action.url}` : ""}`;
+    case "signature":
+      return `Warm regards,\n${b.name}\n${b.role}`;
     case "divider":
       return "—";
   }

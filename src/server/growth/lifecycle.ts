@@ -17,7 +17,7 @@ const utm = (path: string, c: string) => `${app()}${path}${path.includes("?") ? 
 
 type Person = { id: string; email: string; name: string };
 
-async function deliver(p: Person, kind: string, subject: string, layout: Omit<Parameters<typeof renderEmail>[0], "appUrl" | "reason" | "unsubscribeUrl">): Promise<boolean> {
+async function deliver(p: Person, kind: string, subject: string, layout: Omit<Parameters<typeof renderEmail>[0], "appUrl" | "reason" | "unsubscribeUrl">, fromName = "Recktube"): Promise<boolean> {
   const db = getDb();
   if (!db) return false;
   // Claim first so parallel runs can't double-send.
@@ -25,24 +25,162 @@ async function deliver(p: Person, kind: string, subject: string, layout: Omit<Pa
   if (!claimed.length) return false;
   const unsub = unsubscribeUrl(p.email, "marketing");
   const mail = renderEmail({ ...layout, appUrl: app(), reason: "You're receiving this because you chose to get tips and product news from Recktube.", unsubscribeUrl: unsub ?? undefined });
-  const res = await sendEmail({ to: p.email, subject, ...mail, kind: "marketing", fromName: "Recktube", fromAddress: "support@recktube.xyz", replyTo: "support@recktube.xyz", listUnsubscribe: unsub ?? undefined });
+  const res = await sendEmail({ to: p.email, subject, ...mail, kind: "marketing", fromName, fromAddress: "support@recktube.xyz", replyTo: "support@recktube.xyz", listUnsubscribe: unsub ?? undefined });
   if (!res.sent) await db`DELETE FROM lifecycle_sends WHERE user_id = ${p.id} AND kind = ${kind}`; // retry tomorrow
   return res.sent;
 }
 
 const CONSENT = "u.marketing_opt_in = true AND u.email_verified_at IS NOT NULL AND u.status = 'active' AND u.deleted_at IS NULL";
 
+/* ---------------- Welcome series (founder letter + a guide over 7 days) ---------------- */
+
+const FOUNDER = { name: "Japheth Sunday", role: "Founder, Recktube" };
+const GUIDE = { name: "Ada", role: "Creator Success, Recktube" };
+const greet = (p: Person) => (first(p.name) ? `Hi ${first(p.name)},` : "Hi there,");
+
+interface WelcomeStep {
+  kind: string;
+  day: number;
+  /** Sender name shown in the inbox. */
+  from: string;
+  /** Extra SQL condition (users u) — e.g. skip people who already made a video. */
+  where?: string;
+  subject: (p: Person) => string;
+  layout: (p: Person) => Omit<Parameters<typeof renderEmail>[0], "appUrl" | "reason" | "unsubscribeUrl">;
+}
+
+const MADE_VIDEO = `EXISTS (SELECT 1 FROM usage_events e WHERE e.user_id = u.id AND e.kind = 'autovideo' AND e.status = 'completed')`;
+
+export const WELCOME_STEPS: WelcomeStep[] = [
+  {
+    kind: "welcome:0",
+    from: "Japheth from Recktube",
+    day: 0,
+    subject: () => "A personal welcome to Recktube",
+    layout: (p) => ({
+      preheader: "Thank you for joining — here's why we built Recktube, and your 100 free credits.",
+      eyebrow: "Welcome",
+      heading: "Welcome to Recktube",
+      intro: `${greet(p)}\n\nI'm Japheth, the founder of Recktube. Thank you for signing up — I'm genuinely glad you're here.`,
+      blocks: [
+        { type: "text", text: "I started Recktube with a simple goal: help every creator go from an idea to a finished YouTube video without an editing team, expensive tools or weeks of work. Research, script, voice-over, visuals, music and captions — in one studio." },
+        { type: "stats", items: [{ label: "Your free credits", value: "100", tone: "good" }, { label: "That's enough for", value: "1 full video" }] },
+        { type: "text", text: "Over the next few days, Ada from our team will send you a few short tips to get your first video out. And if you ever get stuck, just reply to this email — it comes straight to us." },
+        { type: "signature", ...FOUNDER },
+      ],
+      cta: { label: "Make my first video", url: utm("/studio/video", "welcome-0") },
+    }),
+  },
+  {
+    kind: "welcome:1",
+    from: "Ada from Recktube",
+    day: 1,
+    subject: () => "Your first video, in 3 steps",
+    layout: (p) => ({
+      preheader: "I'm Ada — I'll help you get your first video out this week.",
+      eyebrow: "Getting started",
+      heading: "Let's make your first video",
+      intro: `${greet(p)}\n\nI'm Ada from the Recktube team, and like you just heard from Japheth, I'll be your guide over the next few days.\n\nHere's the fastest way to your first video:`,
+      blocks: [
+        { type: "steps", items: [
+          { title: "Pick an idea", text: "Open Ideas — Content Creator shows what's already working in your niche." },
+          { title: "Write the script", text: "Tap Write with AI in Script Studio. Edit anything you like." },
+          { title: "Generate the video", text: "Tap Generate video: voice-over, visuals, music and captions are added for you." },
+        ] },
+        { type: "text", text: "Talk to you tomorrow!" },
+        { type: "signature", ...GUIDE },
+      ],
+      cta: { label: "Find my first idea", url: utm("/content-creator", "welcome-1") },
+    }),
+  },
+  {
+    kind: "welcome:2",
+    from: "Ada from Recktube",
+    day: 2,
+    where: `NOT ${MADE_VIDEO}`,
+    subject: () => "Your 100 credits are waiting",
+    layout: (p) => ({
+      preheader: "One tap turns your script into a finished video.",
+      eyebrow: "Your first video",
+      heading: "Your first video is 5 minutes away",
+      intro: `${greet(p)}\n\nYou haven't made your first video yet — and that's the fun part. Your 100 free credits cover one complete video: voice-over, visuals, music, captions and a thumbnail.`,
+      blocks: [
+        { type: "banner", highlight: "100 free credits", title: "ready to use", sub: "One full video · no editing skills needed · works on your phone" },
+        { type: "text", text: "Tip: keep your first one short (30–60 seconds). Shorts are the quickest way to learn what your audience likes." },
+        { type: "signature", ...GUIDE },
+      ],
+      cta: { label: "Generate my video", url: utm("/studio/video", "welcome-2") },
+    }),
+  },
+  {
+    kind: "welcome:4",
+    from: "Ada from Recktube",
+    day: 4,
+    subject: () => "The niches that pay creators the most",
+    layout: (p) => ({
+      preheader: "Pick a niche with real demand and strong earning potential.",
+      eyebrow: "Grow",
+      heading: "Make videos people actually search for",
+      intro: `${greet(p)}\n\nThe fastest-growing channels usually have one thing in common: they picked a niche with real demand and good earnings — then posted consistently.`,
+      blocks: [
+        { type: "steps", items: [
+          { title: "Check Most Paying Niches", text: "See niches ranked by earning potential, demand and competition — measured from live YouTube data." },
+          { title: "Watch Trend Radar", text: "Spot what's taking off in your niche this week, before everyone else." },
+          { title: "Post consistently", text: "Two or three Shorts a week beats one perfect video a month." },
+        ] },
+        { type: "signature", ...GUIDE },
+      ],
+      cta: { label: "See paying niches", url: utm("/intelligence/paying-niches", "welcome-4") },
+    }),
+  },
+  {
+    kind: "welcome:7",
+    from: "Japheth from Recktube",
+    day: 7,
+    subject: (p) => `${first(p.name) || "Quick question"} — how's it going?`,
+    layout: (p) => ({
+      preheader: "Reply and tell me what you're making — I read every email.",
+      eyebrow: "One week in",
+      heading: "How's it going?",
+      intro: `${greet(p)}\n\nIt's been a week since you joined Recktube. I'd love to know: what are you making, and what's one thing we could do better?\n\nJust hit reply — your email comes straight to our team, and I read every one.`,
+      blocks: [{ type: "signature", ...FOUNDER }],
+      cta: { label: "Open Recktube", url: utm("/dashboard", "welcome-7") },
+    }),
+  },
+];
+
+async function welcomeSeries(): Promise<number> {
+  const db = getDb();
+  if (!db) return 0;
+  let sent = 0;
+  for (const step of WELCOME_STEPS) {
+    // A 3-day window: a missed daily run still sends, but late sign-ups never get old steps in a burst.
+    const rows = await db.unsafe(
+      `SELECT u.id, u.email, u.name FROM users u
+       WHERE ${CONSENT} AND u.created_at <= now() - interval '${step.day} days' AND u.created_at > now() - interval '${step.day + 3} days'
+         ${step.where ? `AND ${step.where}` : ""}
+         AND NOT EXISTS (SELECT 1 FROM lifecycle_sends l WHERE l.user_id = u.id AND l.kind = '${step.kind}')
+       LIMIT ${PER_RUN}`,
+    );
+    for (const r of rows) {
+      const p = { id: String(r.id), email: String(r.email), name: String(r.name ?? "") };
+      if (await deliver(p, step.kind, step.subject(p), step.layout(p), step.from)) sent++;
+    }
+  }
+  return sent;
+}
+
 export async function lifecycleEmails() {
   const db = getDb();
   if (!db) return { skipped: "no database" };
-  const out = { gettingStarted: 0, comeback: 0, refill: 0 };
+  const out = { welcome: await welcomeSeries(), gettingStarted: 0, comeback: 0, refill: 0 };
 
   // 1) Day 3+: signed up, never started a project.
   const starters = await db.unsafe(
     `SELECT u.id, u.email, u.name FROM users u
      WHERE ${CONSENT} AND u.created_at < now() - interval '3 days' AND u.created_at > now() - interval '21 days'
        AND NOT EXISTS (SELECT 1 FROM memberships m JOIN projects p ON p.workspace_id = m.workspace_id AND p.deleted_at IS NULL WHERE m.user_id = u.id)
-       AND NOT EXISTS (SELECT 1 FROM lifecycle_sends l WHERE l.user_id = u.id AND l.kind = 'getting-started')
+       AND NOT EXISTS (SELECT 1 FROM lifecycle_sends l WHERE l.user_id = u.id AND (l.kind = 'getting-started' OR l.kind LIKE 'welcome:%'))
      LIMIT ${PER_RUN}`,
   );
   for (const r of starters) {
@@ -117,4 +255,17 @@ export async function lifecycleEmails() {
     ) out.refill++;
   }
   return out;
+}
+
+/** Send every welcome email to one address, as a preview (no records kept). */
+export async function sendWelcomePreview(to: string, name: string): Promise<number> {
+  const p = { id: "preview", email: to, name };
+  let n = 0;
+  for (const step of WELCOME_STEPS) {
+    const unsub = unsubscribeUrl(to, "marketing");
+    const mail = renderEmail({ ...step.layout(p), appUrl: app(), reason: "Preview of the Recktube welcome series.", unsubscribeUrl: unsub ?? undefined });
+    const res = await sendEmail({ to, subject: `[Preview day ${step.day}] ${step.subject(p)}`, ...mail, kind: "marketing", fromName: step.from, fromAddress: "support@recktube.xyz", replyTo: "support@recktube.xyz", listUnsubscribe: unsub ?? undefined });
+    if (res.sent) n++;
+  }
+  return n;
 }
