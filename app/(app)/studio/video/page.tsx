@@ -822,7 +822,7 @@ function Studio() {
           <div className="isolate min-h-0 flex-1 border-t border-border">{TimelineBlock()}</div>
           <nav aria-label="Studio tools" className="grid shrink-0 grid-cols-5 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]">
             {([
-              { id: "media", label: "Import", icon: FolderOpen },
+              { id: "media", label: "Add media", icon: FolderOpen },
               { id: "text", label: "Text", icon: Type },
               { id: "elements", label: "Elements", icon: Shapes },
               { id: "edit", label: "Edit", icon: SlidersHorizontal },
@@ -832,7 +832,8 @@ function Studio() {
                 key={t.id}
                 type="button"
                 onClick={() => {
-                  if (t.id === "media" || t.id === "text" || t.id === "elements") setLeftTab(t.id);
+                  if (t.id === "media" && !["media", "stock", "music", "ai"].includes(leftTab)) setLeftTab("media");
+                  if (t.id === "text" || t.id === "elements") setLeftTab(t.id);
                   if (t.id === "edit") setRightTab("inspector");
                   if (t.id === "tools") setRightTab("export");
                   setSheet(sheet === t.id ? null : t.id);
@@ -853,6 +854,24 @@ function Studio() {
                   <X className="size-4" aria-hidden="true" />
                 </button>
               </div>
+              {sheet === "media" && (
+                // Phones: one Import sheet with every source — your files, free stock, music and AI clips.
+                <div className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-2 [scrollbar-width:none]" role="tablist" aria-label="Import from">
+                  {LEFT_TABS.filter((t) => t.id === "media" || t.id === "stock" || t.id === "music" || t.id === "ai").map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={leftTab === t.id}
+                      onClick={() => setLeftTab(t.id)}
+                      className={cx("flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold", leftTab === t.id ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-text")}
+                    >
+                      <t.icon className="size-3.5" aria-hidden="true" />
+                      {t.id === "media" ? "My files" : t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="min-h-0 overflow-y-auto p-3 pt-1">{sheet === "edit" || sheet === "tools" ? rightPanel : leftPanel}</div>
             </div>
           )}

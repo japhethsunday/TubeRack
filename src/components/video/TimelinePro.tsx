@@ -45,7 +45,9 @@ const KIND_STYLE: Record<TimelineClip["kind"], string> = {
   captions: "bg-zinc-500/30 border-zinc-400/70",
 };
 const TRACK_H: Record<TimelineClip["kind"], number> = { video: 64, image: 56, voice: 44, music: 44, sfx: 40, text: 36, captions: 32 };
-const HEADER_W = 132;
+/** Track-label column: full controls on desktop, icon only on phones so clips get the room. */
+const HEADER_W_DESKTOP = 132;
+const HEADER_W_PHONE = 40;
 
 export interface TimelineAsset {
   url: string | null;
@@ -199,6 +201,15 @@ export function TimelinePro({
   /** Fill the parent (studio layout) and hide empty secondary tracks. */
   fill?: boolean;
 }) {
+  const [phone, setPhone] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023.98px)");
+    const update = () => setPhone(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const HEADER_W = phone ? HEADER_W_PHONE : HEADER_W_DESKTOP;
   const scrollRef = useRef<HTMLDivElement>(null);
   const laneRefs = useRef(new Map<string, HTMLDivElement>());
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -424,8 +435,10 @@ export function TimelinePro({
             return (
               <div key={track.id} className="flex border-b border-border/70">
                 <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1 border-r border-border bg-surface px-2" style={{ width: HEADER_W, height: h }}>
-                  <Icon className="size-3.5 shrink-0 text-muted-text" aria-hidden="true" />
-                  <span className={cx("min-w-0 flex-1 truncate text-[11px] font-medium", track.hidden && "text-muted-text line-through")}>{track.label}</span>
+                  <Icon className={cx("shrink-0 text-muted-text", phone ? "mx-auto size-4" : "size-3.5")} aria-label={phone ? track.label : undefined} aria-hidden={phone ? undefined : true} />
+                  {!phone && <span className={cx("min-w-0 flex-1 truncate text-[11px] font-medium", track.hidden && "text-muted-text line-through")}>{track.label}</span>}
+                  {!phone && (
+                    <>
                   {track.kind !== "text" && track.kind !== "captions" && track.kind !== "image" && (
                     <button type="button" onClick={() => onToggleTrack(track.id, "muted")} aria-pressed={track.muted} aria-label={track.muted ? `Unmute ${track.label}` : `Mute ${track.label}`} className="rounded p-0.5 text-muted-text hover:bg-muted hover:text-foreground">
                       {track.muted ? <VolumeX className="size-3.5" aria-hidden="true" /> : <Volume2 className="size-3.5" aria-hidden="true" />}
@@ -442,6 +455,8 @@ export function TimelinePro({
                   <button type="button" onClick={() => onToggleLock(track.id)} aria-pressed={isLocked} aria-label={isLocked ? `Unlock ${track.label}` : `Lock ${track.label}`} className={cx("rounded p-0.5 hover:bg-muted", isLocked ? "text-warning" : "text-muted-text hover:text-foreground")}>
                     {isLocked ? <Lock className="size-3.5" aria-hidden="true" /> : <Unlock className="size-3.5" aria-hidden="true" />}
                   </button>
+                    </>
+                  )}
                 </div>
                 <div
                   ref={(el) => {
