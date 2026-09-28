@@ -6,7 +6,7 @@ import { drawComposition, sourceTime, type VisualSource } from "@/src/lib/video/
 import { mixGain, MUSIC_DUCK, trackVolume, voiceRanges } from "@/src/lib/video/mix";
 import { loadAudio } from "@/src/lib/video/audio-load";
 import { renderMusic, renderSfx, musicRecipe, type MusicMood, type SfxType } from "@/src/lib/media/audio";
-import { assetUrl, estimateBitrate, loadImage, loadVideo, RenderError, untilDone, type RenderOptions, type RenderResult } from "@/src/lib/video/render";
+import { assetUrl, estimateBitrate, loadImage, loadVideo, prefetchAudio, RenderError, untilDone, type RenderOptions, type RenderResult } from "@/src/lib/video/render";
 
 /**
  * Fast exporter: draws every frame directly and encodes it with the
@@ -225,21 +225,27 @@ export async function renderFast(o: RenderOptions): Promise<RenderResult | null>
   const images = new Map<string, HTMLImageElement>();
   const videos = new Map<string, HTMLVideoElement>();
   const media = clips.filter((c) => c.kind === "image" || c.kind === "video");
+  prefetchAudio(o, clips);
   let loaded = 0;
-  for (const clip of media) {
-    if (o.signal?.aborted) throw new RenderError("Export cancelled.");
-    const url = assetUrl(o.assetFor(clip.assetId), clip.kind);
-    if (url) {
-      try {
-        if (clip.kind === "image" && clip.assetId && !images.has(clip.assetId)) images.set(clip.assetId, await loadImage(url, o.signal));
-        if (clip.kind === "video") videos.set(clip.id, await loadVideo(url, true, o.signal));
-      } catch {
-        if (o.signal?.aborted) throw new RenderError("Export cancelled.");
-        warnings.push(`“${clip.name}” couldn't be loaded and was left out.`);
+  // Load several files at once (phones were waiting on each picture in turn).
+  const queue = [...media];
+  const worker = async () => {
+    for (let clip = queue.shift(); clip; clip = queue.shift()) {
+      if (o.signal?.aborted) throw new RenderError("Export cancelled.");
+      const url = assetUrl(o.assetFor(clip.assetId), clip.kind);
+      if (url) {
+        try {
+          if (clip.kind === "image" && clip.assetId && !images.has(clip.assetId)) images.set(clip.assetId, await loadImage(url, o.signal));
+          if (clip.kind === "video") videos.set(clip.id, await loadVideo(url, true, o.signal));
+        } catch {
+          if (o.signal?.aborted) throw new RenderError("Export cancelled.");
+          warnings.push(`“${clip.name}” couldn't be loaded and was left out.`);
+        }
       }
+      o.onProgress({ phase: "preparing", ratio: (++loaded / Math.max(1, media.length)) * 0.5, message: `Loading media… ${loaded}/${media.length}` });
     }
-    o.onProgress({ phase: "preparing", ratio: (++loaded / Math.max(1, media.length)) * 0.5, message: "Loading media…" });
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, media.length) }, worker));
 
   // ---- 2. Audio mix (offline, much faster than real time). ----
   o.onProgress({ phase: "preparing", ratio: 0.6, message: "Mixing audio…" });

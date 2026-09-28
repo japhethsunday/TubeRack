@@ -1,6 +1,7 @@
 "use client";
 
 import { chunkedParts, downloadChunked } from "@/src/lib/media/chunked";
+import { sharedBlob } from "@/src/lib/video/media-cache";
 import type { RenderAsset } from "@/src/lib/video/render";
 
 /**
@@ -19,11 +20,24 @@ export interface LoadedAudio {
 /** Decoding more than this much audio at once risks running out of memory. */
 const MAX_DECODE_SEC = 20 * 60;
 
+/**
+ * Download a file's bytes. Reuses the copy the preview/waveform already
+ * downloaded (shared in-memory cache) so an export never fetches the same
+ * music twice; a fresh download gets 60 s per attempt, retried once.
+ */
 async function fetchBytes(url: string): Promise<ArrayBuffer> {
+  if (!url.startsWith("blob:") && !url.startsWith("data:")) {
+    try {
+      const shared = await Promise.race([sharedBlob(url), new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timed out")), 60_000))]);
+      return await shared.arrayBuffer();
+    } catch {
+      // fall through to a direct download
+    }
+  }
   let last: unknown = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(60_000) });
       if (!res.ok) throw new Error(`download failed (${res.status})`);
       return await res.arrayBuffer();
     } catch (error) {

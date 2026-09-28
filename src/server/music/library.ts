@@ -180,7 +180,7 @@ async function jamendoSearch(clientId: string, mood: MusicMoodId, page: number, 
     if (!t) continue;
     if (SONG_LIKE.test(r.name ?? "")) continue;
     // Beds need some length (the strict API filter is gone, so check here).
-    if (t.durationSec !== null && (t.durationSec < 40 || t.durationSec > 900)) continue;
+    if (t.durationSec !== null && (t.durationSec < 40 || t.durationSec > 360)) continue;
     if (r.audiodownload_allowed !== false && r.audiodownload) jamendoFiles.set(t.id, r.audiodownload);
     out.push(t);
   }

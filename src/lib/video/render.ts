@@ -1,6 +1,7 @@
 "use client";
 import { mixGain, MUSIC_DUCK, trackVolume, voiceRanges } from "@/src/lib/video/mix";
-import { isChunked } from "@/src/lib/media/chunked";
+import { chunkedParts, isChunked } from "@/src/lib/media/chunked";
+import { sharedBlob } from "@/src/lib/video/media-cache";
 import { loadAudio } from "@/src/lib/video/audio-load";
 
 import type { Composition, TimelineClip } from "@/src/lib/video/types";
@@ -101,6 +102,16 @@ export function untilDone<T>(p: Promise<T>, signal?: AbortSignal, ms = MEDIA_LOA
     signal?.addEventListener("abort", onAbort, { once: true });
     p.then((v) => (cleanup(), resolve(v)), (e) => (cleanup(), reject(e)));
   });
+}
+
+/** Start downloading every voice/music/sfx file now, while pictures load, so the audio step doesn't wait. */
+export function prefetchAudio(o: Pick<RenderOptions, "assetFor">, clips: TimelineClip[]): void {
+  for (const c of clips) {
+    if (c.kind !== "voice" && c.kind !== "music" && c.kind !== "sfx") continue;
+    const a = o.assetFor(c.assetId);
+    if (!a || a.source !== "provider-output" || !/^(https?:|\/)/.test(a.payload) || chunkedParts(a.payload)) continue;
+    void sharedBlob(a.payload).catch(() => {});
+  }
 }
 
 export function loadImage(src: string, signal?: AbortSignal): Promise<HTMLImageElement> {
@@ -206,23 +217,29 @@ async function renderRealtime(o: RenderOptions): Promise<RenderResult> {
   const images = new Map<string, HTMLImageElement>();
   const videos = new Map<string, HTMLVideoElement>();
   const media = clips.filter((c) => c.kind === "image" || c.kind === "video");
+  prefetchAudio(o, clips);
   let loaded = 0;
-  for (const clip of media) {
-    if (o.signal?.aborted) throw new RenderError("Export cancelled.");
-    const url = assetUrl(assetOf(clip), clip.kind);
-    try {
-      if (!url) throw new Error("missing");
-      if (clip.kind === "image") {
-        if (clip.assetId && !images.has(clip.assetId)) images.set(clip.assetId, await loadImage(url, o.signal));
-      } else {
-        videos.set(clip.id, await loadVideo(url, false, o.signal));
-      }
-    } catch {
+  // Load several files at once instead of one after another.
+  const queue = [...media];
+  const worker = async () => {
+    for (let clip = queue.shift(); clip; clip = queue.shift()) {
       if (o.signal?.aborted) throw new RenderError("Export cancelled.");
-      warnings.push(`“${clip.name}” couldn't be loaded — it was left out. Re-import it and export again.`);
+      const url = assetUrl(assetOf(clip), clip.kind);
+      try {
+        if (!url) throw new Error("missing");
+        if (clip.kind === "image") {
+          if (clip.assetId && !images.has(clip.assetId)) images.set(clip.assetId, await loadImage(url, o.signal));
+        } else {
+          videos.set(clip.id, await loadVideo(url, false, o.signal));
+        }
+      } catch {
+        if (o.signal?.aborted) throw new RenderError("Export cancelled.");
+        warnings.push(`“${clip.name}” couldn't be loaded — it was left out. Re-import it and export again.`);
+      }
+      o.onProgress({ phase: "preparing", ratio: (++loaded / Math.max(1, media.length)) * 0.6, message: `Loading media… ${loaded}/${media.length}` });
     }
-    o.onProgress({ phase: "preparing", ratio: (++loaded / Math.max(1, media.length)) * 0.6, message: "Loading media…" });
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, media.length) }, worker));
 
   // ---- 2. Audio graph. ----
   const audioCtx = new AudioContext();
