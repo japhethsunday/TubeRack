@@ -21,7 +21,7 @@ interface Pack {
   bannerArt: string;
   generatedAt: string;
 }
-interface Setup { connected: boolean; canManage: boolean; channel: { title?: string } | null }
+interface Setup { connected: boolean; canManage: boolean; channel: { id?: string; title?: string; handle?: string; thumbnail?: string } | null }
 
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Something went wrong.");
 
@@ -101,18 +101,18 @@ export default function BrandChannelPage() {
   const applyText = () => run("apply-text", async () => {
     if (!pack) return;
     await api.patch("/api/v1/youtube/channel-setup", { description: pack.description, keywords: pack.keywords });
-    return "About text and keywords are now on your YouTube channel.";
+    return `About text and keywords saved to “${setup?.channel?.title ?? "your channel"}”. YouTube can take a few minutes to show them.`;
   });
   const applyPlaylists = () => run("apply-lists", async () => {
     if (!pack) return;
     const r = await api.post<{ created: { title: string }[]; skipped: string[] }>("/api/v1/youtube/playlists", { playlists: pack.playlists.map((p) => ({ ...p, privacy: "public" })) });
-    return `Playlists: ${r.created.length} created${r.skipped.length ? `, ${r.skipped.length} already existed` : ""}.`;
+    return `Playlists on “${setup?.channel?.title ?? "your channel"}”: ${r.created.length} created${r.skipped.length ? `, ${r.skipped.length} already existed` : ""}.`;
   });
   const applyBanner = () => run("apply-banner", async () => {
     if (!banner.current) return;
     const res = await fetch("/api/v1/youtube/banner", { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: await bannerJpeg(banner.current) });
     if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { message?: string }).message ?? "Banner upload failed.");
-    return "Banner set on your YouTube channel.";
+    return `Banner set on “${setup?.channel?.title ?? "your channel"}”. YouTube can take a few minutes to show it.`;
   });
 
   return (
@@ -162,6 +162,22 @@ export default function BrandChannelPage() {
         <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={2} maxLength={600} placeholder="Optional direction, e.g. focus on faceless channel creators" className="w-full rounded-lg border border-border bg-background p-2.5 text-sm" />
         <Button className="mt-2" loading={busy === "pack"} onClick={() => void generatePack()}><Sparkles className="size-4" aria-hidden="true" /> {pack ? "Write a new pack" : "Write channel pack"}</Button>
 
+        {canApply && setup?.channel && (
+          <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3 text-sm">
+            {/* eslint-disable-next-line @next/next/no-img-element -- YouTube channel avatar */}
+            {setup.channel.thumbnail && <img src={setup.channel.thumbnail} alt="" className="size-10 rounded-full" />}
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs text-muted-text">Changes go to this YouTube channel</span>
+              <span className="block truncate font-semibold">{setup.channel.title}{setup.channel.handle ? ` · ${setup.channel.handle}` : ""}</span>
+            </span>
+            {setup.channel.id && (
+              <a href={`https://studio.youtube.com/channel/${setup.channel.id}/editing/profile`} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs font-semibold text-primary">Open in Studio</a>
+            )}
+          </div>
+        )}
+        {canApply && (
+          <p className="mt-2 text-xs text-muted-text">Wrong channel? In <Link href="/youtube" className="font-medium text-primary">My Channel</Link>, disconnect and reconnect, and pick the Recktube channel when Google asks which account or channel to use.</p>
+        )}
         {setup && !canApply && (
           <p className="mt-3 rounded-lg bg-muted/60 p-3 text-xs text-muted-text">
             To apply these to YouTube, connect Recktube&apos;s channel with the &quot;manage your channel&quot; permission in <Link href="/youtube" className="font-medium text-primary">My Channel</Link>. (Use a separate channel for Recktube, not your personal one.)
