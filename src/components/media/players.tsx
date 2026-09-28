@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Play, Pause, RotateCcw, Volume2 } from "lucide-react";
 import { stopSpeech } from "@/src/lib/media/audio";
 import { cx } from "@/src/components/ui/cx";
+import { directMediaUrl, isStoredPath } from "@/src/lib/media/resolve";
 
 /**
  * Exclusive playback: starting any preview stops the others (speech +
@@ -314,6 +315,17 @@ export function MediaPlayer({ url, mime, label }: { url: string; mime: string; l
   const isVideo = mime.startsWith("video/");
   // Retry re-requests the file (fresh signed link for stored files).
   const src = attempt === 0 || url.startsWith("blob:") || url.startsWith("data:") ? url : `${url}${url.includes("?") ? "&" : "?"}r=${attempt}`;
+  // Videos stored in the account play from their direct signed link (no redirect per range request).
+  const [direct, setDirect] = useState<{ from: string; to: string } | null>(null);
+  useEffect(() => {
+    if (!isVideo || !isStoredPath(url)) return;
+    let alive = true;
+    void directMediaUrl(url).then((to) => alive && setDirect({ from: src, to }));
+    return () => {
+      alive = false;
+    };
+  }, [isVideo, url, src]);
+  const playSrc = isVideo && isStoredPath(url) ? (direct?.from === src ? direct.to : undefined) : src;
 
   useEffect(() => {
     const el = ref.current;
@@ -398,7 +410,7 @@ export function MediaPlayer({ url, mime, label }: { url: string; mime: string; l
   }
 
   const common = {
-    src,
+    src: playSrc,
     preload: "metadata" as const,
     playsInline: true,
     "aria-label": label,

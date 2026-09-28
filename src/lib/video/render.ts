@@ -2,6 +2,7 @@
 import { mixGain, MUSIC_DUCK, trackVolume, voiceRanges } from "@/src/lib/video/mix";
 import { chunkedParts, isChunked, streamableUrl } from "@/src/lib/media/chunked";
 import { sharedBlob } from "@/src/lib/video/media-cache";
+import { directMediaUrl } from "@/src/lib/media/resolve";
 import { loadAudio } from "@/src/lib/video/audio-load";
 
 import type { Composition, TimelineClip } from "@/src/lib/video/types";
@@ -137,7 +138,9 @@ export function loadVideo(src: string, muted = true, signal?: AbortSignal): Prom
     v.preload = "auto";
     v.onloadeddata = () => resolve(v);
     v.onerror = () => reject(new Error("video failed to load"));
-    v.src = src;
+    void directMediaUrl(src).then((direct) => {
+      v.src = direct;
+    });
   });
   return untilDone(p, signal).catch((e) => {
     // Stop the download so a stuck file doesn't keep the connection busy.

@@ -26,6 +26,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ file
     } catch {
       throw notFound("File");
     }
+    // ?resolve=1: hand back the signed link itself, so video players stream it
+    // directly instead of following a redirect on every range request.
+    if (new URL(request.url).searchParams.get("resolve") === "1") {
+      return NextResponse.json({ data: { url, expiresIn: 3600 } }, { headers: { "Cache-Control": "private, no-store" } });
+    }
     return NextResponse.redirect(url, { status: 302, headers: { "Cache-Control": "private, max-age=600" } });
   } catch (error) {
     return toErrorResponse(error);

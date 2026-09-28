@@ -8,6 +8,7 @@ import type { Composition, TimelineClip } from "@/src/lib/video/types";
 import { drawComposition, sourceTime, transitionState } from "@/src/lib/video/compositor";
 import { assetUrl, loadImage, type RenderAsset } from "@/src/lib/video/render";
 import { streamableUrl } from "@/src/lib/media/chunked";
+import { directMediaUrl } from "@/src/lib/media/resolve";
 import { mixGain } from "@/src/lib/video/mix";
 import { sharedBlob } from "@/src/lib/video/media-cache";
 import { renderMusic, renderSfx, musicRecipe, speakText, stopSpeech, unlockWebAudio, type MusicMood, type SfxType } from "@/src/lib/media/audio";
@@ -205,8 +206,12 @@ export function Preview({
       el.playsInline = true;
       el.muted = true; // phones only let muted video start without a tap; unmuted when audible
       el.preload = "auto";
-      el.src = url;
-      el.load(); // mobile browsers may not start buffering a detached element otherwise
+      // Stored clips play from their direct signed link (no redirect per range request).
+      void directMediaUrl(url).then((direct) => {
+        if (videos.current.get(clip.id)?.el !== el) return;
+        el.src = direct;
+        el.load(); // mobile browsers may not start buffering a detached element otherwise
+      });
       el.onloadeddata = () => setLoadTick((n) => n + 1);
       el.onseeked = () => !playingRef.current && draw(state.current.playhead);
       videos.current.set(clip.id, { el, url });

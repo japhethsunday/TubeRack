@@ -1,4 +1,5 @@
 "use client";
+import { directMediaUrl } from "@/src/lib/media/resolve";
 
 /**
  * Timeline visuals: filmstrip frames for video/image clips and waveform
@@ -36,7 +37,7 @@ async function buildStrip(url: string): Promise<Filmstrip | null> {
   v.crossOrigin = "anonymous";
   v.muted = true;
   v.preload = "auto";
-  v.src = url;
+  v.src = await directMediaUrl(url);
   await new Promise<void>((resolve, reject) => {
     v.onloadeddata = () => resolve();
     v.onerror = () => reject(new Error("load"));
