@@ -257,3 +257,29 @@ export function templateById(id: string): AdminTemplate | undefined {
 export function missingFields(t: AdminTemplate, fields: Record<string, string>): string[] {
   return t.fields.filter((f) => !f.optional && !(fields[f.key] ?? "").trim()).map((f) => f.label);
 }
+
+/** A reply from the admin inbox, on the Recktube design, quoting the original. */
+export function buildReply(
+  mailbox: Mailbox,
+  app: string,
+  r: { subject: string; message: string; name?: string; quoted?: string | null; quotedFrom: string; receivedAt: string },
+): { subject: string; html: string; text: string } {
+  const subject = /^re:/i.test(r.subject.trim()) ? r.subject.trim() : `Re: ${r.subject.trim() || "your message"}`;
+  const quote = (r.quoted ?? "").replace(/\r/g, "").trim().slice(0, 1500);
+  let when = r.receivedAt;
+  try {
+    when = new Date(r.receivedAt).toUTCString().replace(" GMT", " UTC");
+  } catch {
+    // keep as-is
+  }
+  return mail(mailbox, app, subject, {
+    preheader: r.message.slice(0, 120),
+    eyebrow: mailbox === "security" ? "Recktube Security" : "Recktube Support",
+    heading: hi({ name: r.name ?? "" }),
+    blocks: [
+      ...paragraphs(r.message),
+      { type: "text", text: mailbox === "security" ? "Recktube Security" : "The Recktube Support team" },
+      ...(quote ? ([{ type: "divider" }, { type: "text", text: `On ${when}, ${r.quotedFrom} wrote:\n\n${quote}${(r.quoted ?? "").length > 1500 ? "\n…" : ""}` }] as EmailBlock[]) : []),
+    ],
+  });
+}

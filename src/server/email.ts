@@ -19,6 +19,8 @@ export interface EmailRequest {
   replyTo?: string;
   /** Send from this verified address instead of EMAIL_FROM's (falls back to EMAIL_FROM if refused). */
   fromAddress?: string;
+  /** Extra headers, e.g. In-Reply-To / References so a reply threads. */
+  headers?: Record<string, string>;
 }
 
 export interface EmailResult {
@@ -46,6 +48,7 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
       body: JSON.stringify({
         from: sender,
         ...(request.replyTo ? { reply_to: [request.replyTo] } : {}),
+        ...(request.headers ? { headers: request.headers } : {}),
         to: [request.to],
         subject: request.subject,
         text: request.text,

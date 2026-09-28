@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Activity, Coins, FolderKanban, Gauge, LogOut, Mail, Megaphone, Menu, ScrollText, Server, Users } from "lucide-react";
+import { Activity, Coins, FolderKanban, Gauge, Inbox, LogOut, Mail, Megaphone, Menu, ScrollText, Server, Users } from "lucide-react";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { cx } from "@/src/components/ui/cx";
 
@@ -13,6 +13,7 @@ const NAV = [
   { href: "/admin/credits", label: "Credits", icon: Coins },
   { href: "/admin/usage", label: "Generations", icon: Activity },
   { href: "/admin/projects", label: "Projects", icon: FolderKanban },
+  { href: "/admin/inbox", label: "Inbox", icon: Inbox },
   { href: "/admin/email", label: "Email", icon: Mail },
   { href: "/admin/messages", label: "Announcements", icon: Megaphone },
   { href: "/admin/security", label: "Security log", icon: ScrollText },
