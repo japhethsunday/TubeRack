@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, type LucideIcon } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, FileText, Mic, Sparkles, type LucideIcon } from "lucide-react";
+import { FloatingCard, RotatingWord, STAGES } from "@/src/components/auth/AuthLayout";
 import { CircuitBackdrop } from "@/src/components/auth/CircuitBackdrop";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { cx } from "@/src/components/ui/cx";
@@ -101,7 +102,23 @@ export function SplitAuthCard({
           </span>
           <span className="font-semibold tracking-tight">Recktube</span>
         </Link>
-        <div className="my-8 md:my-auto">
+        {/* Product glimpses (desktop): the floating cards from the brand panel. */}
+        <div className="relative my-6 hidden h-56 w-full text-left md:block" aria-hidden="true">
+          <FloatingCard className={cx("top-0 w-56", right ? "right-0" : "left-0")} delay="0s" tilt="-3deg">
+            <p className="flex items-center gap-2 text-xs font-medium text-white/70"><Sparkles className="size-3.5 text-fuchsia-200" /> Video analysis</p>
+            <p className="mt-1.5 text-sm leading-snug">Lead with the payoff — your hook buries the result 12s in.</p>
+          </FloatingCard>
+          <FloatingCard className={cx("top-[5.5rem] w-44", right ? "left-12" : "right-12")} delay="-2s" tilt="4deg">
+            <p className="flex items-center gap-2 text-xs font-medium text-white/70"><FileText className="size-3.5 text-sky-200" /> Script draft</p>
+            <p className="mt-1.5 text-sm">9 sections · 1,240 words</p>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15"><div className="auth-progress h-full rounded-full bg-white/80" /></div>
+          </FloatingCard>
+          <FloatingCard className={cx("bottom-0 w-40", right ? "right-0" : "left-0")} delay="-4s" tilt="2deg">
+            <p className="flex items-center gap-2 text-xs font-medium text-white/70"><Mic className="size-3.5 text-amber-200" /> Voiceover</p>
+            <p className="mt-1.5 flex items-center gap-1.5 text-sm"><CheckCircle2 className="size-3.5 text-emerald-200" /> Take ready</p>
+          </FloatingCard>
+        </div>
+        <div className="my-8 md:my-0">
           <p className={cx(from, "text-3xl font-extrabold uppercase tracking-tight md:text-4xl")} style={{ animationDelay: "450ms" }}>
             {panelTitle}
           </p>
@@ -116,6 +133,21 @@ export function SplitAuthCard({
           >
             {switchLabel}
           </a>
+        </div>
+        {/* Rotating headline + production pipeline marquee. */}
+        <div className={cx(from, "mt-auto w-full space-y-3 pt-8")} style={{ animationDelay: "760ms" }}>
+          <p className="text-lg font-semibold leading-tight">
+            Make better <RotatingWord className="text-white underline decoration-white/50 decoration-2 underline-offset-4" />
+            <br />
+            <span className="text-white/70">From idea to published.</span>
+          </p>
+          <div className="relative overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_12%,black_88%,transparent)]">
+            <ul className="auth-marquee flex w-max gap-2" aria-label="Production pipeline">
+              {[...STAGES, ...STAGES].map((s, i) => (
+                <li key={`${s}-${i}`} className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs text-white/90">{s}</li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </div>

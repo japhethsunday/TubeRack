@@ -7,13 +7,13 @@ import { Clapperboard, Sparkles, FileText, Search, Mic, CheckCircle2 } from "luc
 import { AppBackdrop } from "@/src/components/shell/AppBackdrop";
 
 const WORDS = ["scripts", "thumbnails", "voiceovers", "titles", "research", "videos"];
-const STAGES = [
+export const STAGES = [
   "Idea", "Research", "Strategy", "Script", "Storyboard", "Visuals", "Voice",
   "Music", "Video", "Thumbnail", "SEO", "Repurpose", "Publish", "Analytics",
 ];
 
 /** Rotating headline word; static for reduced-motion users (CSS handles the rest). */
-function RotatingWord() {
+export function RotatingWord({ className = "bg-gradient-to-r from-fuchsia-300 via-violet-200 to-sky-300 bg-clip-text text-transparent" }: { className?: string }) {
   const [index, setIndex] = useState(0);
   useEffect(() => {
     const id = window.setInterval(() => setIndex((i) => (i + 1) % WORDS.length), 2600);
@@ -23,7 +23,7 @@ function RotatingWord() {
     <span className="relative inline-flex h-[1.15em] min-w-[6ch] overflow-hidden align-bottom">
       <span
         key={index}
-        className="auth-word bg-gradient-to-r from-fuchsia-300 via-violet-200 to-sky-300 bg-clip-text text-transparent"
+        className={`auth-word ${className}`}
       >
         {WORDS[index]}.
       </span>
@@ -31,7 +31,7 @@ function RotatingWord() {
   );
 }
 
-function FloatingCard({
+export function FloatingCard({
   className,
   delay,
   tilt,
