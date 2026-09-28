@@ -3,6 +3,7 @@ import { z } from "zod";
 import { adminCredits, adminDb, requireAdmin } from "@/src/server/admin";
 import { adjustCredits, setCreditPlan } from "@/src/server/credits";
 import { audit } from "@/src/server/audit";
+import { notifyCreditGift } from "@/src/server/credit-emails";
 import { notFound, toErrorResponse, validationError } from "@/src/server/errors";
 import { parseBody, parseId } from "@/src/server/validate";
 
@@ -25,6 +26,8 @@ const body = z.object({
   reason: z.string().trim().max(200).optional(),
   monthlyGrant: z.number().int().min(0).max(1_000_000).optional(),
   unlimited: z.boolean().optional(),
+  /** Email the owner about added credits / unlimited (default on). */
+  notify: z.boolean().optional(),
 });
 
 /** POST /api/v1/admin/credits — add/remove credits or change a monthly limit (audited). */
@@ -37,10 +40,17 @@ export async function POST(request: Request) {
     if (!ws) throw notFound("Workspace");
     if (input.delta === undefined && input.monthlyGrant === undefined && input.unlimited === undefined) throw validationError("Nothing to change.");
     let state = null;
+    const [before] = await adminDb()`SELECT unlimited FROM credit_accounts WHERE workspace_id = ${workspaceId}`;
     if (input.delta) state = await adjustCredits(workspaceId, input.delta, input.reason?.trim() || "Admin adjustment");
     if (input.monthlyGrant !== undefined || input.unlimited !== undefined) state = await setCreditPlan(workspaceId, { monthlyGrant: input.monthlyGrant, unlimited: input.unlimited });
     await audit({ userId: admin.id, workspaceId, action: "admin.credits.change", resourceType: "credit_accounts", resourceId: workspaceId, metadata: { delta: input.delta, monthlyGrant: input.monthlyGrant, unlimited: input.unlimited, reason: input.reason } });
-    return NextResponse.json({ data: state });
+    let emailed = 0;
+    if (input.notify !== false) {
+      const nowUnlimited = input.unlimited === true && !before?.unlimited;
+      if (nowUnlimited) emailed = await notifyCreditGift(workspaceId, { unlimited: true, note: input.reason });
+      else if ((input.delta ?? 0) > 0) emailed = await notifyCreditGift(workspaceId, { added: input.delta, balance: state?.unlimited ? undefined : state?.balance, note: input.reason });
+    }
+    return NextResponse.json({ data: { ...(state ?? {}), emailed } });
   } catch (error) {
     return toErrorResponse(error);
   }

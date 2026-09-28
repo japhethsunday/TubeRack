@@ -167,8 +167,10 @@ export function CreditEditor({ workspaceId, balance, monthlyGrant, unlimited, on
     setBusy(kind);
     setMsg(null);
     try {
-      await api.post("/api/v1/admin/credits", { workspaceId, ...body });
-      setMsg({ ok: true, text: "Saved." });
+      const res = await api.post<{ emailed?: number }>("/api/v1/admin/credits", { workspaceId, ...body });
+      const emailed = res?.emailed ?? 0;
+      const gift = (typeof body.delta === "number" && body.delta > 0) || body.unlimited === true;
+      setMsg({ ok: true, text: gift ? (emailed ? "Saved. The user has been emailed about it." : "Saved. No email sent (the owner's email isn't verified).") : "Saved." });
       onDone();
     } catch (e) {
       setMsg({ ok: false, text: errorText(e) });

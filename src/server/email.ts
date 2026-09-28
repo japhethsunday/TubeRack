@@ -13,7 +13,7 @@ export interface EmailRequest {
   subject: string;
   text: string;
   html?: string;
-  kind: "verify" | "recovery" | "security" | "digest" | "reminder" | "welcome" | "alert" | "support" | "marketing";
+  kind: "verify" | "recovery" | "security" | "digest" | "reminder" | "welcome" | "alert" | "support" | "marketing" | "account";
   /** Marketing: the per-send one-click unsubscribe link (overrides the briefs link). */
   listUnsubscribe?: string;
   /** Display name for the sender, e.g. "Recktube Support" (the address stays the verified one). */
