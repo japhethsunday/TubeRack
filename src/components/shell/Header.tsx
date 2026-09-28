@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
 import { BackendBadge } from "@/src/components/shell/BackendStatus";
 import { SyncIndicator } from "@/src/components/shell/SyncIndicator";
 import { UserMenu } from "@/src/components/shell/UserMenu";
+import { CreditsPill } from "@/src/components/shell/CreditsPill";
 import { useSession } from "@/src/components/auth/useSession";
 import Link from "next/link";
 import { CommandMenu } from "@/src/components/ui/search";
@@ -65,6 +66,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         <div className="ml-auto flex items-center gap-1">
           <SyncIndicator />
           <BackendBadge />
+          {session.status === "signed-in" && <CreditsPill />}
           {session.status === "signed-in" && (
             <span className="hidden items-center gap-2 rounded-lg px-2 md:flex">
               <span className="max-w-40 truncate text-sm font-medium">{displayName}</span>

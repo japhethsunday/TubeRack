@@ -6,7 +6,6 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { NAV_SECTIONS, ALL_NAV_ITEMS, type NavItem } from "@/src/config/navigation";
 import { Badge } from "@/src/components/ui/Badge";
 import { cx } from "@/src/components/ui/cx";
-import { CreditsCard } from "@/src/components/shell/CreditsCard";
 
 /** Query-aware active matching, computed once per sidebar (hooks rule). */
 function useActiveFor(): (item: NavItem) => boolean {
@@ -140,13 +139,8 @@ function SidebarLive({ onNavigate, collapsed }: { onNavigate?: () => void; colla
 /** Hierarchized sidebar nav: primary work first, pipeline second, system last. */
 export function Sidebar({ onNavigate, collapsed = false }: { onNavigate?: () => void; collapsed?: boolean }) {
   return (
-    <div className="flex h-full flex-col">
-      <div className="min-h-0 flex-1">
-        <Suspense fallback={<NavList activeFor={() => false} collapsed={collapsed} />}>
-          <SidebarLive onNavigate={onNavigate} collapsed={collapsed} />
-        </Suspense>
-      </div>
-      <CreditsCard collapsed={collapsed} />
-    </div>
+    <Suspense fallback={<NavList activeFor={() => false} collapsed={collapsed} />}>
+      <SidebarLive onNavigate={onNavigate} collapsed={collapsed} />
+    </Suspense>
   );
 }
