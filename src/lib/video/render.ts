@@ -82,19 +82,44 @@ export function renderSupport(): { ok: boolean; reason?: string } {
   return { ok: true };
 }
 
-export function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
+/** A media file that never answers must not hang an export forever. */
+export const MEDIA_LOAD_TIMEOUT_MS = 45_000;
+
+/**
+ * Settle with `p`, or reject when the export is cancelled or the time limit
+ * passes — so Cancel works even while a file is still loading.
+ */
+export function untilDone<T>(p: Promise<T>, signal?: AbortSignal, ms = MEDIA_LOAD_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error("cancelled"));
+    const t = window.setTimeout(() => (cleanup(), reject(new Error("timed out"))), ms);
+    const onAbort = () => (cleanup(), reject(new Error("cancelled")));
+    const cleanup = () => {
+      window.clearTimeout(t);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    p.then((v) => (cleanup(), resolve(v)), (e) => (cleanup(), reject(e)));
+  });
+}
+
+export function loadImage(src: string, signal?: AbortSignal): Promise<HTMLImageElement> {
+  const img = new Image();
+  const p = new Promise<HTMLImageElement>((resolve, reject) => {
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("image failed to load"));
     img.src = src;
   });
+  return untilDone(p, signal).catch((e) => {
+    img.src = "";
+    throw e;
+  });
 }
 
-export function loadVideo(src: string, muted = true): Promise<HTMLVideoElement> {
-  return new Promise((resolve, reject) => {
-    const v = document.createElement("video");
+export function loadVideo(src: string, muted = true, signal?: AbortSignal): Promise<HTMLVideoElement> {
+  const v = document.createElement("video");
+  const p = new Promise<HTMLVideoElement>((resolve, reject) => {
     v.crossOrigin = "anonymous";
     v.muted = muted;
     v.playsInline = true;
@@ -102,6 +127,12 @@ export function loadVideo(src: string, muted = true): Promise<HTMLVideoElement> 
     v.onloadeddata = () => resolve(v);
     v.onerror = () => reject(new Error("video failed to load"));
     v.src = src;
+  });
+  return untilDone(p, signal).catch((e) => {
+    // Stop the download so a stuck file doesn't keep the connection busy.
+    v.removeAttribute("src");
+    v.load();
+    throw e;
   });
 }
 
@@ -182,11 +213,12 @@ async function renderRealtime(o: RenderOptions): Promise<RenderResult> {
     try {
       if (!url) throw new Error("missing");
       if (clip.kind === "image") {
-        if (clip.assetId && !images.has(clip.assetId)) images.set(clip.assetId, await loadImage(url));
+        if (clip.assetId && !images.has(clip.assetId)) images.set(clip.assetId, await loadImage(url, o.signal));
       } else {
-        videos.set(clip.id, await loadVideo(url, false));
+        videos.set(clip.id, await loadVideo(url, false, o.signal));
       }
     } catch {
+      if (o.signal?.aborted) throw new RenderError("Export cancelled.");
       warnings.push(`“${clip.name}” couldn't be loaded — it was left out. Re-import it and export again.`);
     }
     o.onProgress({ phase: "preparing", ratio: (++loaded / Math.max(1, media.length)) * 0.6, message: "Loading media…" });
@@ -211,7 +243,7 @@ async function renderRealtime(o: RenderOptions): Promise<RenderResult> {
         const speed = clip.speed ?? 1;
         const needFrom = (clip.inSec ?? 0) + Math.max(0, from - clip.startSec) * speed;
         const needTo = clip.kind === "music" || clip.reverse ? Infinity : (clip.inSec ?? 0) + (Math.min(clip.startSec + clip.durationSec, to) - clip.startSec) * speed;
-        const loaded = await loadAudio(audioCtx, a, clip.reverse ? 0 : needFrom, needTo);
+        const loaded = await untilDone(loadAudio(audioCtx, a, clip.reverse ? 0 : needFrom, needTo), o.signal, 90_000);
         buffer = loaded.buffer;
         bufferStart = loaded.startSec;
       } else if (clip.kind === "music") {

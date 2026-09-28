@@ -6,7 +6,7 @@ import { drawComposition, sourceTime, type VisualSource } from "@/src/lib/video/
 import { mixGain, MUSIC_DUCK, trackVolume, voiceRanges } from "@/src/lib/video/mix";
 import { loadAudio } from "@/src/lib/video/audio-load";
 import { renderMusic, renderSfx, musicRecipe, type MusicMood, type SfxType } from "@/src/lib/media/audio";
-import { assetUrl, estimateBitrate, loadImage, loadVideo, RenderError, type RenderOptions, type RenderResult } from "@/src/lib/video/render";
+import { assetUrl, estimateBitrate, loadImage, loadVideo, RenderError, untilDone, type RenderOptions, type RenderResult } from "@/src/lib/video/render";
 
 /**
  * Fast exporter: draws every frame directly and encodes it with the
@@ -77,12 +77,12 @@ async function mixAudio(o: RenderOptions, clips: TimelineClip[], from: number, s
     try {
       if (clip.kind === "video") {
         if (clip.reverse || clip.volume <= 0) continue;
-        const loaded = await loadAudio(ctx, a, needFrom, needTo).catch(() => null);
+        const loaded = await untilDone(loadAudio(ctx, a, needFrom, needTo), o.signal, 90_000).catch(() => null);
         if (!loaded) continue; // no sound track, or unreadable: nothing to mix
         buffer = loaded.buffer;
         bufferStart = loaded.startSec;
       } else if (a.source === "provider-output" || a.source === "upload-session") {
-        const loaded = await loadAudio(ctx, a, clip.reverse ? 0 : needFrom, clip.reverse ? Infinity : needTo);
+        const loaded = await untilDone(loadAudio(ctx, a, clip.reverse ? 0 : needFrom, clip.reverse ? Infinity : needTo), o.signal, 90_000);
         buffer = loaded.buffer;
         bufferStart = loaded.startSec;
       } else if (clip.kind === "music") {
@@ -231,9 +231,10 @@ export async function renderFast(o: RenderOptions): Promise<RenderResult | null>
     const url = assetUrl(o.assetFor(clip.assetId), clip.kind);
     if (url) {
       try {
-        if (clip.kind === "image" && clip.assetId && !images.has(clip.assetId)) images.set(clip.assetId, await loadImage(url));
-        if (clip.kind === "video") videos.set(clip.id, await loadVideo(url, true));
+        if (clip.kind === "image" && clip.assetId && !images.has(clip.assetId)) images.set(clip.assetId, await loadImage(url, o.signal));
+        if (clip.kind === "video") videos.set(clip.id, await loadVideo(url, true, o.signal));
       } catch {
+        if (o.signal?.aborted) throw new RenderError("Export cancelled.");
         warnings.push(`“${clip.name}” couldn't be loaded and was left out.`);
       }
     }
