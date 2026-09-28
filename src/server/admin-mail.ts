@@ -87,7 +87,7 @@ export const ADMIN_TEMPLATES: AdminTemplate[] = [
     description: "Let someone know you topped up their credits.",
     fields: [NAME, { key: "amount", label: "Credits added", placeholder: "500", default: "500" }, { key: "reason", label: "Reason (optional)", placeholder: "A thank-you for your feedback", optional: true, default: "A thank-you for being one of our early creators" }],
     build: (f, app) =>
-      mail("support", app, `🎁 ${f.amount?.trim() || "Bonus"} credits added to your Recktube account`, {
+      mail("support", app, `${f.amount?.trim() || "Bonus"} credits added to your Recktube account`, {
         preheader: `We've added ${f.amount?.trim() || "bonus"} credits to your account.`,
         eyebrow: "Credits",
         heading: `${f.amount?.trim() || "Bonus"} credits are yours`,

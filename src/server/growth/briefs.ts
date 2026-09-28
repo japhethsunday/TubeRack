@@ -45,7 +45,7 @@ export const BRIEF_THEMES: BriefTheme[] = [
   {
     id: "morning-pulse",
     eyebrow: "Morning pulse",
-    subject: (c) => `☀️ Your ${c.niches[0]} pulse: “${short(c.best.title)}” leads today`,
+    subject: (c) => `Your ${c.niches[0]} pulse: “${short(c.best.title)}” leads today`,
     heading: (c) => `What's winning in ${c.niches[0]} this morning`,
     intro: () => "The fastest-moving videos in your niche right now, ranked by views per hour — so you know exactly what viewers are choosing today.",
     play: (c) => ({ title: "Today's move", text: `The #1 video is pulling ${num(c.best.viewsPerHour)} views an hour. Borrow its promise, bring your own angle, and publish while attention is here.` }),
@@ -54,7 +54,7 @@ export const BRIEF_THEMES: BriefTheme[] = [
   {
     id: "breakout-watch",
     eyebrow: "Breakout watch",
-    subject: (c) => `🚀 Breakout in ${c.niches[0]}: ${c.lift >= 1.5 ? `${c.lift.toFixed(1)}× the usual pace` : `${num(c.best.viewsPerHour)} views/hr`}`,
+    subject: (c) => `Breakout in ${c.niches[0]}: ${c.lift >= 1.5 ? `${c.lift.toFixed(1)}× the usual pace` : `${num(c.best.viewsPerHour)} views/hr`}`,
     heading: () => "One video is outrunning your niche",
     intro: () => "When a video beats the niche's normal pace this hard, it has found a nerve. Here's what it is and how to answer it.",
     play: () => ({ title: "Why it's working", text: "Look at three things: the promise in the first 5 words of the title, the single emotion in the thumbnail, and how fast the video delivers on the promise. Match the promise, beat the delivery." }),
@@ -68,7 +68,7 @@ export const BRIEF_THEMES: BriefTheme[] = [
   {
     id: "title-lab",
     eyebrow: "Title lab",
-    subject: (c) => `✍️ Viewers are clicking “${c.phrase}” — titles that work in ${c.niches[0]}`,
+    subject: (c) => `Viewers are clicking “${c.phrase}” — titles that work in ${c.niches[0]}`,
     heading: (c) => `The words winning clicks in ${c.niches[0]}`,
     intro: () => "Titles are the first thing a viewer judges. These phrases keep showing up in the videos pulling the most views this week.",
     play: (c) => ({ title: "Title formula of the day", text: `Lead with “${c.phrase}”, add a specific result or number, and close with curiosity. Short titles (under 55 characters) win on mobile.` }),
@@ -77,7 +77,7 @@ export const BRIEF_THEMES: BriefTheme[] = [
   {
     id: "hook-of-the-day",
     eyebrow: "Hook of the day",
-    subject: (c) => `🎣 The hook behind today's #1 ${c.niches[0]} video`,
+    subject: (c) => `The hook behind today's #1 ${c.niches[0]} video`,
     heading: () => "Win the first 15 seconds",
     intro: () => "Most viewers decide in the first few seconds. The top videos in your niche open fast, promise a payoff, and prove it early.",
     play: (c) => ({ title: "Hook template", text: `“In the next few minutes you'll see ${c.phrase ? `the ${c.phrase} method` : "exactly how"} — and the one mistake almost everyone makes.” Show the result first, explain second.` }),
@@ -86,7 +86,7 @@ export const BRIEF_THEMES: BriefTheme[] = [
   {
     id: "thumbnail-teardown",
     eyebrow: "Thumbnail teardown",
-    subject: (c) => `🖼️ Why this thumbnail is winning in ${c.niches[0]}`,
+    subject: (c) => `Why this thumbnail is winning in ${c.niches[0]}`,
     heading: () => "Thumbnails that earn the click",
     intro: () => "Look at the thumbnails below before the titles. Notice what the winners share: one subject, big contrast, and almost no text.",
     play: () => ({ title: "Thumbnail checklist", text: "One clear focal point · readable at phone size · 3 words or fewer · a face or object showing emotion · colours that pop against YouTube's white and dark themes." }),
@@ -95,7 +95,7 @@ export const BRIEF_THEMES: BriefTheme[] = [
   {
     id: "gap-finder",
     eyebrow: "Gap finder",
-    subject: (c) => `🧭 An open lane in ${c.niches[0]} this week`,
+    subject: (c) => `An open lane in ${c.niches[0]} this week`,
     heading: () => "Demand is here. Supply isn't — yet.",
     intro: () => "High views on a topic with few fresh uploads means an open lane. Here's where your niche is hungry.",
     play: (c) => ({ title: "The gap", text: `Viewers are watching “${c.phrase}” videos, but most are from bigger channels. A focused, beginner-friendly take is the fastest way in for a growing channel.` }),
@@ -104,7 +104,7 @@ export const BRIEF_THEMES: BriefTheme[] = [
   {
     id: "shorts-signal",
     eyebrow: "Shorts signal",
-    subject: (c) => `⚡ Turn today's top ${c.niches[0]} topic into a Short`,
+    subject: (c) => `Turn today's top ${c.niches[0]} topic into a Short`,
     heading: () => "One trend, one Short, one day",
     intro: () => "A Short built on a proven topic is the quickest way to reach new viewers — and the best trailer for your long videos.",
     play: (c) => ({ title: "Short recipe", text: `Open with the result in 1 second, give one tip about “${c.phrase || c.niches[0]}”, end with a question that makes people comment. 20–40 seconds.` }),
@@ -113,7 +113,7 @@ export const BRIEF_THEMES: BriefTheme[] = [
   {
     id: "competitor-radar",
     eyebrow: "Competitor radar",
-    subject: (c) => `👀 ${c.best.channelTitle} is pulling ahead in ${c.niches[0]}`,
+    subject: (c) => `${c.best.channelTitle} is pulling ahead in ${c.niches[0]}`,
     heading: (c) => `Keep an eye on ${c.best.channelTitle}`,
     intro: () => "Channels that keep landing top videos set the pace in your niche. Track them and you'll see trends before they peak.",
     play: (c) => ({ title: "Learn from them", text: `${c.best.channelTitle} has today's fastest video. Track the channel in Recktube and you'll get an alert whenever one of their uploads breaks out.` }),
@@ -122,7 +122,7 @@ export const BRIEF_THEMES: BriefTheme[] = [
   {
     id: "script-starter",
     eyebrow: "Script starter",
-    subject: (c) => `📝 A ready-to-film outline for ${c.niches[0]}`,
+    subject: (c) => `A ready-to-film outline for ${c.niches[0]}`,
     heading: () => "Your next video, already outlined",
     intro: () => "Blank pages kill momentum. Here's a structure the top videos in your niche follow — fill it in and you're halfway there.",
     play: () => ({ title: "Winning structure", text: "Hook (the payoff) → why it matters → 3 steps with one example each → the mistake to avoid → a clear next step." }),
@@ -136,7 +136,7 @@ export const BRIEF_THEMES: BriefTheme[] = [
   {
     id: "weekly-game-plan",
     eyebrow: "Game plan",
-    subject: (c) => `📅 Plan your next 3 ${c.niches[0]} videos from this week's winners`,
+    subject: (c) => `Plan your next 3 ${c.niches[0]} videos from this week's winners`,
     heading: () => "Your content plan, built from real demand",
     intro: () => "Consistency beats virality. Use this week's winners to plan three videos — then put them on your calendar so they actually ship.",
     play: (c) => ({ title: "3-video plan", text: `1) Your take on the #1 video. 2) A “${c.phrase || "beginner"}” guide. 3) A Short that teases video 1.` }),
@@ -260,7 +260,7 @@ export function breakoutAlert(niche: string, video: TrendVideo, median: number, 
     reason: "You get breakout alerts for niches you follow in Recktube. Change them in Trend Radar.",
     appUrl: app,
   });
-  return { subject: `🚀 Taking off in ${niche}: “${short(video.title)}”`, ...mail };
+  return { subject: `Taking off in ${niche}: “${short(video.title)}”`, ...mail };
 }
 
 /** A new video counts as a breakout when it is well ahead of the niche's normal pace. */

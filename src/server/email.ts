@@ -1,5 +1,6 @@
 import { getServerEnv } from "@/src/lib/env";
 import { renderEmail, type EmailBlock } from "@/src/server/email-templates";
+import { unsubscribeUrl } from "@/src/server/unsubscribe";
 
 /**
  * Transactional email through Resend (RESEND_API_KEY, EMAIL_FROM).
@@ -40,6 +41,15 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   const env = getServerEnv();
   if (!env.RESEND_API_KEY) return { sent: false, reason: "Email is not configured (RESEND_API_KEY)." };
   const name = (request.fromName ?? "").replace(/[<>"]/g, "").trim();
+  // Deliverability: a real mailbox for replies, and one-click unsubscribe on
+  // everything that isn't account/security mail (Gmail & Yahoo sender rules).
+  const replyTo = request.replyTo ?? "support@recktube.xyz";
+  const headers: Record<string, string> = { ...(request.headers ?? {}) };
+  if (["digest", "alert", "reminder"].includes(request.kind)) {
+    const url = unsubscribeUrl(request.to);
+    headers["List-Unsubscribe"] = url ? `<${url}>, <mailto:support@recktube.xyz?subject=unsubscribe>` : "<mailto:support@recktube.xyz?subject=unsubscribe>";
+    if (url) headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+  }
   const from = (address: string) => (name ? `${name} <${address}>` : address === senderAddress(env.EMAIL_FROM) ? env.EMAIL_FROM : address);
   const post = (sender: string) =>
     fetch("https://api.resend.com/emails", {
@@ -47,8 +57,8 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from: sender,
-        ...(request.replyTo ? { reply_to: [request.replyTo] } : {}),
-        ...(request.headers ? { headers: request.headers } : {}),
+        reply_to: [replyTo],
+        ...(Object.keys(headers).length ? { headers } : {}),
         to: [request.to],
         subject: request.subject,
         text: request.text,
