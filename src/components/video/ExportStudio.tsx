@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Download, Film, X, RotateCcw, Check, AlertTriangle, MonitorPlay, Loader2 } from "lucide-react";
 import type { Composition, HealthState, ValidationIssue } from "@/src/lib/video/types";
 import { estimateBitrate, renderComposition, renderSupport, RenderError, type ExportQuality, type RenderAsset } from "@/src/lib/video/render";
-import { downloadBlob, safeFileName } from "@/src/lib/download";
+import { safeFileName, saveVideo } from "@/src/lib/download";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
 
@@ -61,7 +61,7 @@ export function ExportStudio({
   health: HealthState;
   assetFor: (id: string | undefined) => RenderAsset | null;
   inOut: { in: number; out: number } | null;
-  onPublish: (exp: FinishedExport) => void;
+  onPublish?: (exp: FinishedExport) => void;
 }) {
   const [settings, setSettings] = useState<ExportSettings>({ height: 1080, fps: 30, quality: "high", audioKbps: 192, range: "all" });
   const [state, setState] = useState<"idle" | "running" | "done" | "failed">("idle");
@@ -217,8 +217,8 @@ export function ExportStudio({
           <p className="text-xs text-muted-text">{result.width}×{result.height} · {result.fps} fps · {ext.toUpperCase()} · {fmtMb(result.blob.size)}</p>
           {previewUrl && <video src={previewUrl} controls className="aspect-video w-full rounded-md bg-black" />}
           <div className="flex gap-2">
-            <Button size="sm" className="flex-1" onClick={() => onPublish(result)}><MonitorPlay className="size-3.5" aria-hidden="true" /> Publish to YouTube</Button>
-            <Button size="sm" variant="outline" onClick={() => downloadBlob(result.blob, safeFileName(projectName, ext))}><Download className="size-3.5" aria-hidden="true" /> Download</Button>
+            {onPublish && <Button size="sm" className="flex-1" onClick={() => onPublish(result)}><MonitorPlay className="size-3.5" aria-hidden="true" /> Publish to YouTube</Button>}
+            <Button size="sm" variant="outline" onClick={() => void saveVideo(result.blob, safeFileName(projectName, ext))}><Download className="size-3.5" aria-hidden="true" /> {onPublish ? "Download" : "Save to my device"}</Button>
           </div>
         </div>
       )}

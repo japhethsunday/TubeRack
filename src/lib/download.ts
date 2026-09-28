@@ -86,3 +86,22 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
   }
   return new Blob([view], { type: "audio/wav" });
 }
+
+/**
+ * Save a finished video. On phones and tablets this opens the share sheet
+ * (so iPhone/Android can "Save video" straight to Photos/Gallery); elsewhere,
+ * or if sharing isn't available, it downloads the file.
+ */
+export async function saveVideo(blob: Blob, filename: string): Promise<void> {
+  try {
+    const touch = window.matchMedia("(pointer: coarse)").matches;
+    const file = new File([blob], filename, { type: blob.type || "video/mp4" });
+    if (touch && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    }
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") return; // user closed the sheet
+  }
+  downloadBlob(blob, filename);
+}

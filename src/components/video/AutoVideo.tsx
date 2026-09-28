@@ -2,11 +2,12 @@
 
 import { ProjectPreview } from "@/src/components/video/ProjectPreview";
 import { ProjectPublish } from "@/src/components/video/ProjectPublish";
+import { ProjectSave } from "@/src/components/video/ProjectSave";
 import { sceneSpeech } from "@/src/lib/script/engine";
 import { useProductionContext } from "@/src/components/projects/useProductionContext";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Clapperboard, Loader2, TriangleAlert, X } from "lucide-react";
+import { Check, Clapperboard, Download, Loader2, TriangleAlert, X } from "lucide-react";
 import { api, ApiError } from "@/src/lib/api";
 import { generateProviderImage, retryBusy, synthesizeProviderSpeech } from "@/src/lib/ai-client";
 import { scenesFromSections } from "@/src/lib/script/engine";
@@ -126,6 +127,7 @@ export function GenerateVideoDialog({
   const [steps, setSteps] = useState<Step[]>(INITIAL);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
   const [replaceOk, setReplaceOk] = useState(false);
   const [visualMode, setVisualMode] = useState<VisualMode>("mix");
@@ -451,12 +453,23 @@ export function GenerateVideoDialog({
               <ProjectPreview projectId={project.id} />
             </section>
           )}
+          {finished && saving && (
+            <section aria-label="Save to your device" className="rounded-xl border border-border p-3">
+              <p className="mb-2 text-sm font-semibold">Save to your phone or computer</p>
+              <ProjectSave projectId={project.id} projectName={project.name} />
+            </section>
+          )}
           <div className="flex flex-wrap justify-end gap-2 max-sm:[&>*]:flex-1">
             {finished ? (
               <>
                 <Button variant="outline" onClick={() => router.push(`/studio/video?project=${project.id}`)}>
                   <Clapperboard className="size-4" aria-hidden="true" /> Edit in Video Studio
                 </Button>
+                {!saving && (
+                  <Button variant="outline" onClick={() => setSaving(true)}>
+                    <Download className="size-4" aria-hidden="true" /> Save to device
+                  </Button>
+                )}
                 <ProjectPublish projectId={project.id} projectName={project.name} topic={project.topic} />
               </>
             ) : (
