@@ -18,7 +18,7 @@ const body = z.object({
 export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
-    caller = await guardProviderCall();
+    caller = await guardProviderCall("text");
     const input = await parseBody(request, body);
     const result = await rewriteSection(input);
     await recordUsage(caller, { kind: "text", provider: "gemini", model: result.model, status: "completed", ref: "rewrite" });

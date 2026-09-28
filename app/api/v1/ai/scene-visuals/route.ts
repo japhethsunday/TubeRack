@@ -19,7 +19,7 @@ const body = z.object({
 export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
-    caller = await guardProviderCall();
+    caller = await guardProviderCall("text");
     const input = await parseBody(request, body);
     const out = await planSceneVisuals(input);
     await recordUsage(caller, { kind: "text", provider: "gemini", model: out.model, status: "completed", ref: "scene-visuals" });

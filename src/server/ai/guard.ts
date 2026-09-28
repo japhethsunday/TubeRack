@@ -1,5 +1,6 @@
 import { assertCredits, spendCredits } from "@/src/server/credits";
 import { isAdmin } from "@/src/server/admin";
+import { featureBlocked } from "@/src/server/admin-ops";
 import { getDb } from "@/src/server/db";
 import { sharedLimit } from "@/src/server/shared-limit";
 import { requireUser, type SessionUser } from "@/src/server/auth";
@@ -22,7 +23,7 @@ export interface ProviderCaller {
   workspaceId: string;
 }
 
-export async function guardProviderCall(): Promise<ProviderCaller> {
+export async function guardProviderCall(kind?: string): Promise<ProviderCaller> {
   const user = await requireUser();
   const limit = limiterFor("expensive").take(`expensive:${user.id}`);
   if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
@@ -30,7 +31,12 @@ export async function guardProviderCall(): Promise<ProviderCaller> {
   await sharedLimit(`ai:${user.id}`, 300, 3600);
   const workspaceId = await defaultWorkspace(user);
   await requireMembership(workspaceId, user, "editor");
-  if (!isAdmin(user)) await assertCredits(workspaceId);
+  if (!isAdmin(user)) {
+    // Admin feature switches: a paused tool answers with a friendly message.
+    const paused = await featureBlocked(kind);
+    if (paused) throw new BackendError("FORBIDDEN", paused);
+    await assertCredits(workspaceId, kind);
+  }
   return { user, workspaceId };
 }
 

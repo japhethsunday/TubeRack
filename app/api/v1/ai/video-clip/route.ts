@@ -23,7 +23,7 @@ const body = z.object({
 /** POST /api/v1/ai/video-clip — a short AI clip from a prompt (and optionally a still image). */
 export async function POST(request: Request) {
   try {
-    const caller = await guardProviderCall();
+    const caller = await guardProviderCall("video");
     if (!isFreeVideoConfigured()) throw new BackendError("BACKEND_UNAVAILABLE", "AI video clips aren't set up yet.");
     // The free GPU allowance is small and shared: keep each user to a few clips a day.
     await sharedLimit(`video-clip:${caller.user.id}`, 5, 86400);

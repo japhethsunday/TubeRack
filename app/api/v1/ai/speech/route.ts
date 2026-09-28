@@ -17,7 +17,7 @@ const body = z.object({
 export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
-    caller = await guardProviderCall();
+    caller = await guardProviderCall("tts");
     const input = await parseBody(request, body);
     const result = await new GeminiTtsProvider().synthesizeSpeech(input);
     const ext = result.mimeType === "audio/mpeg" ? "mp3" : "wav";

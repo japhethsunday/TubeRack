@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, Ban, CheckCircle2, LogOut, MailCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, CheckCircle2, Eye, LogOut, MailCheck, Trash2 } from "lucide-react";
 import { api } from "@/src/lib/api";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
@@ -59,7 +59,9 @@ export default function AdminUser() {
           <PageTitle
             title={data.user.email}
             sub={`${data.user.name || "No name"} · joined ${when(data.user.createdAt)}`}
-            actions={data.user.admin ? <Badge tone="info">Admin</Badge> : (
+            actions={<>
+              <Link href={`/admin/users/${id}/view`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium hover:bg-muted"><Eye className="size-4" aria-hidden="true" /> View as user</Link>
+              {data.user.admin ? <Badge tone="info">Admin</Badge> : (
               <>
                 {data.user.status === "active"
                   ? <Button size="sm" variant="outline" loading={busy === "suspend"} onClick={() => void act("suspend", "Suspend")}><Ban className="size-4" aria-hidden="true" /> Suspend</Button>
@@ -69,6 +71,7 @@ export default function AdminUser() {
                 <Button size="sm" variant="destructive" loading={busy === "delete"} onClick={() => void remove()}><Trash2 className="size-4" aria-hidden="true" /> Delete account</Button>
               </>
             )}
+            </>}
           />
           {msg && <p className="text-sm text-muted-text">{msg}</p>}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -7,7 +7,7 @@ import { toErrorResponse, validationError } from "@/src/server/errors";
 export async function GET(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
-    caller = await guardProviderCall();
+    caller = await guardProviderCall("research");
     await youtubeSearchBudget(caller);
     const params = new URL(request.url).searchParams;
     const q = (params.get("q") ?? "").trim();

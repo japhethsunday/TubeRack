@@ -42,7 +42,7 @@ const body = z.object({
 export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
-    caller = await guardProviderCall();
+    caller = await guardProviderCall("text");
     await youtubeSearchBudget(caller);
     const input = await parseBody(request, body);
     let result;

@@ -2,7 +2,7 @@ import { getDb } from "@/src/server/db";
 import { getSessionUser, type SessionUser } from "@/src/server/auth";
 import { getServerEnv } from "@/src/lib/env";
 import { audit } from "@/src/server/audit";
-import { backendUnavailable, notFound, rateLimited } from "@/src/server/errors";
+import { backendUnavailable, forbidden, notFound, rateLimited } from "@/src/server/errors";
 import { limiterFor, callerKey } from "@/src/server/rate-limit";
 
 /**
@@ -24,14 +24,37 @@ export function isAdmin(user: Pick<SessionUser, "email" | "emailVerifiedAt" | "s
   return Boolean(user && user.status === "active" && user.emailVerifiedAt && adminEmails().includes(user.email.trim().toLowerCase()));
 }
 
-/** Guard every admin API: rate-limited, 404 for non-admins, every call audited. */
+export { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
+import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
+
+/** The signed-in person's admin role: owner from ADMIN_EMAILS, team roles from admin_members. */
+export async function adminRole(user: SessionUser | null): Promise<AdminRole | null> {
+  if (!user) return null;
+  if (isAdmin(user)) return "owner";
+  if (user.status !== "active" || !user.emailVerifiedAt) return null;
+  const db = getDb();
+  if (!db) return null;
+  try {
+    const [r] = await db`SELECT role FROM admin_members WHERE email = ${user.email.trim().toLowerCase()}`;
+    return r ? (String(r.role) as AdminRole) : null;
+  } catch {
+    return null; // table not migrated yet: owners only
+  }
+}
+
+/** Guard every admin API: rate-limited, 404 for non-admins, role-checked, every call audited. */
 export async function requireAdmin(request: Request, action: string): Promise<SessionUser> {
   const limit = limiterFor("write").take(`admin:${callerKey(request)}`);
   if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
   const user = await getSessionUser();
-  if (!isAdmin(user)) {
+  const role = await adminRole(user);
+  if (!role) {
     if (user) await audit({ userId: user.id, action: "admin.denied", metadata: { path: new URL(request.url).pathname } });
     throw notFound("Page");
+  }
+  if (!roleAllows(role, action)) {
+    await audit({ userId: user!.id, action: "admin.denied", metadata: { path: new URL(request.url).pathname, role, need: action } });
+    throw forbidden("Your admin role doesn't include this. Ask the owner.");
   }
   await audit({ userId: user!.id, action: `admin.${action}` });
   return user!;

@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   let task = "";
   try {
-    caller = await guardProviderCall();
+    caller = await guardProviderCall("text");
     const input = await parseBody(request, body);
     task = input.task;
     const result = await requestIntelligence({ task: input.task, context: input.context });

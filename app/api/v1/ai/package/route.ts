@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   let kind = "";
   try {
-    caller = await guardProviderCall();
+    caller = await guardProviderCall("text");
     const input = await parseBody(request, body);
     kind = input.kind;
     // Real market data first; the copy still works (from the video alone) if YouTube is unavailable.

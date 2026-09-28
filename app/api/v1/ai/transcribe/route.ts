@@ -19,7 +19,7 @@ const body = z.object({ file: z.string().regex(FILE, "Choose a stored voice take
 export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
-    caller = await guardProviderCall();
+    caller = await guardProviderCall("transcription");
     const input = await parseBody(request, body);
     const [, folder, name] = FILE.exec(input.file)!;
     let media;

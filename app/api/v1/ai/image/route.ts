@@ -16,7 +16,7 @@ const body = z.object({
 export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
-    caller = await guardProviderCall();
+    caller = await guardProviderCall("image");
     const input = await parseBody(request, body);
     const result = await new GeminiImageProvider().generateImage(input);
     // Store bytes in the bucket; the client keeps only a short URL.

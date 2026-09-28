@@ -20,7 +20,7 @@ const body = z.object({
 export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
-    caller = await guardProviderCall();
+    caller = await guardProviderCall("text");
     const input = await parseBody(request, body);
     const { report, model } = await writeNicheReport(input);
     await recordUsage(caller, { kind: "text", provider: "gemini", model, status: "completed", ref: `niche-report:${input.name.slice(0, 60)}` });

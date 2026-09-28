@@ -32,7 +32,7 @@ const body = z.object({
 export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
-    caller = await guardProviderCall();
+    caller = await guardProviderCall("research");
     const input = await parseBody(request, body);
     const settled = await Promise.allSettled(
       input.items.map((it) => {
