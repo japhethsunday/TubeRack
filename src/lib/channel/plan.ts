@@ -1,12 +1,25 @@
 /** Channel strategy produced by the Channel Creator (validated shape). */
 
+/** Where the channel will publish. Market data is measured on YouTube; short-form platforms use Shorts data. */
+export const CHANNEL_PLATFORMS = [
+  { id: "both", label: "YouTube long-form + Shorts" },
+  { id: "youtube", label: "YouTube long-form" },
+  { id: "youtube-shorts", label: "YouTube Shorts" },
+  { id: "tiktok", label: "TikTok" },
+  { id: "instagram", label: "Instagram Reels" },
+  { id: "facebook", label: "Facebook videos & Reels" },
+  { id: "all", label: "All platforms (YouTube, TikTok, Instagram, Facebook)" },
+] as const;
+export type ChannelPlatform = (typeof CHANNEL_PLATFORMS)[number]["id"];
+export const channelPlatformLabel = (id: string) => CHANNEL_PLATFORMS.find((p) => p.id === id)?.label ?? id;
+
 export interface ChannelInputs {
   niche: string;
   query: string;
   audience: string;
   region: string;
   contentType: "faceless" | "on-camera" | "mixed" | "animation" | "screen-recording";
-  platform: "youtube" | "youtube-shorts" | "both";
+  platform: ChannelPlatform;
   style: string;
   competitors: string[];
   brandName: string;

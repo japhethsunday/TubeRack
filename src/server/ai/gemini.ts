@@ -2,7 +2,7 @@ import { skillsFor, skillsForTask, type SkillId } from "@/src/server/ai/skills";
 import { isPiperConfigured, PIPER_CHUNK_CHARS, piperChunk } from "@/src/server/ai/piper";
 import { CLOUD_TTS_CHUNK_CHARS, cloudTtsChunk, isCloudTtsConfigured, isVertexConfigured, vertexOptions } from "@/src/server/ai/google-cloud";
 import { GoogleGenAI } from "@google/genai";
-import { normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPlan } from "@/src/lib/channel/plan";
+import { channelPlatformLabel, normalisePlan, type ChannelEvidence, type ChannelInputs, type ChannelPlan } from "@/src/lib/channel/plan";
 import { stripMarkdown } from "@/src/lib/text/markdown";
 import { extractJsonObject } from "@/src/lib/ai-gateway/json";
 import { isNvidiaConfigured, nvidiaGenerateText } from "@/src/server/ai/nvidia";
@@ -1218,7 +1218,7 @@ export async function writeChannelPlan(input: ChannelInputs, evidence: ChannelEv
   const prompt =
     `You are a senior YouTube channel strategist writing a launch plan a professional agency would hand to a client.\n` +
     `Niche: ${input.niche}. Search phrase: ${input.query}. Target audience: ${input.audience || "not specified — infer from the data"}. Country/market: ${input.region || "worldwide"}.\n` +
-    `Content type: ${input.contentType}. Platform: ${input.platform}. Channel style: ${input.style || "not specified"}.` +
+    `Content type: ${input.contentType}. Platform: ${channelPlatformLabel(input.platform)} — shape names, formats, lengths and ideas for this platform. Channel style: ${input.style || "not specified"}.` +
     (input.brandName ? ` Name to build on: ${input.brandName}.` : "") +
     `\n\nEvidence (the only numbers you may cite):\n${facts}\n\n` +
     `Rules: be specific to this niche and audience; short, concrete sentences; no filler, no hype, no emojis, no markdown. ` +

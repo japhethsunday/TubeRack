@@ -497,6 +497,12 @@ a[class*="rounded-2xl"][class*="border"]:hover {
   main :where(h1, h2, h3, p, a, span, li, td, dd) {
     overflow-wrap: anywhere;
   }
+  /* Grid cells and stretchy flex items never grow wider than the screen
+     (long unbroken text used to push whole cards off the right edge). */
+  main .grid > *,
+  main .flex-1 {
+    min-width: 0;
+  }
 }
 
 /* Phones: tables become stacked cards (labels come from MobileTables). */

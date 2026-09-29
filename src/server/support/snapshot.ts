@@ -18,6 +18,7 @@ export interface AccountSnapshot {
   projects: { name: string; status: string; stage: string; updated: string }[];
   projectCount: number;
   youtube: { connected: boolean; channel: string | null };
+  tiktok: { connected: boolean; account: string | null; recentPosts: { when: string; status: string }[] };
   lastExports: { when: string; status: string; health: string }[];
   recentPublishes: { when: string; status: string; title: string; error: string | null }[];
   briefs: { niches: string[]; emailBriefsOn: boolean };
@@ -106,6 +107,14 @@ export async function accountSnapshot(userId: string, workspaceId: string | null
       }, { connected: false, channel: null })
     : { connected: false, channel: null };
 
+  const tiktok = ws
+    ? await safe(async () => {
+        const [t] = await db`SELECT display_name FROM tiktok_connections WHERE workspace_id = ${ws} LIMIT 1`;
+        const posts = await db`SELECT status, created_at FROM tiktok_posts WHERE workspace_id = ${ws} ORDER BY created_at DESC LIMIT 5`;
+        return { connected: Boolean(t), account: t ? clip(t.display_name, 80) : null, recentPosts: posts.map((r) => ({ when: iso(r.created_at), status: clip(r.status, 20) })) };
+      }, { connected: false, account: null, recentPosts: [] as { when: string; status: string }[] })
+    : { connected: false, account: null, recentPosts: [] };
+
   const lastExports = ws
     ? await safe(async () => {
         const rows = await db`SELECT status, health, created_at FROM render_requests WHERE workspace_id = ${ws} ORDER BY created_at DESC LIMIT 5`;
@@ -142,6 +151,7 @@ export async function accountSnapshot(userId: string, workspaceId: string | null
     projects,
     projectCount,
     youtube,
+    tiktok,
     lastExports,
     recentPublishes,
     briefs,

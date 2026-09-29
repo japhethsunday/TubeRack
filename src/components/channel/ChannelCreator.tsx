@@ -7,7 +7,7 @@ import { Rocket, Copy, Check, Loader2, Trash2, CalendarPlus, Clapperboard, Plus 
 import { api, ApiError } from "@/src/lib/api";
 import { retryBusy } from "@/src/lib/ai-client";
 import type { ChannelEvidence, ChannelInputs, ChannelPlan } from "@/src/lib/channel/plan";
-import { channelKeywordsField, planChannelName } from "@/src/lib/channel/plan";
+import { CHANNEL_PLATFORMS, channelKeywordsField, planChannelName } from "@/src/lib/channel/plan";
 import { CATEGORIES } from "@/src/lib/market/signals";
 import { REGIONS, regionName } from "@/src/lib/market/regions";
 import { useProjects } from "@/src/components/projects/ProjectsProvider";
@@ -284,7 +284,7 @@ export function ChannelCreator() {
   const keywordsField = useMemo(() => (plan ? channelKeywordsField(plan.channelKeywords) : ""), [plan]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="space-y-3">
         <Button className="w-full" variant={current ? "outline" : "primary"} onClick={() => { setCurrent(null); router.replace("/channel-creator", { scroll: false }); }}>
           <Plus className="size-4" aria-hidden="true" /> New channel plan
@@ -332,9 +332,7 @@ export function ChannelCreator() {
                 <option value="animation">Animation</option>
               </Select>
               <Select label="Platform" value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value as ChannelInputs["platform"] })}>
-                <option value="both">YouTube long-form + Shorts</option>
-                <option value="youtube">YouTube long-form</option>
-                <option value="youtube-shorts">YouTube Shorts</option>
+                {CHANNEL_PLATFORMS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
               </Select>
               <Select label="Advertiser category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} hint="Detected from the niche if left automatic.">
                 <option value="">Automatic</option>

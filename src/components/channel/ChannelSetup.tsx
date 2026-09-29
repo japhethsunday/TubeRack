@@ -182,7 +182,7 @@ export function ChannelSetup({ plan, planId, region, keywordsField }: { plan: Ch
                   <label key={id} className="flex items-start gap-3 rounded-lg border border-border p-3 text-sm">
                     <input type="checkbox" checked={fields[id]} onChange={(e) => setFields({ ...fields, [id]: e.target.checked })} className="mt-1 size-4 accent-[var(--primary)]" />
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2 font-medium">
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
                         {label}
                         <span className={cx("rounded px-1.5 text-[11px]", same(now, next) ? "bg-success/15 text-success" : "bg-muted text-muted-text")}>{same(now, next) ? "Matches plan" : now ? "Will replace current" : "Currently empty"}</span>
                       </span>
@@ -204,7 +204,7 @@ export function ChannelSetup({ plan, planId, region, keywordsField }: { plan: Ch
                 )}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-border p-3 text-sm">
                   <p className="font-medium">Channel banner</p>
                   <p className="mt-0.5 text-xs text-muted-text">JPEG or PNG, at least 2048×1152. Keep text inside the centre 1235×338 safe area.</p>

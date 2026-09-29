@@ -8,7 +8,7 @@ import { isTextConfigured, writeChannelPlan } from "@/src/server/ai/gemini";
 import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller, youtubeSearchBudget } from "@/src/server/ai/guard";
 import { CATEGORIES, guessCategory, type CategoryId } from "@/src/lib/market/signals";
 import { median } from "@/src/lib/niche/score";
-import type { ChannelEvidence, ChannelInputs } from "@/src/lib/channel/plan";
+import { CHANNEL_PLATFORMS, type ChannelEvidence, type ChannelInputs, type ChannelPlatform } from "@/src/lib/channel/plan";
 import { backendUnavailable, toErrorResponse, validationError } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
 
@@ -21,7 +21,7 @@ const body = z.object({
   audience: z.string().trim().max(300).default(""),
   region: z.string().trim().toUpperCase().regex(/^([A-Z]{2})?$/).default(""),
   contentType: z.enum(["faceless", "on-camera", "mixed", "animation", "screen-recording"]).default("mixed"),
-  platform: z.enum(["youtube", "youtube-shorts", "both"]).default("both"),
+  platform: z.enum(CHANNEL_PLATFORMS.map((p) => p.id) as [ChannelPlatform, ...ChannelPlatform[]]).default("both"),
   style: z.string().trim().max(200).default(""),
   competitors: z.array(z.string().trim().min(3).max(200)).max(3).default([]),
   brandName: z.string().trim().max(60).default(""),
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     const notes: string[] = [];
     const [marketResult, ...competitorResults] = await Promise.allSettled([
-      marketProfile({ name: input.niche, query, region: input.region, category, focus: input.platform === "youtube-shorts" ? "shorts" : "youtube" }),
+      marketProfile({ name: input.niche, query, region: input.region, category, focus: ["youtube-shorts", "tiktok", "instagram"].includes(input.platform) ? "shorts" : "youtube" }),
       ...input.competitors.map(async (c) => {
         const ch = await resolveChannel(c);
         const uploads = ch.uploadsPlaylist ? await channelUploads(ch.uploadsPlaylist, 12).catch(() => []) : [];
