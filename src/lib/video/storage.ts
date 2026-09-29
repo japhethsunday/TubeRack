@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lenientParse } from "@/src/lib/lenient";
 import type { Composition, CompositionSnapshot, RenderRequest } from "@/src/lib/video/types";
 
 const styleSchema = z.object({
@@ -111,8 +112,8 @@ export function emptyVideoBundle(): VideoBundle {
 }
 
 export function parseVideoBundle(data: unknown): VideoBundle {
-  const parsed = bundleSchema.safeParse(data);
-  if (!parsed.success) {
+  const parsed = lenientParse<z.infer<typeof bundleSchema>>(bundleSchema, data, "video data");
+  if (!parsed.ok) {
     throw new Error(
       `Import is not a Recktube video file: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "root"} — ${i.message}`).join("; ")}`,
     );

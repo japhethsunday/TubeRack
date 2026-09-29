@@ -218,6 +218,7 @@ describe("package storage", () => {
     const bundle = emptyPackageBundle();
     assert.deepEqual(parsePackageBundle(JSON.parse(JSON.stringify(bundle))), bundle);
     assert.throws(() => parsePackageBundle({}), /package file/);
-    assert.throws(() => parsePackageBundle({ version: 1, concepts: [{ id: 1 }], variants: [], titles: [], seo: [], packs: [], items: [] }), /package file/);
+    // One bad item is skipped; the rest still loads.
+    assert.deepEqual(parsePackageBundle({ version: 1, concepts: [{ id: 1 }], variants: [], titles: [], seo: [], packs: [], items: [] }).concepts, []);
   });
 });

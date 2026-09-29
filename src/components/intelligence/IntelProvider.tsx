@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { lenientParse } from "@/src/lib/lenient";
 import type { ChannelDNA } from "@/src/lib/intelligence/dna";
 import { emptyDNA, parseDNA } from "@/src/lib/intelligence/dna";
 import type {
@@ -127,8 +128,8 @@ export function useIntel(): IntelContextValue {
 }
 
 function parseIntelRemote(remote: unknown): Omit<IntelBundle, "version"> | null {
-  const parsed = bundleSchema.safeParse(remote);
-  if (!parsed.success) return null;
+  const parsed = lenientParse<z.infer<typeof bundleSchema>>(bundleSchema, remote, "research data");
+  if (!parsed.ok) return null;
   const dna: Record<string, ChannelDNA> = {};
   for (const [k, v] of Object.entries(parsed.data.dna)) {
     try {

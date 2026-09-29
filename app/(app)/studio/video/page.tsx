@@ -155,10 +155,39 @@ function Studio() {
   const playhead = Math.min(rawPlayhead, duration);
 
 
-  const issues = useMemo(
-    () => (comp && project ? validateComposition(comp, scenes, assets) : []),
-    [comp, project, scenes, assets],
-  );
+  // A timeline can arrive a moment before its media (saved separately). When
+  // clips point at media this tab hasn't got yet, fetch the media list again
+  // before calling anything "deleted".
+  const missingKey = useMemo(() => {
+    if (!comp) return "";
+    const have = new Set(assets.map((a) => a.id));
+    return [...new Set(comp.clips.map((c) => c.assetId).filter((id): id is string => Boolean(id) && !have.has(id as string)))].sort().join(",");
+  }, [comp, assets]);
+  const [checkedMissing, setCheckedMissing] = useState("");
+  const refreshMedia = mediaApi.refresh;
+  useEffect(() => {
+    if (!missingKey || !mediaApi.ready || checkedMissing === missingKey) return;
+    let stop = false;
+    void (async () => {
+      // Try a few times: media saved by a just-finished job can take a moment to land.
+      for (let i = 0; i < 3 && !stop; i++) {
+        await refreshMedia();
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      if (!stop) setCheckedMissing(missingKey);
+    })();
+    return () => {
+      stop = true;
+    };
+  }, [missingKey, mediaApi.ready, checkedMissing, refreshMedia]);
+  const mediaSettling = Boolean(missingKey) && checkedMissing !== missingKey;
+
+  const issues = useMemo(() => {
+    if (!comp || !project) return [];
+    const all = validateComposition(comp, scenes, assets);
+    // While the media list is still being fetched, say so instead of "deleted".
+    return mediaSettling ? all.filter((i) => !/points at a deleted asset/.test(i.message)) : all;
+  }, [comp, project, scenes, assets, mediaSettling]);
   const health = healthOf(issues);
   const selectedClip = comp?.clips.find((c) => c.id === selectedClipId) ?? null;
 

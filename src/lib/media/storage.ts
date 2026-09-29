@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lenientParse } from "@/src/lib/lenient";
 import type { ConsistencySettings, GenerationJob, MediaAsset, MediaStatus, VoiceProfile } from "@/src/lib/media/types";
 
 const assetSchema = z.object({
@@ -102,8 +103,8 @@ export function parseMediaBundle(data: unknown): MediaBundle {
     for (const a of bundle.assets) a.title = a.title.replace(/^Gemini take\b/, "Voice take").replace(/^Gemini art\b/, "Art").replace(/\bGemini\b/g, "Generated");
     return bundle;
   }
-  const parsed = bundleSchema.safeParse(data);
-  if (!parsed.success) {
+  const parsed = lenientParse<z.infer<typeof bundleSchema>>(bundleSchema, data, "media data");
+  if (!parsed.ok) {
     throw new Error(
       `Import is not a Recktube media file: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "root"} — ${i.message}`).join("; ")}`,
     );

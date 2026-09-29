@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lenientParse } from "@/src/lib/lenient";
 import type {
   PackTitle,
   PlatformId,
@@ -123,8 +124,8 @@ export function emptyPackageBundle(): PackageBundle {
 }
 
 export function parsePackageBundle(data: unknown): PackageBundle {
-  const parsed = bundleSchema.safeParse(data);
-  if (!parsed.success) {
+  const parsed = lenientParse<z.infer<typeof bundleSchema>>(bundleSchema, data, "package data");
+  if (!parsed.ok) {
     throw new Error(
       `Import is not a Recktube package file: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "root"} — ${i.message}`).join("; ")}`,
     );

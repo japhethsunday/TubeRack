@@ -222,6 +222,7 @@ describe("script storage", () => {
     const bundle = emptyScriptBundle();
     assert.deepEqual(parseScriptBundle(JSON.parse(JSON.stringify(bundle))), bundle);
     assert.throws(() => parseScriptBundle({}), /script file/);
-    assert.throws(() => parseScriptBundle({ version: 1, scripts: { x: { id: 1 } }, boards: {}, loops: {} }), /script file/);
+    // One bad item is skipped; the rest still loads.
+    assert.deepEqual(parseScriptBundle({ version: 1, scripts: { x: { id: 1 } }, boards: {}, loops: {} }).scripts, {});
   });
 });

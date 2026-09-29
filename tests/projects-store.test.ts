@@ -108,7 +108,8 @@ describe("workspace storage", () => {
     const bundle = emptyBundle();
     assert.deepEqual(parseBundle(JSON.parse(JSON.stringify(bundle))), bundle);
     assert.throws(() => parseBundle({}), /workspace file/);
-    assert.throws(() => parseBundle({ version: 1, projects: [{ id: "x" }], channels: [], events: [] }), /workspace file/);
+    // One bad item is skipped; the rest still loads.
+    assert.deepEqual(parseBundle({ version: 1, projects: [{ id: "x" }], channels: [], events: [] }).projects, []);
     assert.throws(() => parseBundle("nope"), /workspace file/);
   });
 });

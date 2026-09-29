@@ -212,7 +212,8 @@ describe("video storage", () => {
     const bundle = emptyVideoBundle();
     assert.deepEqual(parseVideoBundle(JSON.parse(JSON.stringify(bundle))), bundle);
     assert.throws(() => parseVideoBundle({}), /video file/);
-    assert.throws(() => parseVideoBundle({ version: 1, compositions: [{ projectId: 1 }], snapshots: [], requests: [] }), /video file/);
+    // One bad item is skipped; the rest still loads.
+    assert.deepEqual(parseVideoBundle({ version: 1, compositions: [{ projectId: 1 }], snapshots: [], requests: [] }).compositions, []);
   });
 });
 

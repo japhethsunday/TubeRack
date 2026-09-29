@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lenientParse } from "@/src/lib/lenient";
 import { PROJECT_STAGES, type ProjectStage } from "@/src/types/domain";
 import type { ActivityEvent, Channel, Project } from "@/src/lib/projects/types";
 import { CONTENT_TYPES, PLATFORMS } from "@/src/lib/projects/types";
@@ -68,8 +69,8 @@ export const RECENT_SEARCHES_KEY = "tuberack.recent-searches.v1";
 
 /** Validate an imported bundle; throws with a readable message on mismatch. */
 export function parseBundle(data: unknown): WorkspaceBundle {
-  const parsed = bundleSchema.safeParse(data);
-  if (!parsed.success) {
+  const parsed = lenientParse<z.infer<typeof bundleSchema>>(bundleSchema, data, "workspace data");
+  if (!parsed.ok) {
     throw new Error(
       `Import is not a Recktube workspace file: ${parsed.error.issues
         .slice(0, 3)

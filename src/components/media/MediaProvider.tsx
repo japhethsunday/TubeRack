@@ -43,6 +43,8 @@ const failedDownloads: Set<string> = (() => {
 })();
 export interface MediaContextValue {
   ready: boolean;
+  /** Fetch the latest media list from the account now (merges; never loses local work). */
+  refresh: () => Promise<void>;
   assets: MediaAsset[];
   voices: VoiceProfile[];
   assetsFor: (projectId: string) => MediaAsset[];
@@ -264,16 +266,18 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     });
   }, [bundle, ready, cloud]);
 
+  const refresh = useCallback(async () => {
+    if (!cloud) return;
+    const remote = await pullBundle("media", true).catch(() => null);
+    if (remote) {
+      const incoming = parseMediaBundle(remote);
+      setBundle((cur) => mergeRemoteBundle(cur, incoming));
+    }
+  }, [cloud]);
+
   // Pick up changes made on other devices when this tab regains focus.
   useRemoteRefresh("media", cloud && ready, () => {
-    void pullBundle("media", true)
-      .then((remote) => {
-        if (remote) {
-          const incoming = parseMediaBundle(remote);
-          setBundle((cur) => mergeRemoteBundle(cur, incoming));
-        }
-      })
-      .catch(() => undefined);
+    void refresh();
   });
 
   const touchAsset = useCallback(
@@ -312,6 +316,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<MediaContextValue>(
     () => ({
       ready,
+      refresh,
       assets: bundle.assets,
       voices: bundle.voices,
       assetsFor: (projectId) => bundle.assets.filter((a) => a.projectId === projectId),

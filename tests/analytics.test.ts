@@ -171,7 +171,8 @@ describe("analytics storage + reports", () => {
     const bundle = emptyAnalyticsBundle();
     assert.deepEqual(parseAnalyticsBundle(JSON.parse(JSON.stringify(bundle))), bundle);
     assert.throws(() => parseAnalyticsBundle({}), /analytics file/);
-    assert.throws(() => parseAnalyticsBundle({ version: 1, entries: [{ id: 1 }], retention: [], signals: [], snapshots: [] }), /analytics file/);
+    // One bad item is skipped; the rest still loads.
+    assert.deepEqual(parseAnalyticsBundle({ version: 1, entries: [{ id: 1 }], retention: [], signals: [], snapshots: [] }).entries, []);
 
     const csv = entriesToCsv(
       [entry({ id: "a", projectId: "p1", views: 1500, ctr: 5.5 }), entry({ id: "b", projectId: "p2", platform: "tiktok", views: 200, notes: 'Said "wow", really' })],
