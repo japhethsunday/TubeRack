@@ -480,37 +480,7 @@ export function textUnit(W: number, H: number): number {
 
 function drawCaption(ctx: CanvasRenderingContext2D, clip: TimelineClip, t: number, W: number, H: number, comp: Composition) {
   if (!clip.text) return;
-  const unit = textUnit(W, H);
-  const st: Partial<TextStyle> = clip.style ?? {};
-  // A caption the creator styled by hand (colour box, size…) keeps its own look.
-  const custom = Boolean(clip.style && (clip.style.background || clip.style.color || clip.style.size));
-  if (!custom) {
-    drawStyledCaption(ctx, clip.text, captionStyleFor(comp.projectId, comp.canvas.captionStyle), { local: t - clip.startSec, dur: clip.durationSec, W, H, unit });
-    return;
-  }
-  // Default look: big, heavy white words with an outline and soft shadow
-  // (short-form style), sitting above the bottom edge — no boxes behind lines.
-  const boxed = Boolean(st.background && st.background !== "transparent");
-  ctx.save();
-  if (!boxed) {
-    ctx.shadowColor = "rgba(0,0,0,0.55)";
-    ctx.shadowBlur = 6 * unit;
-    ctx.shadowOffsetY = 2 * unit;
-  }
-  drawTextBlock(ctx, clip.text, {
-    fontPx: Math.max(12, (st.size ?? 48) / 2.4) * unit,
-    weight: st.weight ?? 800,
-    font: st.font ?? "",
-    color: st.color ?? "#fff",
-    background: boxed ? st.background! : "transparent",
-    align: "center",
-    x: W / 2,
-    y: H - (H > W ? H * 0.2 : H * 0.1),
-    anchor: "bottom",
-    W,
-    stroke: !boxed,
-  });
-  ctx.restore();
+  drawStyledCaption(ctx, clip.text, captionStyleFor(comp.projectId, comp.canvas.captionStyle), { local: t - clip.startSec, dur: clip.durationSec, W, H, unit: textUnit(W, H) });
 }
 
 /** Paint one full frame of the composition at timeline time t. */
