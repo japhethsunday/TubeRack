@@ -45,7 +45,7 @@ interface ChatsState {
   chatId: string | null;
   chats: ChatSummary[];
   newChat: () => void;
-  openChat: (id: string) => Promise<void>;
+  openChat: (id: string, onlyIfUntouched?: boolean) => Promise<void>;
   removeChat: (id: string) => Promise<void>;
 }
 const Ctx = createContext<{ turns: TurnsState; chats: ChatsState } | null>(null);
@@ -78,8 +78,10 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const openChat = useCallback(async (id: string) => {
+  const openChat = useCallback(async (id: string, onlyIfUntouched = false) => {
     const c = await api.get<{ id: string; turns: Turn[] }>(`/api/v1/admin/assistant/chats?id=${encodeURIComponent(id)}`);
+    // The admin may have started typing while this loaded: never overwrite that.
+    if (onlyIfUntouched && dirty.current) return;
     dirty.current = false;
     idRef.current = c.id;
     setChatId(c.id);
@@ -95,7 +97,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
       .then((list) => {
         if (!live) return;
         setChats(list);
-        if (list[0] && !dirty.current) void openChat(list[0].id).catch(() => undefined);
+        if (list[0] && !dirty.current) void openChat(list[0].id, true).catch(() => undefined);
       })
       .catch(() => undefined);
     return () => {

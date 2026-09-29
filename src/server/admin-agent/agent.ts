@@ -123,7 +123,7 @@ export async function askAssistant(adminId: string, role: AdminRole, history: Ch
   const steps: string[] = [];
   const lookups: string[] = [];
   for (let i = 0; i < MAX_STEPS; i++) {
-    const { text } = await ai.generateText({ prompt: prompt(role, history, steps, ceoName), maxTokens: 2000, json: true });
+    const { text } = await ai.generateText({ prompt: prompt(role, history, steps, ceoName), maxTokens: 2000, json: true, fast: true });
     let out: Record<string, unknown>;
     try {
       out = parseJsonObject(text);

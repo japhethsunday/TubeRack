@@ -331,7 +331,7 @@ body {
 .su-panel-r-leave { animation: su-panel-r-out 0.55s cubic-bezier(0.7, 0, 0.2, 1) both; }
 .su-from-right { animation: su-slide-right 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .su-from-left { animation: su-slide-left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.su-field { position: relative; border-radius: 0.75rem; padding: 1px; background: var(--color-border); transition: background 0.3s; }
+.su-field { position: relative; border-radius: 0.75rem; padding: 1px; background: var(--color-border); transition: background 0.15s; }
 .su-field:focus-within {
   background: linear-gradient(90deg, #d946ef, #7c3aed, #0ea5e9, #d946ef);
   background-size: 300% 100%;
@@ -570,6 +570,16 @@ a[class*="rounded-2xl"][class*="border"]:hover {
 /* ---------- Admin console only: glass cards that lift on hover and ease in on load. ---------- */
 .admin-fx {
   background-color: #07060c;
+  position: relative;
+  isolation: isolate;
+}
+/* The glossy backdrop is painted once on a fixed layer (no repaint while scrolling). */
+.admin-fx::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image:
     /* glossy light streaks, like light across dark glass */
     linear-gradient(115deg, transparent 38%, rgba(217, 70, 239, 0.1) 44%, transparent 47%),
@@ -577,7 +587,6 @@ a[class*="rounded-2xl"][class*="border"]:hover {
     linear-gradient(118deg, transparent 70%, rgba(14, 165, 233, 0.08) 73%, transparent 76%),
     radial-gradient(60rem 40rem at 85% -10%, rgba(139, 92, 246, 0.22), transparent 60%),
     radial-gradient(50rem 36rem at -10% 110%, rgba(217, 70, 239, 0.14), transparent 60%);
-  background-attachment: fixed;
 }
 /* Desktop: the whole console sits in one rounded glass frame. */
 @media (min-width: 1024px) {
@@ -586,9 +595,7 @@ a[class*="rounded-2xl"][class*="border"]:hover {
     min-height: calc(100dvh - 2rem);
     border-radius: 28px;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(12, 10, 20, 0.45);
-    -webkit-backdrop-filter: blur(22px) saturate(140%);
-    backdrop-filter: blur(22px) saturate(140%);
+    background: rgba(12, 10, 20, 0.62);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 30px 80px -30px rgba(0, 0, 0, 0.8);
   }
   .admin-fx .admin-rail { margin: 1rem 0 1rem 1rem; border-radius: 22px; }
@@ -615,10 +622,8 @@ a[class*="rounded-2xl"][class*="border"]:hover {
 /* Sidebar: glass panel with a glowing brand-gradient edge. */
 .admin-fx .admin-rail {
   position: relative;
-  background: rgba(16, 12, 28, 0.72);
+  background: rgba(16, 12, 28, 0.86);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
   overflow: clip;
 }
 .admin-fx .admin-rail::before {
@@ -641,9 +646,8 @@ a[class*="rounded-2xl"][class*="border"]:hover {
 .admin-fx .admin-glass,
 .admin-fx main .grid > [class*="rounded-xl"][class*="border"],
 .admin-fx main .grid > [class*="rounded-2xl"][class*="border"] {
-  background-color: rgba(24, 16, 40, 0.55);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-  backdrop-filter: blur(16px) saturate(150%);
+  /* Solid tint instead of a live blur per card: same look on the dark console, far cheaper to draw. */
+  background-color: rgba(24, 16, 40, 0.72);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px -18px rgba(0, 0, 0, 0.6);
 }
@@ -652,7 +656,6 @@ a[class*="rounded-2xl"][class*="border"]:hover {
 .admin-fx main .grid > [class*="rounded-xl"][class*="border"],
 .admin-fx main .grid > [class*="rounded-2xl"][class*="border"] {
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease, border-color 0.35s ease;
-  will-change: transform;
 }
 @media (hover: hover) {
   .admin-fx .admin-lift:hover,
@@ -670,14 +673,14 @@ a[class*="rounded-2xl"][class*="border"]:hover {
 }
 .admin-fx .admin-rise,
 .admin-fx main .grid > * {
-  animation: admin-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: admin-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
-.admin-fx main .grid > *:nth-child(2) { animation-delay: 0.06s; }
-.admin-fx main .grid > *:nth-child(3) { animation-delay: 0.12s; }
-.admin-fx main .grid > *:nth-child(4) { animation-delay: 0.18s; }
-.admin-fx main .grid > *:nth-child(5) { animation-delay: 0.24s; }
-.admin-fx main .grid > *:nth-child(6) { animation-delay: 0.3s; }
-.admin-fx main .grid > *:nth-child(n + 7) { animation-delay: 0.36s; }
+.admin-fx main .grid > *:nth-child(2) { animation-delay: 0.03s; }
+.admin-fx main .grid > *:nth-child(3) { animation-delay: 0.06s; }
+.admin-fx main .grid > *:nth-child(4) { animation-delay: 0.09s; }
+.admin-fx main .grid > *:nth-child(5) { animation-delay: 0.12s; }
+.admin-fx main .grid > *:nth-child(6) { animation-delay: 0.15s; }
+.admin-fx main .grid > *:nth-child(n + 7) { animation-delay: 0.18s; }
 @media (prefers-reduced-motion: reduce) {
   .admin-fx .admin-rise,
   .admin-fx main .grid > * { animation: none; }

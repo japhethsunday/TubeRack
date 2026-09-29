@@ -12,8 +12,11 @@ export const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(
 export const errorText = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong. Try again.");
 
 /** Load admin data from the backend with loading / error / reload. */
+/** Last response per admin API path (this tab only): pages open instantly and refresh in the background. */
+const adminCache = new Map<string, unknown>();
+
 export function useAdmin<T>(path: string | null) {
-  const [data, setData] = useState<T | null>(null);
+  const [data, setData] = useState<T | null>(() => (path ? ((adminCache.get(path) as T | undefined) ?? null) : null));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const reload = useCallback(async () => {
@@ -21,16 +24,19 @@ export function useAdmin<T>(path: string | null) {
     setLoading(true);
     setError(null);
     try {
-      setData(await api.get<T>(path));
+      const fresh = await api.get<T>(path);
+      adminCache.set(path, fresh);
+      setData(fresh);
     } catch (e) {
       setError(errorText(e));
     }
     setLoading(false);
   }, [path]);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load from the backend when the path changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- show the cached copy for this path, then refresh.
+    if (path && adminCache.has(path)) setData(adminCache.get(path) as T);
     void reload();
-  }, [reload]);
+  }, [reload, path]);
   return { data, error, loading, reload };
 }
 

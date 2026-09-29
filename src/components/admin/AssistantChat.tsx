@@ -66,7 +66,7 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
         history: next.map((t) => ({ role: t.role, text: t.text })).slice(-30),
       });
       const open = r.open && /^\/admin(\/[a-z-]+)?(\?q=[^#\s]*)?$/.test(r.open) ? r.open : undefined;
-      setTurns([...next, { role: "assistant", text: r.text, proposals: r.proposals.map((p) => ({ ...p, state: "idle" })), lookups: r.lookups, ...(open ? { open } : {}) }]);
+      setTurns((all) => [...all, { role: "assistant", text: r.text, proposals: r.proposals.map((p) => ({ ...p, state: "idle" })), lookups: r.lookups, ...(open ? { open } : {}) }]);
       if (open) router.push(open);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "The assistant couldn't answer. Try again.");

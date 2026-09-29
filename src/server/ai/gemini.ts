@@ -60,6 +60,7 @@ import { IntelligenceNotConfiguredError } from "@/src/lib/ai-gateway/intelligenc
 
 // Pro when the key's plan includes it (a quota-less plan is skipped instantly), else Flash.
 const DEFAULT_TEXT_MODEL = "gemini-pro-latest";
+const FAST_TEXT_MODEL = "gemini-flash-latest";
 const DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image";
 const DEFAULT_TTS_MODEL = "gemini-2.5-flash-preview-tts";
 const DEFAULT_TTS_VOICE = "Kore";
@@ -218,7 +219,7 @@ export class GeminiTextProvider implements TextProvider {
   readonly capability = "text" as const;
   readonly name = "gemini";
 
-  async generateText(request: { prompt: string; maxTokens?: number; json?: boolean; skills?: SkillId[] }): Promise<{ text: string; model: string }> {
+  async generateText(request: { prompt: string; maxTokens?: number; json?: boolean; skills?: SkillId[]; fast?: boolean }): Promise<{ text: string; model: string }> {
     if (!request.prompt.trim()) throw new Error("Text generation failed: prompt cannot be empty.");
     // Expert skills go first, so every model (and every backup) works to the same standard.
     const prompt = `${skillsFor(request.skills)}${request.prompt.trim()}`;
@@ -232,7 +233,8 @@ export class GeminiTextProvider implements TextProvider {
         throw providerError("text generation", error);
       }
     }
-    const model = env.GEMINI_TEXT_MODEL || DEFAULT_TEXT_MODEL;
+    // Interactive tools ask for speed: the Flash family answers in seconds.
+    const model = request.fast ? FAST_TEXT_MODEL : env.GEMINI_TEXT_MODEL || DEFAULT_TEXT_MODEL;
     // Floor of 256: reasoning models spend output budget on thought tokens,
     // so tiny caps would return empty text.
     // JSON replies get a generous budget: thinking tokens count against it, and

@@ -125,7 +125,7 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-3 border-b border-white/10 bg-black/40 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:top-4 lg:mx-4 lg:h-14 lg:rounded-2xl lg:border lg:pt-0 lg:px-6">
+        <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-3 border-b border-white/10 bg-[#0b0814]/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:top-4 lg:mx-4 lg:h-14 lg:rounded-2xl lg:border lg:pt-0 lg:px-6">
           <button className="rounded-md p-1.5 text-muted-text hover:bg-muted lg:hidden" aria-label="Open menu" onClick={() => setOpen(true)}>
             <Menu className="size-5" />
           </button>
