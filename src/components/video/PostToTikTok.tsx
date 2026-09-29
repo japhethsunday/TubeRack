@@ -28,6 +28,14 @@ interface Creator {
   max_video_post_duration_sec?: number;
 }
 
+/** True when this browser can build the H.264 + AAC MP4 TikTok accepts (Chrome/Edge yes; Firefox usually not). */
+async function canMakeTikTokMp4(): Promise<boolean> {
+  if (typeof window === "undefined" || !("VideoEncoder" in window) || !("AudioEncoder" in window)) return false;
+  const v = await VideoEncoder.isConfigSupported({ codec: "avc1.42e028", width: 720, height: 1280, bitrate: 4_000_000, framerate: 30 }).catch(() => null);
+  const a = await AudioEncoder.isConfigSupported({ codec: "mp4a.40.2", sampleRate: 48000, numberOfChannels: 2, bitrate: 128_000 }).catch(() => null);
+  return Boolean(v?.supported && a?.supported);
+}
+
 const PRIVACY_LABEL: Record<string, string> = {
   PUBLIC_TO_EVERYONE: "Everyone",
   MUTUAL_FOLLOW_FRIENDS: "Friends",
@@ -77,6 +85,12 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
   const [yourBrand, setYourBrand] = useState(false);
   const [branded, setBranded] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
+  const [sourceKind, setSourceKind] = useState<"project" | "file">("project");
+  const [picked, setPicked] = useState<File | null>(null);
+  const [mp4Ok, setMp4Ok] = useState<boolean | null>(null);
+  useEffect(() => {
+    void canMakeTikTokMp4().then(setMp4Ok);
+  }, []);
   const [progress, setProgress] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
   const cancelled = useRef(false);
@@ -106,11 +120,12 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
 
   const returnTo = typeof window === "undefined" ? "/" : window.location.pathname + window.location.search;
   const connectHref = `/api/v1/tiktok/start?returnTo=${encodeURIComponent(returnTo)}`;
-  const tooLong = Boolean(creator?.max_video_post_duration_sec && source.duration > creator.max_video_post_duration_sec);
+  const tooLong = sourceKind === "project" && Boolean(creator?.max_video_post_duration_sec && source.duration > creator.max_video_post_duration_sec);
+  const fileMissing = sourceKind === "file" && !picked;
   const brandedPrivate = branded && privacy === "SELF_ONLY";
   const busy = phase === "render" || phase === "upload" || phase === "send" || phase === "processing";
   const canPost =
-    !busy && phase !== "done" && !tooLong && !brandedPrivate && Boolean(creator) &&
+    !busy && phase !== "done" && !tooLong && !fileMissing && !brandedPrivate && Boolean(creator) &&
     (mode === "draft" || (privacy && (!commercial || yourBrand || branded)));
 
   async function post() {
@@ -119,8 +134,9 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
     const ac = new AbortController();
     abort.current = ac;
     try {
-      let blob = prerendered?.blob ?? null;
-      let mime = prerendered?.mime ?? "video/mp4";
+      let blob: Blob | null = sourceKind === "file" ? picked : (prerendered?.blob ?? null);
+      let mime = sourceKind === "file" ? picked?.type || "video/mp4" : (prerendered?.mime ?? "video/mp4");
+      if (sourceKind === "file" && !blob) throw new Error("Choose a video file first.");
       if (!blob) {
         setPhase("render");
         const out = await renderComposition({
@@ -209,6 +225,34 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
               </div>
               <a href={connectHref} className="text-xs text-primary hover:underline">Switch account</a>
             </div>
+
+            <fieldset className="space-y-2 text-sm">
+              <legend className="mb-1 font-medium">Video to send</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button type="button" disabled={busy} onClick={() => setSourceKind("project")} className={cx("rounded-xl border p-3 text-left", sourceKind === "project" ? "border-primary bg-primary/5" : "border-border")}>
+                  <p className="font-medium">This project</p>
+                  <p className="text-xs text-muted-text">{prerendered ? "Uses the video you just exported." : `${source.projectName} · made from the timeline`}</p>
+                </button>
+                <button type="button" disabled={busy} onClick={() => setSourceKind("file")} className={cx("rounded-xl border p-3 text-left", sourceKind === "file" ? "border-primary bg-primary/5" : "border-border")}>
+                  <p className="font-medium">A video file</p>
+                  <p className="text-xs text-muted-text">Choose an MP4 or MOV from your computer.</p>
+                </button>
+              </div>
+              {sourceKind === "file" && (
+                <input
+                  type="file"
+                  accept="video/mp4,video/quicktime,video/webm"
+                  disabled={busy}
+                  onChange={(e) => setPicked(e.target.files?.[0] ?? null)}
+                  className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm"
+                />
+              )}
+              {sourceKind === "project" && mp4Ok === false && (
+                <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+                  This browser can&apos;t make the MP4 format TikTok needs (Firefox usually can&apos;t), so TikTok may reject it. Open Recktube in Chrome or Edge to post this project, or choose an MP4 file instead.
+                </p>
+              )}
+            </fieldset>
 
             {tooLong && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">This video is {Math.round(source.duration)}s long; this TikTok account can post up to {creator.max_video_post_duration_sec}s. Trim it in the studio first.</p>}
 
