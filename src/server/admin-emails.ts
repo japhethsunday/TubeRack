@@ -176,6 +176,18 @@ export function sendPlanChanged(email: string, monthly: number) {
   });
 }
 
+/** A personal message from the team (written by an admin, or drafted by the assistant and approved). */
+export function sendTeamMessage(email: string, subject: string, message: string) {
+  return send(email, {
+    subject: subject.slice(0, 140),
+    preheader: message.slice(0, 110),
+    eyebrow: "Message from the team",
+    heading: subject.slice(0, 90),
+    intro: message.slice(0, 4000),
+    reason: "You're receiving this because the Recktube team sent you a message about your account.",
+  });
+}
+
 /* ---------------- Affiliates ---------------- */
 
 export function sendAffiliateStatus(email: string, status: string, code: string, pct: number) {

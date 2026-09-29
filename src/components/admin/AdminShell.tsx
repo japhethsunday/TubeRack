@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Activity, Calculator, Clapperboard, Coins, FileDown, FolderKanban, Gauge, Gift, Handshake, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, ShieldUser, Tags, ToggleRight, Ticket, TriangleAlert, Users, Wallet } from "lucide-react";
+import { Activity, Bot, ShieldAlert, Calculator, Clapperboard, Coins, FileDown, FolderKanban, Gauge, Gift, Handshake, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, ShieldUser, Tags, ToggleRight, Ticket, TriangleAlert, Users, Wallet } from "lucide-react";
 import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { cx } from "@/src/components/ui/cx";
@@ -11,6 +11,8 @@ import { MobileTables } from "@/src/components/shell/MobileTables";
 
 export const NAV = [
   { href: "/admin", label: "Overview", icon: Gauge, group: "Overview", need: "overview" },
+  { href: "/admin/assistant", label: "Assistant", icon: Bot, group: "Overview", need: "overview" },
+  { href: "/admin/safety", label: "Safety", icon: ShieldAlert, group: "People", need: "users.view" },
   { href: "/admin/users", label: "Users", icon: Users, group: "People", need: "users.list" },
   { href: "/admin/credits", label: "Credits", icon: Coins, group: "Money", need: "credits.list" },
   { href: "/admin/bulk-credits", label: "Bulk credits", icon: Gift, group: "Money", need: "bulk.view" },

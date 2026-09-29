@@ -24,6 +24,7 @@ export const FEATURES = [
   { id: "video", label: "AI video clips", blurb: "Generated video clips." },
   { id: "transcription", label: "Transcription & captions", blurb: "Caption and transcript generation." },
   { id: "tiktok", label: "TikTok posting", blurb: "Connect TikTok and post finished videos to it." },
+  { id: "email_autoreply", label: "Automatic support email replies", blurb: "The assistant answers simple emails to support@ on its own; everything else waits for the team." },
 ] as const;
 
 export type FeatureFlags = Record<string, { off: boolean; message: string }>;

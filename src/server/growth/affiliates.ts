@@ -101,9 +101,37 @@ export async function applyAffiliate(userId: string, name: string, input: { webs
       VALUES (${userId}, ${code}, ${input.website}, ${input.audience}, ${input.payoutDetails}, 'pending')
       ON CONFLICT (user_id) DO UPDATE SET code = EXCLUDED.code, website = EXCLUDED.website, audience = EXCLUDED.audience,
         payout_details = EXCLUDED.payout_details, status = 'pending'`;
+    await autoReview(userId, input.website);
     return;
   }
   throw validationError("Couldn't reserve a link name. Try a different one.");
+}
+
+/**
+ * Approve an application straight away when it looks genuine: verified
+ * email, an active account at least a day old, a real website or channel
+ * link, no open safety flags and no account farm behind it. Anything else
+ * stays pending for the team (and never an automatic rejection).
+ */
+async function autoReview(userId: string, website: string): Promise<void> {
+  const d = db();
+  let url: URL | null = null;
+  try {
+    url = new URL(website);
+  } catch {
+    url = null;
+  }
+  if (!url || !/^https?:$/.test(url.protocol) || !url.hostname.includes(".")) return;
+  const [u] = await d`
+    SELECT u.email_verified_at, u.status, u.created_at,
+      (SELECT count(*) FROM safety_flags f WHERE f.user_id = u.id AND f.status = 'open') AS flags,
+      (SELECT count(*) FROM users x WHERE u.signup_fp IS NOT NULL AND x.signup_fp = u.signup_fp AND x.deleted_at IS NULL) AS same_net
+    FROM users u WHERE u.id = ${userId}`;
+  if (!u || !u.email_verified_at || u.status !== "active") return;
+  if (Date.now() - new Date(String(u.created_at)).getTime() < 86_400_000) return;
+  if (Number(u.flags) > 0 || Number(u.same_net) > 3) return;
+  const [a] = await d`SELECT id FROM affiliates WHERE user_id = ${userId} AND status = 'pending'`;
+  if (a) await updateAffiliate(String(a.id), { status: "approved" }); // emails them their link
 }
 
 /** A click on /go/CODE: counted only for approved affiliates. Returns the code to remember, or "". */

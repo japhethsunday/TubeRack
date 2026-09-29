@@ -4,6 +4,7 @@ import { GeminiImageProvider } from "@/src/server/ai/gemini";
 import { guardProviderCall, providerFailure, recordUsage, storeGenerated, type ProviderCaller } from "@/src/server/ai/guard";
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
+import { screenPrompt } from "@/src/server/safety";
 
 export const maxDuration = 300;
 
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
   try {
     caller = await guardProviderCall("image");
     const input = await parseBody(request, body);
+    await screenPrompt(caller.user, input.prompt);
     const result = await new GeminiImageProvider().generateImage(input);
     // Store bytes in the bucket; the client keeps only a short URL.
     const match = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(result.url);

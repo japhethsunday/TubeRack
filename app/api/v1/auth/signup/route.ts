@@ -14,6 +14,7 @@ import { cookies } from "next/headers";
 import { ATTR_COOKIES, attributeSignup } from "@/src/server/growth/referrals";
 import { BONUS_COOKIE, redeemAtSignup } from "@/src/server/growth/codes";
 import { AFF_COOKIE, attributeAffiliate } from "@/src/server/growth/affiliates";
+import { recordSignupNetwork } from "@/src/server/safety";
 
 const signupSchema = z
   .object({
@@ -86,6 +87,7 @@ export async function POST(request: Request) {
       console.error("signup attribution failed:", error instanceof Error ? error.message : String(error));
     }
 
+    await recordSignupNetwork(String(result.user.id), request);
     // Bonus code typed on the form (or remembered from a ?bonus= link).
     const jar = await cookies();
     await redeemAtSignup(String(result.user.id), body.bonusCode || jar.get(BONUS_COOKIE)?.value);

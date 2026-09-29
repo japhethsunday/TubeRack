@@ -77,6 +77,8 @@ export async function recordUsage(
   } catch (error) {
     console.error("usage record failed:", error instanceof Error ? error.message : String(error));
   }
+  // Health watch: a tool that keeps failing pauses itself and alerts the admins.
+  if (entry.status === "failed") await import("@/src/server/health").then((h) => h.watchFailure(entry.kind)).catch(() => undefined);
 }
 
 /**

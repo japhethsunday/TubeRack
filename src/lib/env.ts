@@ -37,6 +37,8 @@ const serverSchema = z.object({
 
   // Transactional email (Resend; server-only)
   RESEND_API_KEY: z.string().optional(),
+  // Signing secret of the Resend webhook that announces received support email (whsec_…).
+  RESEND_WEBHOOK_SECRET: z.string().optional(),
   EMAIL_FROM: z.string().default("Recktube <no-reply@info.lekderis.com>"),
 
   // Security (required for auth routes; validated lazily at startup of those routes)

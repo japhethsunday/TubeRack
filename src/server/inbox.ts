@@ -23,6 +23,8 @@ export interface InboxEmail extends InboxSummary {
   html: string | null;
   text: string | null;
   messageId: string | null;
+  /** Sent by a machine (auto-reply, list, bounce): never answered automatically. */
+  automated: boolean;
 }
 
 type Raw = Record<string, unknown>;
@@ -106,6 +108,13 @@ export async function getInboxEmail(id: string): Promise<InboxEmail> {
     html: str(raw.html) || null,
     text: str(raw.text) || null,
     messageId: str(raw.message_id) || header(raw, "message-id") || null,
+    automated:
+      (header(raw, "auto-submitted") !== "" && header(raw, "auto-submitted").toLowerCase() !== "no") ||
+      /bulk|list|junk|auto_reply/i.test(header(raw, "precedence")) ||
+      header(raw, "list-id") !== "" ||
+      header(raw, "list-unsubscribe") !== "" ||
+      header(raw, "x-autoreply") !== "" ||
+      header(raw, "x-autorespond") !== "",
   };
 }
 

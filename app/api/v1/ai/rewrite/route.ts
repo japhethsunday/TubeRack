@@ -4,6 +4,7 @@ import { rewriteSection } from "@/src/server/ai/gemini";
 import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } from "@/src/server/ai/guard";
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
+import { screenPrompt } from "@/src/server/safety";
 
 export const maxDuration = 300;
 
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
   try {
     caller = await guardProviderCall("text");
     const input = await parseBody(request, body);
+    await screenPrompt(caller.user, [input.text, input.instruction, input.topic].join(" "), "text");
     const result = await rewriteSection(input);
     await recordUsage(caller, { kind: "text", provider: "gemini", model: result.model, status: "completed", ref: "rewrite" });
     return NextResponse.json({ data: result });

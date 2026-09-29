@@ -261,5 +261,7 @@ export async function runDaily() {
     retention: await safe("retention", purgeStaleYouTubeData),
     lifecycle: await safe("lifecycle", lifecycleEmails),
     campaigns: await safe("campaigns", runDueCampaigns),
+    // Safety scan + the admins' morning briefing email.
+    briefing: await safe("briefing", () => import("@/src/server/health").then((h) => h.morningBriefing())),
   };
 }

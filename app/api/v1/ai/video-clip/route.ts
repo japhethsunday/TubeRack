@@ -6,6 +6,7 @@ import { assertCredits, creditState, isPaidPlan } from "@/src/server/credits";
 import { isAdmin } from "@/src/server/admin";
 import { toErrorResponse, BackendError } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
+import { screenPrompt } from "@/src/server/safety";
 import { isFreeVideoConfigured } from "@/src/server/ai/free-video";
 import { generateVideoClip } from "@/src/server/ai/video-gen";
 
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
     await sharedLimit(`video-clip:${caller.user.id}`, 20, 86400);
     await assertCredits(caller.workspaceId, "video");
     const input = await parseBody(request, body);
+    await screenPrompt(caller.user, input.prompt);
     let image: { bytes: Uint8Array; mime: string } | null = null;
     if (input.image) {
       const [head, b64] = input.image.split(",", 2);
