@@ -25,6 +25,10 @@ const serverSchema = z.object({
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET: z.string().optional(),
+  // Cloudflare Workers AI (free daily allowance): API token with Workers AI permission.
+  CF_AI_TOKEN: z.string().optional(),
+  CF_ACCOUNT_ID: z.string().optional(),
+  CF_AI_TEXT_MODELS: z.string().optional(),
 
   // Transactional email (Resend; server-only)
   RESEND_API_KEY: z.string().optional(),

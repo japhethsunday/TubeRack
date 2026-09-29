@@ -56,6 +56,16 @@ export function describeProviders(): ProviderDescriptor[] {
       detail: env.MISTRAL_API_KEY ? "MISTRAL_API_KEY is set; backs up text, voice and captions." : "Set MISTRAL_API_KEY to add Mistral text, voice and captions as backup.",
     },
     {
+      provider: "cloudflare",
+      type: "cloud",
+      capabilities: ["text", "intelligence"],
+      models: env.CF_AI_TEXT_MODELS ? env.CF_AI_TEXT_MODELS.split(",").map((m) => m.trim()).filter(Boolean) : ["Workers AI open models"],
+      local: false,
+      gpuRequired: false,
+      configured: Boolean(env.CF_AI_TOKEN),
+      detail: env.CF_AI_TOKEN ? "CF_AI_TOKEN is set; free backup for text." : "Set CF_AI_TOKEN to add Cloudflare Workers AI as a free text backup.",
+    },
+    {
       provider: "nvidia",
       type: "cloud",
       capabilities: ["text", "intelligence"],

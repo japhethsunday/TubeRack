@@ -9,6 +9,7 @@ import { isNvidiaConfigured, nvidiaGenerateText } from "@/src/server/ai/nvidia";
 import { arkGenerateImage, arkGenerateText, isArkConfigured } from "@/src/server/ai/ark";
 import { hfGenerateImage, hfGenerateText, isHuggingFaceConfigured } from "@/src/server/ai/huggingface";
 import { cleanImagePrompt, isNvidiaImageConfigured, nvidiaGenerateImage } from "@/src/server/ai/nvidia-image";
+import { cloudflareGenerateText, isCloudflareAiConfigured } from "@/src/server/ai/cloudflare";
 import { isMistralConfigured, mistralGenerateText, mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
 
 type TextRequest = { prompt: string; maxTokens?: number; json?: boolean; skills?: SkillId[] };
@@ -19,6 +20,7 @@ function backupTextProviders(env = getServerEnv()): { name: string; run: (r: Tex
     ...(isMistralConfigured(env) ? [{ name: "mistral", run: (r: TextRequest) => mistralGenerateText(r) }] : []),
     ...(isNvidiaConfigured(env) ? [{ name: "nvidia", run: (r: TextRequest) => nvidiaGenerateText(r) }] : []),
     ...(isHuggingFaceConfigured(env) ? [{ name: "huggingface", run: (r: TextRequest) => hfGenerateText(r) }] : []),
+    ...(isCloudflareAiConfigured(env) ? [{ name: "cloudflare", run: (r: TextRequest) => cloudflareGenerateText(r) }] : []),
     ...(isArkConfigured(env) ? [{ name: "byteplus", run: (r: TextRequest) => arkGenerateText(r) }] : []),
   ];
 }
@@ -76,7 +78,7 @@ export function isGeminiConfigured(env = getServerEnv()): boolean {
 
 /** Text features work with Gemini, Mistral, NVIDIA, or any mix. */
 export function isTextConfigured(env = getServerEnv()): boolean {
-  return isGeminiConfigured(env) || isMistralConfigured(env) || isNvidiaConfigured(env) || isHuggingFaceConfigured(env) || isArkConfigured(env);
+  return isGeminiConfigured(env) || isMistralConfigured(env) || isNvidiaConfigured(env) || isHuggingFaceConfigured(env) || isCloudflareAiConfigured(env) || isArkConfigured(env);
 }
 
 /** Resolved model names (env overrides, safe defaults). */
@@ -320,7 +322,7 @@ export class GeminiImageProvider implements ImageProvider {
     const env = getServerEnv();
     const model = env.GEMINI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL;
     const aspect = request.aspectRatio === "9:16" || request.aspectRatio === "1:1" ? request.aspectRatio : "16:9";
-    const backups = isNvidiaImageConfigured(env) || isHuggingFaceConfigured(env) || isArkConfigured(env);
+    const backups = isNvidiaImageConfigured(env) || isHuggingFaceConfigured(env) || isCloudflareAiConfigured(env) || isArkConfigured(env);
     // No Gemini key: the backup image models directly.
     if (!isGeminiConfigured(env) && backups) {
       try {
