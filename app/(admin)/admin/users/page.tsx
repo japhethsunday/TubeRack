@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Search, Trash2 } from "lucide-react";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
@@ -10,8 +11,9 @@ import { deleteAccount, errorText, Loading, PageTitle, th, td, useAdmin, when } 
 interface Row { id: string; email: string; name: string; status: string; verified: boolean; createdAt: string; lastSeen: string | null; projects: number; usage30: number; youtube: boolean; credits: number | null; unlimited: boolean }
 
 export default function AdminUsers() {
-  const [q, setQ] = useState("");
-  const [query, setQuery] = useState("");
+  const initial = (useSearchParams().get("q") ?? "").slice(0, 120);
+  const [q, setQ] = useState(initial);
+  const [query, setQuery] = useState(initial);
   const [page, setPage] = useState(1);
   const { data, error, reload } = useAdmin<{ total: number; page: number; pageSize: number; users: Row[] }>(`/api/v1/admin/users?${new URLSearchParams({ q: query, page: String(page) })}`);
   const [deleting, setDeleting] = useState<string | null>(null);

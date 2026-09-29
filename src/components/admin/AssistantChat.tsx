@@ -1,19 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bot, Check, Loader2, Search, Send, ShieldCheck, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Bot, Check, History, Loader2, Plus, Search, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import { useAssistantChats } from "@/src/components/admin/AssistantLauncher";
 import { api, ApiError } from "@/src/lib/api";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
 
 export interface Proposal { action: string; summary: string; token: string; state?: "idle" | "busy" | "done" | "error" | "dismissed"; result?: string }
-export interface Turn { role: "admin" | "assistant"; text: string; proposals?: Proposal[]; lookups?: string[] }
+export interface Turn { role: "admin" | "assistant"; text: string; proposals?: Proposal[]; lookups?: string[]; open?: string }
 
 const STARTERS = [
   "How is the business doing this week?",
   "Any suspicious accounts or fraud?",
   "What failed in the last 24 hours?",
   "Who is waiting for support?",
+  "Email everyone a note from the founder",
   "Anything new for founder@ or owner@?",
   "Where are new sign-ups coming from?",
 ];
@@ -33,14 +36,17 @@ const LOOKUP_LABEL: Record<string, string> = {
 
 /**
  * The admin assistant chat. Admin console only — it has its own endpoint and
- * shares nothing with the creators' support chat. The conversation lives in
- * memory for this session only (never saved in the browser).
+ * shares nothing with the creators' support chat. Conversations are saved to
+ * the admin's account (see AssistantProvider).
  */
 export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; setTurns: React.Dispatch<React.SetStateAction<Turn[]>>; compact?: boolean }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  const saved = useAssistantChats();
+  const router = useRouter();
+  const [showHistory, setShowHistory] = useState(false);
   useEffect(() => {
     // Braces matter: newer browsers return a Promise from scrollIntoView, and
     // an effect must never return anything but a cleanup function.
@@ -56,10 +62,12 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
     setBusy(true);
     setError(null);
     try {
-      const r = await api.post<{ text: string; proposals: Proposal[]; lookups: string[] }>("/api/v1/admin/assistant", {
+      const r = await api.post<{ text: string; proposals: Proposal[]; lookups: string[]; open?: string | null }>("/api/v1/admin/assistant", {
         history: next.map((t) => ({ role: t.role, text: t.text })).slice(-30),
       });
-      setTurns([...next, { role: "assistant", text: r.text, proposals: r.proposals.map((p) => ({ ...p, state: "idle" })), lookups: r.lookups }]);
+      const open = r.open && /^\/admin(\/[a-z-]+)?(\?q=[^#\s]*)?$/.test(r.open) ? r.open : undefined;
+      setTurns([...next, { role: "assistant", text: r.text, proposals: r.proposals.map((p) => ({ ...p, state: "idle" })), lookups: r.lookups, ...(open ? { open } : {}) }]);
+      if (open) router.push(open);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "The assistant couldn't answer. Try again.");
     }
@@ -82,6 +90,32 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
 
   return (
       <div className={cx("flex flex-col", compact ? "h-full min-h-0" : "admin-glass min-h-[60vh] rounded-xl border border-border")}>
+        {saved && (
+          <div className="relative flex items-center gap-1 border-b border-white/10 px-3 py-2 text-xs">
+            <button type="button" onClick={() => setShowHistory((v) => !v)} aria-expanded={showHistory} className="flex min-h-8 items-center gap-1.5 rounded-lg px-2.5 text-muted-text hover:bg-white/5 hover:text-foreground">
+              <History className="size-3.5" aria-hidden="true" /> History{saved.chats.length ? ` · ${saved.chats.length}` : ""}
+            </button>
+            <button type="button" onClick={() => { saved.newChat(); setShowHistory(false); setError(null); }} disabled={busy} className="ml-auto flex min-h-8 items-center gap-1.5 rounded-lg px-2.5 font-medium text-primary hover:bg-primary/10 disabled:opacity-40">
+              <Plus className="size-3.5" aria-hidden="true" /> New chat
+            </button>
+            {showHistory && (
+              <div className="absolute inset-x-2 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-elevated/95 p-1 shadow-2xl backdrop-blur-xl">
+                {saved.chats.length === 0 && <p className="px-3 py-4 text-center text-muted-text">No saved conversations yet.</p>}
+                {saved.chats.map((c) => (
+                  <div key={c.id} className={cx("group flex items-center gap-1 rounded-lg", c.id === saved.chatId && "bg-primary/10")}>
+                    <button type="button" disabled={busy} onClick={() => { void saved.openChat(c.id).catch(() => setError("Couldn't open that conversation.")); setShowHistory(false); }} className="min-w-0 flex-1 px-3 py-2 text-left hover:text-primary">
+                      <span className="block truncate text-foreground">{c.title || "Conversation"}</span>
+                      <span className="text-[10px] text-muted-text">{new Date(c.updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
+                    </button>
+                    <button type="button" aria-label="Delete conversation" onClick={() => void saved.removeChat(c.id)} className="rounded-md p-2 text-muted-text hover:bg-destructive/10 hover:text-destructive">
+                      <Trash2 className="size-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className={cx("flex-1 space-y-4 overflow-y-auto", compact ? "min-h-0 p-3" : "p-4 sm:p-5")} aria-live="polite">
           {turns.length === 0 && (
             <div className="space-y-4 py-6 text-center">
@@ -105,6 +139,11 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
                   </p>
                 )}
                 <p className="whitespace-pre-wrap break-words">{t.text}</p>
+                {t.open && (
+                  <button type="button" onClick={() => router.push(t.open!)} className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10">
+                    Open {t.open.replace(/^\/admin\/?/, "").split("?")[0] || "overview"} →
+                  </button>
+                )}
                 {t.proposals?.map((p, pi) => (
                   <div key={pi} className="rounded-xl border border-border bg-background/70 p-3">
                     <p className="flex items-start gap-2 text-sm">

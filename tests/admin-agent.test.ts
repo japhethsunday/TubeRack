@@ -59,3 +59,33 @@ describe("assistant email aliases", () => {
     assert.equal(prepare("send_email", { ...base, from: "ceo" }), null);
   });
 });
+
+describe("assistant email everyone", () => {
+  it("is one owner-only action, from founder@ to opted-in users by default", async () => {
+    const { prepare, ACTIONS } = await import("@/src/server/admin-agent/actions");
+    const { roleAllows } = await import("@/src/lib/admin-roles");
+    const p = prepare("email_everyone", { subject: "A note from our founder", message: "Thank you for building with Recktube." });
+    assert.equal(p?.args.from, "founder");
+    assert.equal(p?.args.audience, "opted_in");
+    assert.match(p!.summary, /founder@recktube\.xyz/);
+    assert.equal(prepare("email_everyone", { subject: "Hi there", message: "Thank you for everything.", audience: "all_users_even_opted_out" }), null);
+    for (const r of ["support", "finance", "operations"] as const) assert.equal(roleAllows(r, ACTIONS.email_everyone.permission), false);
+  });
+});
+
+describe("assistant navigation and credit removal", () => {
+  it("only opens our own admin pages", async () => {
+    const { safeAdminPath } = await import("@/src/server/admin-agent/agent");
+    assert.equal(safeAdminPath("/admin/inbox"), "/admin/inbox");
+    assert.equal(safeAdminPath("/admin/users?q=ada@example.com"), "/admin/users?q=ada%40example.com");
+    assert.equal(safeAdminPath("https://evil.example"), null);
+    assert.equal(safeAdminPath("//evil.example"), null);
+    assert.equal(safeAdminPath("/admin/../dashboard"), null);
+    assert.equal(safeAdminPath("/admin/nope"), null);
+  });
+  it("remove_credits needs a positive amount", async () => {
+    const { prepare } = await import("@/src/server/admin-agent/actions");
+    assert.match(prepare("remove_credits", { email: "ada@example.com", amount: 50 })!.summary, /Remove 50 credits/);
+    assert.equal(prepare("remove_credits", { email: "ada@example.com", amount: -5 }), null);
+  });
+});

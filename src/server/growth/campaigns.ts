@@ -7,6 +7,7 @@ import { PRODUCT_FACTS } from "@/src/server/support/facts";
 import { openPixelUrl, trackedUrl, unsubscribeUrl } from "@/src/server/unsubscribe";
 import { backendUnavailable, validationError } from "@/src/server/errors";
 import { parseJsonObject } from "@/src/server/admin-ai";
+import { MAILBOX_ADDRESS, MAILBOX_SENDER, type Mailbox } from "@/src/server/admin-mail";
 
 /**
  * Email campaigns to Recktube's own users. Only people who opted in to
@@ -35,6 +36,8 @@ export interface CampaignContent {
   videoUrl: string;
   videoThumb: string;
   videoTitle: string;
+  /** Which of our addresses it comes from (default support@). */
+  from?: Mailbox;
 }
 
 export const EMPTY_CONTENT: CampaignContent = { preheader: "", heading: "", body: "", ctaLabel: "Open Recktube", ctaUrl: "/dashboard", videoUrl: "", videoThumb: "", videoTitle: "" };
@@ -207,6 +210,8 @@ export async function runCampaign(id: string, budgetMs = 240_000): Promise<{ sen
       ON CONFLICT (campaign_id, user_id) DO NOTHING`;
     await d`UPDATE campaigns SET status = 'sending', updated_at = now() WHERE id = ${id}`;
   }
+  const box: Mailbox = c.content.from && c.content.from in MAILBOX_ADDRESS ? c.content.from : "support";
+  const sender = { name: box === "support" ? "Recktube" : MAILBOX_SENDER[box].name, address: MAILBOX_ADDRESS[box] };
   const started = Date.now();
   let sent = 0;
   let failed = 0;
@@ -230,9 +235,9 @@ export async function runCampaign(id: string, budgetMs = 240_000): Promise<{ sen
         html: mail.html,
         text: mail.text,
         kind: "marketing",
-        fromName: "Recktube",
-        fromAddress: "support@recktube.xyz",
-        replyTo: "support@recktube.xyz",
+        fromName: sender.name,
+        fromAddress: sender.address,
+        replyTo: sender.address,
         listUnsubscribe: mail.listUnsubscribe ?? undefined,
       });
       if (res.sent) {

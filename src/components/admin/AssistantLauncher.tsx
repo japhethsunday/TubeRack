@@ -1,6 +1,7 @@
 "use client";
 
-import { Component, createContext, useContext, useEffect, useState } from "react";
+import { Component, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { api } from "@/src/lib/api";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Bot, Maximize2, X } from "lucide-react";
@@ -39,17 +40,116 @@ export class ChatBoundary extends Component<{ children: React.ReactNode }, { fai
 }
 
 type TurnsState = [Turn[], React.Dispatch<React.SetStateAction<Turn[]>>];
-const Ctx = createContext<TurnsState | null>(null);
+export interface ChatSummary { id: string; title: string; updatedAt: string }
+interface ChatsState {
+  chatId: string | null;
+  chats: ChatSummary[];
+  newChat: () => void;
+  openChat: (id: string) => Promise<void>;
+  removeChat: (id: string) => Promise<void>;
+}
+const Ctx = createContext<{ turns: TurnsState; chats: ChatsState } | null>(null);
 
+/**
+ * One assistant conversation shared by the floating panel and the full page,
+ * saved to the account (like the creators' support chat) so it survives
+ * leaving the page, reloads and other devices.
+ */
 export function AssistantProvider({ children }: { children: React.ReactNode }) {
-  const state = useState<Turn[]>([]);
-  return <Ctx.Provider value={state}>{children}</Ctx.Provider>;
+  const [turns, setTurnsRaw] = useState<Turn[]>([]);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const dirty = useRef(false);
+  const idRef = useRef<string | null>(null);
+  const saving = useRef<Promise<unknown> | null>(null);
+
+  const setTurns: React.Dispatch<React.SetStateAction<Turn[]>> = useCallback((v) => {
+    dirty.current = true;
+    setTurnsRaw(v);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    try {
+      const list = await api.get<ChatSummary[]>("/api/v1/admin/assistant/chats");
+      setChats(list);
+      return list;
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const openChat = useCallback(async (id: string) => {
+    const c = await api.get<{ id: string; turns: Turn[] }>(`/api/v1/admin/assistant/chats?id=${encodeURIComponent(id)}`);
+    dirty.current = false;
+    idRef.current = c.id;
+    setChatId(c.id);
+    // A card that was mid-confirm when the page closed can be tried again.
+    setTurnsRaw(c.turns.map((t) => (t.proposals ? { ...t, proposals: t.proposals.map((p) => (p.state === "busy" ? { ...p, state: "idle" } : p)) } : t)));
+  }, []);
+
+  // Pick up the latest conversation on first load.
+  useEffect(() => {
+    let live = true;
+    api
+      .get<ChatSummary[]>("/api/v1/admin/assistant/chats")
+      .then((list) => {
+        if (!live) return;
+        setChats(list);
+        if (list[0] && !dirty.current) void openChat(list[0].id).catch(() => undefined);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [openChat]);
+
+  // Save after every change (debounced).
+  useEffect(() => {
+    if (!dirty.current || !turns.length) return;
+    const t = setTimeout(() => {
+      const run = async () => {
+        if (saving.current) await saving.current.catch(() => undefined);
+        const r = await api.post<{ id: string }>("/api/v1/admin/assistant/chats", { id: idRef.current, turns: turns.slice(-200) });
+        if (!idRef.current) {
+          idRef.current = r.id;
+          setChatId(r.id);
+          void refresh();
+        }
+      };
+      saving.current = run().catch(() => undefined);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [turns, refresh]);
+
+  const newChat = useCallback(() => {
+    dirty.current = false;
+    idRef.current = null;
+    setChatId(null);
+    setTurnsRaw([]);
+    void refresh();
+  }, [refresh]);
+
+  const removeChat = useCallback(
+    async (id: string) => {
+      await api.remove(`/api/v1/admin/assistant/chats?id=${encodeURIComponent(id)}`);
+      if (idRef.current === id) newChat();
+      else void refresh();
+    },
+    [newChat, refresh],
+  );
+
+  const value = useMemo(() => ({ turns: [turns, setTurns] as TurnsState, chats: { chatId, chats, newChat, openChat, removeChat } }), [turns, setTurns, chatId, chats, newChat, openChat, removeChat]);
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 export function useAssistantTurns(): TurnsState {
   const ctx = useContext(Ctx);
   const local = useState<Turn[]>([]);
-  return ctx ?? local;
+  return ctx?.turns ?? local;
+}
+
+export function useAssistantChats(): ChatsState | null {
+  return useContext(Ctx)?.chats ?? null;
 }
 
 export function AssistantLauncher() {

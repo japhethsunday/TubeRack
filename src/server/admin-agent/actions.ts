@@ -7,6 +7,7 @@ import { adjustCredits, setCreditPlan } from "@/src/server/credits";
 import { notifyCreditGift } from "@/src/server/credit-emails";
 import { FEATURES, featureFlags, putSetting } from "@/src/server/admin-ops";
 import { normalizeCode } from "@/src/server/growth/codes";
+import { AUDIENCES, EMPTY_CONTENT, audienceCounts, runCampaign, type AudienceKey } from "@/src/server/growth/campaigns";
 import { updateAffiliate } from "@/src/server/growth/affiliates";
 import { forbidden, notFound, validationError } from "@/src/server/errors";
 import { sendAccountReactivated, sendAccountSuspended, sendPlanChanged, sendTeamMessage, workspaceOwnerEmails } from "@/src/server/admin-emails";
@@ -27,6 +28,11 @@ export const ACTIONS = {
     permission: "credits.change",
     args: z.object({ email, amount: z.number().int().min(1).max(10_000), reason: z.string().trim().max(200).default("From the Recktube team") }),
     describe: (a: { email: string; amount: number; reason: string }) => `Give ${a.amount.toLocaleString("en-US")} credits to ${a.email} (“${a.reason}”) and email them.`,
+  },
+  remove_credits: {
+    permission: "credits.change",
+    args: z.object({ email, amount: z.number().int().min(1).max(1_000_000), reason: z.string().trim().max(200).default("Adjusted by the Recktube team") }),
+    describe: (a: { email: string; amount: number; reason: string }) => `Remove ${a.amount.toLocaleString("en-US")} credits from ${a.email} (“${a.reason}”). The balance never goes below 0; no email is sent.`,
   },
   set_monthly_plan: {
     permission: "credits.change",
@@ -52,6 +58,17 @@ export const ACTIONS = {
     permission: "users.action",
     args: z.object({ email, subject: z.string().trim().min(3).max(140), message: z.string().trim().min(10).max(4000), from: z.enum(["support", "security", "founder", "owner"]).default("support") }),
     describe: (a: { email: string; subject: string; message: string; from: string }) => `Email ${a.email} from ${a.from}@recktube.xyz: “${a.subject}” — ${a.message.slice(0, 160)}${a.message.length > 160 ? "…" : ""}`,
+  },
+  email_everyone: {
+    permission: "campaigns.send",
+    args: z.object({
+      subject: z.string().trim().min(3).max(140),
+      message: z.string().trim().min(10).max(6000),
+      from: z.enum(["support", "founder", "owner"]).default("founder"),
+      audience: z.enum(AUDIENCES.map((a) => a.key) as [AudienceKey, ...AudienceKey[]]).default("opted_in"),
+    }),
+    describe: (a: { subject: string; message: string; from: string; audience: string }) =>
+      `Email ${AUDIENCES.find((x) => x.key === a.audience)?.label.toLowerCase() ?? a.audience} from ${a.from}@recktube.xyz: “${a.subject}” — ${a.message.slice(0, 200)}${a.message.length > 200 ? "…" : ""} (branded design, unsubscribe link; people who opted out are skipped)`,
   },
   approve_affiliate: {
     permission: "affiliates.manage",
@@ -119,6 +136,13 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       await log({ email: a.email, amount: a.amount });
       return `Added ${a.amount} credits to ${a.email}.`;
     }
+    case "remove_credits": {
+      const u = await userByEmail(a.email);
+      const ws = await ownedWorkspace(String(u.id));
+      const state = await adjustCredits(ws, -Number(a.amount), a.reason);
+      await log({ email: a.email, amount: -Number(a.amount) });
+      return state?.unlimited ? `Removed ${a.amount} credits from ${a.email} (note: they're on unlimited credits).` : `Removed credits from ${a.email}. New balance: ${state?.balance ?? 0}.`;
+    }
     case "set_monthly_plan": {
       const u = await userByEmail(a.email);
       const ws = await ownedWorkspace(String(u.id));
@@ -159,6 +183,19 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       const ok = await sendTeamMessage(a.email, a.subject, a.message, a.from);
       await log({ email: a.email, subject: a.subject, from: a.from });
       return ok ? `Emailed ${a.email}.` : `Couldn't send the email to ${a.email} (email service unavailable).`;
+    }
+    case "email_everyone": {
+      const audience = a.audience as AudienceKey;
+      const reach = (await audienceCounts())[audience] ?? 0;
+      if (!reach) return "Nobody in that group can receive email right now.";
+      const content = { ...EMPTY_CONTENT, preheader: String(a.message).slice(0, 110), heading: a.subject, body: a.message, from: a.from };
+      const [c] = await adminDb()`
+        INSERT INTO campaigns (name, subject, audience, content, created_by)
+        VALUES (${`Assistant: ${String(a.subject).slice(0, 60)}`}, ${a.subject}, ${audience}, ${JSON.stringify(content)}, ${admin.id}) RETURNING id`;
+      // Send what fits now; the daily job finishes anything left.
+      const r = await runCampaign(String(c.id), 40_000);
+      await log({ campaign: String(c.id), audience, from: a.from, reach });
+      return `Sending to ${reach} people: ${r.sent} sent now${r.failed ? `, ${r.failed} failed` : ""}${r.remaining ? `, ${r.remaining} more going out shortly` : ""}. Track it under Campaigns.`;
     }
     case "approve_affiliate": {
       const u = await userByEmail(a.email);
