@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Activity, Bot, ShieldAlert, Calculator, Clapperboard, Coins, FileDown, FolderKanban, Gauge, Gift, Handshake, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, ShieldUser, Tags, ToggleRight, Ticket, TriangleAlert, Users, Wallet } from "lucide-react";
+import { Activity, Bot, Search, ShieldAlert, Calculator, Clapperboard, Coins, FileDown, FolderKanban, Gauge, Gift, Handshake, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, ShieldUser, Tags, ToggleRight, Ticket, TriangleAlert, Users, Wallet } from "lucide-react";
 import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { cx } from "@/src/components/ui/cx";
@@ -45,6 +45,14 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
   const items = NAV.filter((n) => roleAllows(role, n.need));
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const matches = query.trim() ? items.filter((n) => `${n.label} ${n.group}`.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 6) : [];
+  const go = (href: string) => {
+    setQuery("");
+    router.push(href);
+  };
+  const tabs = items.filter((n) => ["/admin", "/admin/assistant", "/admin/safety", "/admin/users"].includes(n.href));
   const active = (href: string) => (href === "/admin" ? path === "/admin" : path.startsWith(href));
   const sidebar = (grouped: boolean) => (
     <>
@@ -119,10 +127,50 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
           <button className="rounded-md p-1.5 text-muted-text hover:bg-muted lg:hidden" aria-label="Open menu" onClick={() => setOpen(true)}>
             <Menu className="size-5" />
           </button>
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold">{items.find((n) => active(n.href))?.label ?? "Admin"}</span>
-          <span className="ml-auto hidden items-center gap-2 rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[11px] font-semibold text-success sm:flex">
-            <span className="size-1.5 rounded-full bg-success" /> Secure admin session
-          </span>
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold lg:hidden">{items.find((n) => active(n.href))?.label ?? "Admin"}</span>
+          {/* Quick tabs, like the reference's segmented control. */}
+          <nav aria-label="Quick sections" className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 lg:flex">
+            {tabs.map((n) => (
+              <Link key={n.href} href={n.href} className={cx("rounded-full px-3 py-1 text-xs font-medium transition-colors", active(n.href) ? "admin-nav-active text-white" : "text-muted-text hover:text-foreground")}>
+                {n.label}
+              </Link>
+            ))}
+          </nav>
+          {/* Command search: type a page name, Enter to jump. */}
+          <div className="relative ml-auto hidden w-64 md:block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-text" aria-hidden="true" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && matches[0]) go(matches[0].href);
+                if (e.key === "Escape") setQuery("");
+              }}
+              placeholder="Search or jump to…"
+              aria-label="Search admin pages"
+              className="h-9 w-full rounded-full border border-white/10 bg-black/30 pl-8 pr-3 text-xs placeholder:text-muted-text focus:border-violet-400/50 focus:outline-none"
+            />
+            {matches.length > 0 && (
+              <ul className="absolute right-0 top-11 z-50 w-full overflow-hidden rounded-xl border border-white/10 bg-[#120e1d]/95 p-1 shadow-2xl backdrop-blur-xl">
+                {matches.map((n) => (
+                  <li key={n.href}>
+                    <button type="button" onClick={() => go(n.href)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-white/10">
+                      <n.icon className="size-3.5 text-violet-300" aria-hidden="true" /> {n.label}
+                      <span className="ml-auto text-[10px] text-muted-text">{n.group}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {items.some((n) => n.href === "/admin/exports") && (
+            <Link href="/admin/exports" className="hidden h-9 items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 text-xs font-medium hover:bg-white/10 xl:inline-flex">
+              <FileDown className="size-3.5" aria-hidden="true" /> Export data
+            </Link>
+          )}
+          <Link href="/admin/assistant" className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-3 text-xs font-semibold text-white shadow-lg shadow-violet-900/40 hover:opacity-90 md:ml-0">
+            <Bot className="size-3.5" aria-hidden="true" /> Ask assistant
+          </Link>
         </header>
         <MobileTables />
         <main className="mx-auto w-full max-w-7xl p-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-4 lg:p-8">

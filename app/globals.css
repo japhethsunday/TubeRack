@@ -593,6 +593,25 @@ a[class*="rounded-2xl"][class*="border"]:hover {
   }
   .admin-fx .admin-rail { margin: 1rem 0 1rem 1rem; border-radius: 22px; }
 }
+/* A slow light sweep gliding along the top edge of the console frame. */
+@keyframes admin-sweep { from { transform: translateX(-30%); } to { transform: translateX(130%); } }
+@media (min-width: 1024px) {
+  .admin-fx .admin-frame { position: relative; overflow: clip; }
+  .admin-fx .admin-frame::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 40%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), rgba(217, 70, 239, 0.8), transparent);
+    animation: admin-sweep 7s ease-in-out infinite;
+    pointer-events: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-fx .admin-frame::before { animation: none; display: none; }
+}
 /* Sidebar: glass panel with a glowing brand-gradient edge. */
 .admin-fx .admin-rail {
   position: relative;
@@ -603,13 +622,16 @@ a[class*="rounded-2xl"][class*="border"]:hover {
   overflow: hidden;
 }
 .admin-fx .admin-rail::before {
+  /* the curved, glowing band from the reference, in brand colours */
   content: "";
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  background: linear-gradient(180deg, #d946ef, #7c3aed 50%, #0ea5e9);
-  box-shadow: 0 0 24px 2px rgba(124, 58, 237, 0.55);
+  inset: 10px auto 10px 0;
+  width: 14px;
+  border-radius: 0 14px 14px 0;
+  background: linear-gradient(180deg, #d946ef, #7c3aed 45%, #4f46e5 70%, #0ea5e9);
+  box-shadow: 0 0 28px 4px rgba(124, 58, 237, 0.55), inset -2px 0 6px rgba(255, 255, 255, 0.25);
 }
+.admin-fx .admin-rail > * { padding-left: 12px; }
 .admin-fx .admin-rail > * { position: relative; }
 .admin-fx .admin-rail > div:first-child { border-color: rgba(255, 255, 255, 0.08); }
 .admin-fx .admin-nav-active {
