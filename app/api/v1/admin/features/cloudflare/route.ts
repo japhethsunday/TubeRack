@@ -28,7 +28,7 @@ export async function PUT(request: Request) {
     const off = new Set(await getSetting<string[]>("cf_models_off", []));
     if (on) off.delete(id);
     else off.add(id);
-    await putSetting("cf_models_off", [...off], admin.id);
+    await putSetting("cf_models_off", [...off].slice(0, 300), admin.id);
     return NextResponse.json({ data: { ok: true } });
   } catch (error) {
     return toErrorResponse(error);

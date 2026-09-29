@@ -1,7 +1,7 @@
 import { getServerEnv } from "@/src/lib/env";
 import { getDb } from "@/src/server/db";
 import { internalError } from "@/src/server/errors";
-import { isR2Active, isR2Configured, r2DeleteMany, r2Exists, r2Get, r2List, r2Ping, r2Presign, r2Put } from "@/src/server/r2";
+import { isR2Active, isR2Configured, strictUploadsOn, r2DeleteMany, r2Exists, r2Get, r2List, r2Ping, r2Presign, r2Put } from "@/src/server/r2";
 
 /**
  * Object storage adapter for the configured Supabase Storage bucket (private).
@@ -145,10 +145,12 @@ export async function inlineLimit(): Promise<number> {
  * large video never passes through a serverless function (4.5 MB cap).
  * The server chooses the key; the token is single-use and short-lived.
  */
-export async function storageSignedUpload(key: string): Promise<string> {
+export async function storageSignedUpload(key: string, pin?: { mime: string; size: number }): Promise<string> {
   if (await isR2Active()) {
     locationCache.set(key, "r2");
-    return r2Presign("PUT", key, 3600);
+    // Pin the size and type so a link can't be reused for a bigger or different file.
+    const headers: Record<string, string> = pin && (await strictUploadsOn()) ? { "content-type": pin.mime, "content-length": String(pin.size) } : {};
+    return r2Presign("PUT", key, 3600, {}, headers);
   }
   const env = getServerEnv();
   if (!supaConfigured(env)) throw new Error("Object storage is not configured.");

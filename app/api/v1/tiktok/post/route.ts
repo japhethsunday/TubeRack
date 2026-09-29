@@ -3,7 +3,8 @@ import { z } from "zod";
 import { requireWorkspace } from "@/src/server/workspace";
 import { postToTikTok } from "@/src/server/tiktok/post";
 import { audit } from "@/src/server/audit";
-import { toErrorResponse } from "@/src/server/errors";
+import { rateLimited, toErrorResponse } from "@/src/server/errors";
+import { limiterFor } from "@/src/server/rate-limit";
 import { parseBody } from "@/src/server/validate";
 
 export const maxDuration = 300;
@@ -26,6 +27,8 @@ const body = z.object({
 export async function POST(request: Request) {
   try {
     const caller = await requireWorkspace("editor");
+    const limit = limiterFor("upload").take(`tiktok:${caller.user.id}`);
+    if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const input = await parseBody(request, body);
     const out = await postToTikTok(caller.workspaceId, caller.user.id, input);
     await audit({ workspaceId: caller.workspaceId, userId: caller.user.id, action: "tiktok.post_started", resourceType: "tiktok_post", resourceId: out.id, metadata: { mode: input.mode } }).catch(() => undefined);

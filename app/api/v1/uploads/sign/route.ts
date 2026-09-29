@@ -39,16 +39,19 @@ export async function POST(request: Request) {
     const input = await parseBody(request, body);
     const file = `${crypto.randomUUID()}.${EXT[input.mime]}`;
     const parts = partCount(input.size);
-    const sign = (key: string) =>
-      storageSignedUpload(key).catch(() => {
+    const sign = (key: string, size: number) =>
+      storageSignedUpload(key, { mime: input.mime, size }).catch(() => {
         throw new BackendError("BACKEND_UNAVAILABLE", "Cloud storage is unreachable right now.");
       });
     if (parts === 1) {
-      const uploadUrl = await sign(`${workspaceId}/uploads/${file}`);
+      const uploadUrl = await sign(`${workspaceId}/uploads/${file}`, input.size);
       return NextResponse.json({ data: { uploadUrl, uploadUrls: [uploadUrl], partBytes: PART_BYTES, fileUrl: `/api/v1/uploads/${file}` } });
     }
     const uploadUrls: string[] = [];
-    for (let i = 0; i < parts; i++) uploadUrls.push(await sign(`${workspaceId}/uploads/${file}.part${i}`));
+    for (let i = 0; i < parts; i++) {
+      const size = i < parts - 1 ? PART_BYTES : input.size - PART_BYTES * (parts - 1);
+      uploadUrls.push(await sign(`${workspaceId}/uploads/${file}.part${i}`, size));
+    }
     return NextResponse.json({ data: { uploadUrl: uploadUrls[0], uploadUrls, partBytes: PART_BYTES, fileUrl: `/api/v1/uploads/${file}?parts=${parts}` } });
   } catch (error) {
     return toErrorResponse(error);

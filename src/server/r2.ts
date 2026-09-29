@@ -90,8 +90,12 @@ function canonicalQuery(q: Record<string, string>) {
     .join("&");
 }
 
-/** A presigned GET/PUT link valid for `expires` seconds. */
-export function r2Presign(method: "GET" | "PUT" | "HEAD", key: string, expires = 3600, extra: Record<string, string> = {}): string {
+/**
+ * A presigned GET/PUT link valid for `expires` seconds. `headers` are signed
+ * too, so the request must send exactly those values (used to pin an upload's
+ * size and type).
+ */
+export function r2Presign(method: "GET" | "PUT" | "HEAD", key: string, expires = 3600, extra: Record<string, string> = {}, headers: Record<string, string> = {}): string {
   const env = r2Env();
   if (!env) throw new Error("R2 is not configured.");
   const { amz, day } = stamp();
@@ -103,9 +107,13 @@ export function r2Presign(method: "GET" | "PUT" | "HEAD", key: string, expires =
     "X-Amz-Credential": `${env.key}/${scope}`,
     "X-Amz-Date": amz,
     "X-Amz-Expires": String(Math.min(604800, Math.max(1, Math.round(expires)))),
-    "X-Amz-SignedHeaders": "host",
+    "X-Amz-SignedHeaders": "",
   };
-  const canonical = [method, path, canonicalQuery(q), `host:${host(env)}\n`, "host", "UNSIGNED-PAYLOAD"].join("\n");
+  const all: Record<string, string> = { host: host(env) };
+  for (const [k, v] of Object.entries(headers)) all[k.toLowerCase()] = String(v).trim();
+  const names = Object.keys(all).sort();
+  q["X-Amz-SignedHeaders"] = names.join(";");
+  const canonical = [method, path, canonicalQuery(q), names.map((n) => `${n}:${all[n]}\n`).join(""), names.join(";"), "UNSIGNED-PAYLOAD"].join("\n");
   const toSign = ["AWS4-HMAC-SHA256", amz, scope, sha256(canonical)].join("\n");
   const sig = createHmac("sha256", signingKey(env.secret, day)).update(toSign).digest("hex");
   return `https://${host(env)}${path}?${canonicalQuery(q)}&X-Amz-Signature=${sig}`;
@@ -224,13 +232,20 @@ export async function r2Diagnose(): Promise<string | null> {
   }
 }
 
-/** Upload a tiny file, fetch it back through a presigned link (as the browser would), then remove it. */
-export async function r2SelfTest(): Promise<{ upload: string; signedGet: string; cors: string }> {
+/** Upload a tiny file through a size/type-pinned link, fetch it back through a presigned link (as the browser would), then remove it. */
+export async function r2SelfTest(): Promise<{ upload: string; signedGet: string; cors: string; strictUploads: string }> {
   const key = `_selftest/${Date.now()}.txt`;
-  const out = { upload: "", signedGet: "", cors: "" };
+  const out = { upload: "", signedGet: "", cors: "", strictUploads: "" };
   try {
-    await r2Put(key, new TextEncoder().encode("ok"), "text/plain");
-    out.upload = "ok";
+    const body = new TextEncoder().encode("ok");
+    const url = r2Presign("PUT", key, 300, {}, { "content-type": "text/plain", "content-length": String(body.byteLength) });
+    const put = await fetch(url, { method: "PUT", headers: { "Content-Type": "text/plain" }, body, signal: AbortSignal.timeout(10_000) });
+    out.upload = put.ok ? "ok" : `${put.status}: ${(await put.text()).slice(0, 200)}`;
+    // A wrong size must be refused.
+    const bad = await fetch(url, { method: "PUT", headers: { "Content-Type": "text/plain" }, body: new TextEncoder().encode("too long"), signal: AbortSignal.timeout(10_000) });
+    out.strictUploads = put.ok && !bad.ok ? "ok" : bad.ok ? "size not enforced" : "upload failed";
+    if (out.strictUploads === "ok") await setStrictUploads(true);
+    if (!put.ok) return out;
   } catch (e) {
     out.upload = e instanceof Error ? e.message : "failed";
     return out;
@@ -245,4 +260,29 @@ export async function r2SelfTest(): Promise<{ upload: string; signedGet: string;
   }
   await r2DeleteMany([key]).catch(() => undefined);
   return out;
+}
+
+/** Pinned-size upload links are used once the self-test has proven they work with this bucket. */
+let strictCache: { at: number; on: boolean } | null = null;
+export async function strictUploadsOn(): Promise<boolean> {
+  if (strictCache && Date.now() - strictCache.at < 60_000) return strictCache.on;
+  let on = false;
+  try {
+    const { getDb } = await import("@/src/server/db");
+    const db = getDb();
+    const [r] = db ? await db`SELECT value FROM admin_settings WHERE key = 'storage_r2'` : [];
+    on = Boolean((r?.value as { strict?: boolean } | undefined)?.strict);
+  } catch {
+    on = false;
+  }
+  strictCache = { at: Date.now(), on };
+  return on;
+}
+
+async function setStrictUploads(on: boolean): Promise<void> {
+  const { getDb } = await import("@/src/server/db");
+  const db = getDb();
+  if (!db) return;
+  await db`UPDATE admin_settings SET value = value || ${JSON.stringify({ strict: on })}::jsonb, updated_at = now() WHERE key = 'storage_r2'`;
+  strictCache = null;
 }

@@ -16,6 +16,8 @@ async function readUpload(workspaceId: string, fileUrl: string): Promise<{ bytes
   if (!m) throw validationError("That video file can't be found. Export it again.");
   const key = `${workspaceId}/uploads/${m[1]}`;
   const parts = Number(m[3] ?? 1);
+  // TikTok's limit is 4 GB, but the whole file is held in memory here: keep it to what a server can safely handle.
+  if (parts > 6) throw validationError("That video is too large to send to TikTok from here (max about 250 MB). Export a shorter or smaller version.");
   if (parts <= 1) return storageGet(key);
   const chunks: Uint8Array[] = [];
   let mime = "video/mp4";
