@@ -4,6 +4,7 @@ import { requireAdmin } from "@/src/server/admin";
 import { getInboxEmail, mailboxAddress, parseAddress } from "@/src/server/inbox";
 import { MAILBOX_SENDER, buildReply } from "@/src/server/admin-mail";
 import { sendEmail } from "@/src/server/email";
+import { founder } from "@/src/server/founder";
 import { getServerEnv } from "@/src/lib/env";
 import { audit } from "@/src/server/audit";
 import { toErrorResponse, validationError } from "@/src/server/errors";
@@ -35,6 +36,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     const mailbox = input.mailbox ?? original.mailbox;
     const from = mailboxAddress(mailbox);
     const app = getServerEnv().APP_URL.replace(/\/$/, "");
+    const ceo = mailbox === "founder" ? await founder() : null;
     const mail = buildReply(mailbox, app, {
       subject: original.subject,
       message: input.message,
@@ -42,7 +44,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       quoted: original.text,
       quotedFrom: original.fromName ? `${original.fromName} <${original.from}>` : original.from,
       receivedAt: original.receivedAt,
-    });
+    }, ceo);
     if (input.preview) return NextResponse.json({ data: { subject: mail.subject, html: mail.html } });
     const to = parseAddress(original.replyTo).address;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) || to.endsWith("@recktube.xyz")) throw validationError("This email has no address to reply to.");
@@ -52,7 +54,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       html: mail.html,
       text: mail.text,
       kind: mailbox === "security" ? "security" : mailbox === "support" ? "support" : "account",
-      fromName: MAILBOX_SENDER[mailbox].name,
+      fromName: ceo ? ceo.fromName : MAILBOX_SENDER[mailbox].name,
       fromAddress: from,
       replyTo: from,
       ...(original.messageId ? { headers: { "In-Reply-To": original.messageId, References: original.messageId } } : {}),

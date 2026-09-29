@@ -4,6 +4,7 @@ import { sendEmail } from "@/src/server/email";
 import { getDb } from "@/src/server/db";
 import { ROLE_LABELS } from "@/src/lib/admin-roles";
 import { MAILBOX_ADDRESS, MAILBOX_SENDER, type Mailbox } from "@/src/server/admin-mail";
+import { founder } from "@/src/server/founder";
 
 const ADMIN_ROLES_LABEL: Record<string, string> = Object.fromEntries(Object.entries(ROLE_LABELS).map(([k, v]) => [k, v.label]));
 
@@ -32,17 +33,19 @@ async function send(
 ): Promise<boolean> {
   try {
     const first = m.name ?? (await firstName(to));
+    const ceo = m.from === "founder" ? await founder() : null;
+    const signoff = ceo ? ceo.signoff : `Questions? Just reply to this email.\n\n${m.from ? MAILBOX_SENDER[m.from].signoff : "The Recktube team"}`;
     const mail = renderEmail({
       preheader: m.preheader,
       eyebrow: m.eyebrow,
       heading: m.heading,
       intro: `${first ? `Hi ${first}, ` : ""}${m.intro}`,
-      blocks: [...(m.blocks ?? []), { type: "text", text: `Questions? Just reply to this email.\n\n${m.from ? MAILBOX_SENDER[m.from].signoff : "The Recktube team"}` }],
+      blocks: [...(m.blocks ?? []), { type: "text", text: signoff }],
       cta: m.cta,
       reason: m.reason,
       appUrl: app(),
     });
-    const res = await sendEmail({ to, subject: m.subject, ...mail, kind: "account", fromName: m.from ? MAILBOX_SENDER[m.from].name : "Recktube", fromAddress: MAILBOX_ADDRESS[m.from ?? "support"], replyTo: MAILBOX_ADDRESS[m.from ?? "support"] });
+    const res = await sendEmail({ to, subject: m.subject, ...mail, kind: "account", fromName: ceo ? ceo.fromName : m.from ? MAILBOX_SENDER[m.from].name : "Recktube", fromAddress: MAILBOX_ADDRESS[m.from ?? "support"], replyTo: MAILBOX_ADDRESS[m.from ?? "support"] });
     return res.sent;
   } catch (error) {
     console.error("admin email failed:", error instanceof Error ? error.message : String(error));
@@ -183,10 +186,10 @@ export function sendTeamMessage(email: string, subject: string, message: string,
     from,
     subject: subject.slice(0, 140),
     preheader: message.slice(0, 110),
-    eyebrow: "Message from the team",
+    eyebrow: from === "founder" ? "A personal note from our founder" : "Message from the team",
     heading: subject.slice(0, 90),
     intro: message.slice(0, 4000),
-    reason: "You're receiving this because the Recktube team sent you a message about your account.",
+    reason: from === "founder" ? "You're receiving this because you have a Recktube account. Reply any time — it reaches me directly." : "You're receiving this because the Recktube team sent you a message about your account.",
   });
 }
 

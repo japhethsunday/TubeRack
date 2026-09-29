@@ -8,6 +8,7 @@ import { openPixelUrl, trackedUrl, unsubscribeUrl } from "@/src/server/unsubscri
 import { backendUnavailable, validationError } from "@/src/server/errors";
 import { parseJsonObject } from "@/src/server/admin-ai";
 import { MAILBOX_ADDRESS, MAILBOX_SENDER, type Mailbox } from "@/src/server/admin-mail";
+import { founder, type Founder } from "@/src/server/founder";
 
 /**
  * Email campaigns to Recktube's own users. Only people who opted in to
@@ -107,6 +108,7 @@ export function renderCampaign(
   c: { name: string; subject: string; content: CampaignContent },
   recipient: { email: string; name: string },
   sendId: string | null,
+  ceo?: Founder | null,
 ): { subject: string; html: string; text: string; listUnsubscribe: string | null } {
   const tag = slug(c.name);
   const link = (u: string) => {
@@ -119,11 +121,11 @@ export function renderCampaign(
     blocks.push({ type: "hero-video", title: c.content.videoTitle || "Watch the video", channel: "Recktube", thumbnail: c.content.videoThumb, url: link(c.content.videoUrl), meta: ["▶ Watch now"] });
   }
   for (const p of c.content.body.split(/\n{2,}/).map((t) => t.trim()).filter(Boolean)) blocks.push({ type: "text", text: p });
-  blocks.push({ type: "text", text: "The Recktube team" });
+  blocks.push({ type: "text", text: ceo ? ceo.signoff : "The Recktube team" });
   const unsub = unsubscribeUrl(recipient.email, "marketing", sendId ?? undefined);
   const mail = renderEmail({
     preheader: c.content.preheader || c.content.body.slice(0, 120),
-    eyebrow: "Recktube",
+    eyebrow: ceo ? "A personal note from our founder" : "Recktube",
     heading: c.content.heading || c.subject,
     intro: first ? `Hi ${first},` : undefined,
     blocks,
@@ -188,8 +190,10 @@ export function assertReady(c: { subject: string; content: CampaignContent }): v
 export async function sendTest(id: string, to: string, name: string) {
   const c = await loadCampaign(id);
   assertReady(c);
-  const mail = renderCampaign(c, { email: to, name }, null);
-  return sendEmail({ to, subject: `[Test] ${mail.subject}`, html: mail.html, text: mail.text, kind: "marketing", fromName: "Recktube", fromAddress: "support@recktube.xyz", replyTo: "support@recktube.xyz", listUnsubscribe: mail.listUnsubscribe ?? undefined });
+  const ceo = c.content.from === "founder" ? await founder() : null;
+  const mail = renderCampaign(c, { email: to, name }, null, ceo);
+  const address = MAILBOX_ADDRESS[c.content.from && c.content.from in MAILBOX_ADDRESS ? c.content.from : "support"];
+  return sendEmail({ to, subject: `[Test] ${mail.subject}`, html: mail.html, text: mail.text, kind: "marketing", fromName: ceo ? ceo.fromName : "Recktube", fromAddress: address, replyTo: address, listUnsubscribe: mail.listUnsubscribe ?? undefined });
 }
 
 /**
@@ -211,7 +215,8 @@ export async function runCampaign(id: string, budgetMs = 240_000): Promise<{ sen
     await d`UPDATE campaigns SET status = 'sending', updated_at = now() WHERE id = ${id}`;
   }
   const box: Mailbox = c.content.from && c.content.from in MAILBOX_ADDRESS ? c.content.from : "support";
-  const sender = { name: box === "support" ? "Recktube" : MAILBOX_SENDER[box].name, address: MAILBOX_ADDRESS[box] };
+  const ceo = box === "founder" ? await founder() : null;
+  const sender = { name: ceo ? ceo.fromName : box === "support" ? "Recktube" : MAILBOX_SENDER[box].name, address: MAILBOX_ADDRESS[box] };
   const started = Date.now();
   let sent = 0;
   let failed = 0;
@@ -228,7 +233,7 @@ export async function runCampaign(id: string, budgetMs = 240_000): Promise<{ sen
         await d`UPDATE campaign_sends SET status = 'skipped' WHERE id = ${r.id}`;
         continue;
       }
-      const mail = renderCampaign(c, { email: String(r.email), name: String(r.name ?? "") }, String(r.id));
+      const mail = renderCampaign(c, { email: String(r.email), name: String(r.name ?? "") }, String(r.id), ceo);
       const res = await sendEmail({
         to: String(r.email),
         subject: mail.subject,

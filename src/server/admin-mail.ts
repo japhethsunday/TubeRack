@@ -478,6 +478,7 @@ export function buildReply(
   mailbox: Mailbox,
   app: string,
   r: { subject: string; message: string; name?: string; quoted?: string | null; quotedFrom: string; receivedAt: string },
+  signer?: { signoff: string } | null,
 ): { subject: string; html: string; text: string } {
   const subject = /^re:/i.test(r.subject.trim()) ? r.subject.trim() : `Re: ${r.subject.trim() || "your message"}`;
   const quote = (r.quoted ?? "").replace(/\r/g, "").trim().slice(0, 1500);
@@ -493,7 +494,7 @@ export function buildReply(
     heading: hi({ name: r.name ?? "" }),
     blocks: [
       ...paragraphs(r.message),
-      { type: "text", text: MAILBOX_SENDER[mailbox].signoff },
+      { type: "text", text: signer?.signoff ?? MAILBOX_SENDER[mailbox].signoff },
       ...(quote ? ([{ type: "divider" }, { type: "text", text: `On ${when}, ${r.quotedFrom} wrote:\n\n${quote}${(r.quoted ?? "").length > 1500 ? "\n…" : ""}` }] as EmailBlock[]) : []),
     ],
   });

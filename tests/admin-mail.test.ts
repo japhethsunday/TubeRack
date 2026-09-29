@@ -39,3 +39,14 @@ describe("admin email defaults", () => {
     assert.ok(ADMIN_TEMPLATES.length >= 19);
   });
 });
+
+describe("founder signature", () => {
+  it("signs founder mail personally as Founder & CEO", async () => {
+    const { founderFrom } = await import("@/src/server/founder");
+    const f = founderFrom("Ada Lovelace");
+    assert.match(f.signoff, /Ada Lovelace\nFounder & CEO, Recktube/);
+    assert.equal(f.fromName, "Ada Lovelace · Recktube");
+    assert.doesNotMatch(f.signoff, /team/i);
+    assert.equal(founderFrom('Eve <x@y>"\r\nBcc: z').fromName.includes("\n"), false);
+  });
+});
