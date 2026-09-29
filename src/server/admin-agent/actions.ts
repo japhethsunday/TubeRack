@@ -7,6 +7,7 @@ import { adjustCredits, setCreditPlan } from "@/src/server/credits";
 import { notifyCreditGift } from "@/src/server/credit-emails";
 import { FEATURES, featureFlags, putSetting } from "@/src/server/admin-ops";
 import { normalizeCode } from "@/src/server/growth/codes";
+import { sendTeamReply } from "@/src/server/support/emails";
 import { AUDIENCES, EMPTY_CONTENT, audienceCounts, runCampaign, type AudienceKey } from "@/src/server/growth/campaigns";
 import { updateAffiliate } from "@/src/server/growth/affiliates";
 import { forbidden, notFound, validationError } from "@/src/server/errors";
@@ -69,6 +70,16 @@ export const ACTIONS = {
     }),
     describe: (a: { subject: string; message: string; from: string; audience: string }) =>
       `Email ${AUDIENCES.find((x) => x.key === a.audience)?.label.toLowerCase() ?? a.audience} from ${a.from}@recktube.xyz: “${a.subject}” — ${a.message.slice(0, 200)}${a.message.length > 200 ? "…" : ""} (branded design, unsubscribe link; people who unsubscribed are skipped)`,
+  },
+  reply_support: {
+    permission: "support.act",
+    args: z.object({
+      conversationId: z.string().uuid(),
+      message: z.string().trim().min(10).max(4000),
+      resolve: z.boolean().default(false),
+    }),
+    describe: (a: { conversationId: string; message: string; resolve: boolean }) =>
+      `Reply in support chat ${a.conversationId.slice(0, 8)}${a.resolve ? " and mark it solved" : ""} (in the app and by email): “${a.message.slice(0, 220)}${a.message.length > 220 ? "…" : ""}”`,
   },
   approve_affiliate: {
     permission: "affiliates.manage",
@@ -196,6 +207,16 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       const r = await runCampaign(String(c.id), 40_000);
       await log({ campaign: String(c.id), audience, from: a.from, reach });
       return `Sending to ${reach} people: ${r.sent} sent now${r.failed ? `, ${r.failed} failed` : ""}${r.remaining ? `, ${r.remaining} more going out shortly` : ""}. Track it under Campaigns.`;
+    }
+    case "reply_support": {
+      const db = adminDb();
+      const [c] = await db`SELECT c.id, c.subject, u.email, u.name, u.email_verified_at FROM support_conversations c JOIN users u ON u.id = c.user_id WHERE c.id = ${a.conversationId}`;
+      if (!c) throw notFound("Support chat");
+      await db`INSERT INTO support_messages (conversation_id, role, body, meta) VALUES (${a.conversationId}, 'admin', ${a.message}, ${JSON.stringify({ by: admin.email, via: "assistant" })})`;
+      await db`UPDATE support_conversations SET user_unread = true, admin_unread = false, status = ${a.resolve ? "resolved" : "handoff"}, updated_at = now() WHERE id = ${a.conversationId}`;
+      const emailed = c.email_verified_at ? (await sendTeamReply(String(c.email), String(c.name), String(c.subject) || "your support request", a.message)).sent : false;
+      await log({ conversation: a.conversationId, emailed, resolved: a.resolve });
+      return `Replied to ${String(c.email)}${emailed ? " (in the app and by email)" : " (in the app)"}${a.resolve ? ", marked solved" : ""}.`;
     }
     case "approve_affiliate": {
       const u = await userByEmail(a.email);

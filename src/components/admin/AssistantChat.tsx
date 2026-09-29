@@ -80,6 +80,15 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
     setBusy(false);
   }
 
+  async function confirmAll(ti: number) {
+    const list = turns[ti]?.proposals ?? [];
+    // One after another, so each is re-checked and logged like a single Confirm.
+    for (let pi = 0; pi < list.length; pi++) {
+      const p = list[pi];
+      if (p.state === "idle" || p.state === "error") await confirm(ti, pi, p);
+    }
+  }
+
   function setProposal(ti: number, pi: number, patch: Partial<Proposal>) {
     setTurns((all) => all.map((t, i) => (i === ti ? { ...t, proposals: t.proposals?.map((p, j) => (j === pi ? { ...p, ...patch } : p)) } : t)));
   }
@@ -193,6 +202,11 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
                   <button type="button" onClick={() => router.push(t.open!)} className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10">
                     Open {t.open.replace(/^\/admin\/?/, "").split("?")[0] || "overview"} →
                   </button>
+                )}
+                {(t.proposals?.filter((p) => p.state === "idle" || p.state === "error").length ?? 0) >= 2 && (
+                  <Button size="sm" onClick={() => void confirmAll(ti)} disabled={t.proposals?.some((p) => p.state === "busy")}>
+                    <Check className="size-3.5" aria-hidden="true" /> Confirm all {t.proposals?.filter((p) => p.state === "idle" || p.state === "error").length}
+                  </Button>
                 )}
                 {t.proposals?.map((p, pi) => (
                   <div key={pi} className="rounded-xl border border-border bg-background/70 p-3">

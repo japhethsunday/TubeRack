@@ -108,3 +108,15 @@ describe("boss mode", () => {
     }
   });
 });
+
+describe("assistant support replies", () => {
+  it("reply_support needs a real chat id and a real message", async () => {
+    const { prepare } = await import("@/src/server/admin-agent/actions");
+    const id = "3f2b6c1e-8a4d-4c2e-9b1a-1234567890ab";
+    const p = prepare("reply_support", { conversationId: id, message: "Thanks for the details, here is how to fix it." });
+    assert.equal(p?.args.resolve, false);
+    assert.match(p!.summary, /Reply in support chat 3f2b6c1e/);
+    assert.equal(prepare("reply_support", { conversationId: "../etc", message: "Thanks for the details, here is how." }), null);
+    assert.equal(prepare("reply_support", { conversationId: id, message: "ok" }), null);
+  });
+});

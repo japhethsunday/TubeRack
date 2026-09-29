@@ -82,13 +82,25 @@ export const TOOLS = {
   },
   support_queue: {
     permission: "support.list",
-    about: "Support chats waiting for a teammate, newest first, with the assistant's hand-over summary.",
+    about: "Support chats waiting for a teammate, newest first: id, the creator's email, subject, the hand-over summary and their latest messages (to draft replies with reply_support).",
     args: z.object({}),
     run: async () => {
       const rows = await adminDb()`
-        SELECT c.subject, c.category, c.handoff_summary, c.updated_at, u.email FROM support_conversations c JOIN users u ON u.id = c.user_id
+        SELECT c.id, c.subject, c.category, c.handoff_summary, c.updated_at, u.email,
+          (SELECT json_agg(x.body ORDER BY x.created_at) FROM (SELECT body, created_at FROM support_messages m WHERE m.conversation_id = c.id AND m.role = 'user' ORDER BY created_at DESC LIMIT 3) x) AS latest
+        FROM support_conversations c JOIN users u ON u.id = c.user_id
         WHERE c.status = 'handoff' ORDER BY c.updated_at DESC LIMIT 10`;
-      return { waiting: rows.map((r) => ({ email: String(r.email), subject: String(r.subject), category: String(r.category), summary: String(r.handoff_summary ?? "").slice(0, 400), updated: new Date(String(r.updated_at)).toISOString().slice(0, 16) })) };
+      return {
+        waiting: rows.map((r) => ({
+          id: String(r.id),
+          email: String(r.email),
+          subject: String(r.subject),
+          category: String(r.category),
+          summary: String(r.handoff_summary ?? "").slice(0, 400),
+          latestMessages: (Array.isArray(r.latest) ? r.latest : []).map((b: unknown) => String(b).slice(0, 500)),
+          updated: new Date(String(r.updated_at)).toISOString().slice(0, 16),
+        })),
+      };
     },
   },
   inbox: {
