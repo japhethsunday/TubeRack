@@ -175,33 +175,38 @@ export function AssistantLauncher() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open the admin assistant"
-          className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-5 z-[70] flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white shadow-xl shadow-violet-900/40 transition-transform hover:scale-105"
+          className="support-launch fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-5 z-[70] flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white shadow-xl shadow-violet-900/40 transition-transform hover:scale-105"
         >
           <span className="support-ring absolute inset-0 rounded-full" aria-hidden="true" />
-          <Bot className="size-6" aria-hidden="true" />
+          <Bot className="relative size-6" aria-hidden="true" />
         </button>
       )}
       {open && (
         <div
           role="dialog"
           aria-label="Admin assistant"
-          className="support-panel fixed inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] top-[calc(0.5rem+env(safe-area-inset-top))] z-[70] flex flex-col overflow-hidden rounded-2xl border border-border bg-elevated shadow-2xl shadow-black/40 sm:inset-x-auto sm:bottom-5 sm:right-5 sm:top-auto sm:h-[min(680px,calc(100dvh-2.5rem))] sm:w-[420px]"
+          className="support-panel fixed inset-x-2 bottom-2 z-[70] flex h-[min(640px,calc(100dvh-1rem))] flex-col overflow-hidden rounded-2xl border border-border bg-elevated shadow-2xl shadow-black/40 sm:inset-x-auto sm:bottom-5 sm:right-5 sm:w-[390px]"
         >
-          <div className="flex items-center gap-3 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-4 py-3 text-white">
-            <span className="flex size-9 items-center justify-center rounded-full bg-white/15">
-              <Bot className="size-5" aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Admin assistant</p>
-              <p className="truncate text-[11px] text-white/80">Changes only happen when you tap Confirm</p>
+          <header className="relative overflow-hidden bg-gradient-to-br from-fuchsia-600 via-violet-700 to-sky-600 px-4 py-3 text-white">
+            <div className="auth-grid absolute inset-0 opacity-50" aria-hidden="true" />
+            <div className="relative flex items-center gap-3">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-white/15">
+                <Bot className="size-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1 leading-tight">
+                <p className="text-sm font-semibold">Admin assistant</p>
+                <p className="flex items-center gap-1.5 truncate text-[11px] text-white/80">
+                  <span className="size-1.5 rounded-full bg-emerald-300" /> Online · changes only happen when you Confirm
+                </p>
+              </div>
+              <Link href="/admin/assistant" onClick={() => setOpen(false)} aria-label="Open full screen" className="rounded-md p-1 hover:bg-white/15">
+                <Maximize2 className="size-4" aria-hidden="true" />
+              </Link>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="rounded-md p-1 hover:bg-white/15">
+                <X className="size-5" aria-hidden="true" />
+              </button>
             </div>
-            <Link href="/admin/assistant" onClick={() => setOpen(false)} aria-label="Open full screen" className="rounded-md p-2 hover:bg-white/15">
-              <Maximize2 className="size-4" aria-hidden="true" />
-            </Link>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="rounded-md p-2 hover:bg-white/15">
-              <X className="size-4" aria-hidden="true" />
-            </button>
-          </div>
+          </header>
           <div className="min-h-0 flex-1">
             <ChatBoundary>
               <AssistantChat turns={turns} setTurns={setTurns} compact />

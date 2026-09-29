@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Check, History, Loader2, Plus, Search, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import { ArrowLeft, Bot, Check, History, MessageSquarePlus, Plus, Search, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import { useAssistantChats } from "@/src/components/admin/AssistantLauncher";
 import { api, ApiError } from "@/src/lib/api";
 import { Button } from "@/src/components/ui/Button";
@@ -89,41 +89,54 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
   }
 
   return (
-      <div className={cx("flex flex-col", compact ? "h-full min-h-0" : "admin-glass min-h-[60vh] rounded-xl border border-border")}>
-        {saved && (
-          <div className="relative flex items-center gap-1 border-b border-white/10 px-3 py-2 text-xs">
-            <button type="button" onClick={() => setShowHistory((v) => !v)} aria-expanded={showHistory} className="flex min-h-8 items-center gap-1.5 rounded-lg px-2.5 text-muted-text hover:bg-white/5 hover:text-foreground">
-              <History className="size-3.5" aria-hidden="true" /> History{saved.chats.length ? ` · ${saved.chats.length}` : ""}
+      <div className={cx("flex flex-col", compact ? "h-full min-h-0" : "h-[calc(100dvh-12rem)] min-h-[480px] overflow-hidden rounded-2xl border border-border bg-elevated shadow-2xl shadow-black/30")}>
+        {saved && !showHistory && (
+          <div className="flex items-center gap-1 border-b border-border px-3 py-1.5 text-xs">
+            <button type="button" onClick={() => setShowHistory(true)} className="flex min-h-8 items-center gap-1.5 rounded-full px-2.5 text-muted-text hover:bg-muted hover:text-foreground">
+              <History className="size-3.5" aria-hidden="true" /> All conversations{saved.chats.length ? ` · ${saved.chats.length}` : ""}
             </button>
-            <button type="button" onClick={() => { saved.newChat(); setShowHistory(false); setError(null); }} disabled={busy} className="ml-auto flex min-h-8 items-center gap-1.5 rounded-lg px-2.5 font-medium text-primary hover:bg-primary/10 disabled:opacity-40">
-              <Plus className="size-3.5" aria-hidden="true" /> New chat
+            <button type="button" onClick={() => { saved.newChat(); setError(null); }} disabled={busy} className="ml-auto flex min-h-8 items-center gap-1.5 rounded-full px-2.5 font-medium text-primary hover:bg-primary/10 disabled:opacity-40">
+              <Plus className="size-3.5" aria-hidden="true" /> New
             </button>
-            {showHistory && (
-              <div className="absolute inset-x-2 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-elevated/95 p-1 shadow-2xl backdrop-blur-xl">
-                {saved.chats.length === 0 && <p className="px-3 py-4 text-center text-muted-text">No saved conversations yet.</p>}
-                {saved.chats.map((c) => (
-                  <div key={c.id} className={cx("group flex items-center gap-1 rounded-lg", c.id === saved.chatId && "bg-primary/10")}>
-                    <button type="button" disabled={busy} onClick={() => { void saved.openChat(c.id).catch(() => setError("Couldn't open that conversation.")); setShowHistory(false); }} className="min-w-0 flex-1 px-3 py-2 text-left hover:text-primary">
-                      <span className="block truncate text-foreground">{c.title || "Conversation"}</span>
-                      <span className="text-[10px] text-muted-text">{new Date(c.updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
-                    </button>
-                    <button type="button" aria-label="Delete conversation" onClick={() => void saved.removeChat(c.id)} className="rounded-md p-2 text-muted-text hover:bg-destructive/10 hover:text-destructive">
-                      <Trash2 className="size-3.5" aria-hidden="true" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
-        <div className={cx("flex-1 space-y-4 overflow-y-auto", compact ? "min-h-0 p-3" : "p-4 sm:p-5")} aria-live="polite">
+        {saved && showHistory ? (
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <button type="button" onClick={() => setShowHistory(false)} className="mb-2 flex items-center gap-1.5 rounded-md px-1 py-1 text-xs text-muted-text hover:text-foreground">
+              <ArrowLeft className="size-3.5" aria-hidden="true" /> Back to chat
+            </button>
+            <button type="button" onClick={() => { saved.newChat(); setShowHistory(false); setError(null); }} className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/50 py-2.5 text-sm font-medium text-primary hover:bg-primary/5">
+              <MessageSquarePlus className="size-4" aria-hidden="true" /> New conversation
+            </button>
+            {saved.chats.length === 0 && <p className="py-6 text-center text-sm text-muted-text">No saved conversations yet.</p>}
+            <ul className="space-y-1.5">
+              {saved.chats.map((c) => (
+                <li key={c.id} className={cx("group flex items-center rounded-xl hover:bg-muted", c.id === saved.chatId && "bg-muted")}>
+                  <button type="button" disabled={busy} onClick={() => { void saved.openChat(c.id).catch(() => setError("Couldn't open that conversation.")); setShowHistory(false); }} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left">
+                    <span className={cx("size-2 shrink-0 rounded-full", c.id === saved.chatId ? "bg-emerald-400" : "bg-sky-400")} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{c.title || "Conversation"}</span>
+                      <span className="block text-[11px] text-muted-text">{new Date(c.updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
+                    </span>
+                  </button>
+                  <button type="button" aria-label="Delete conversation" onClick={() => void saved.removeChat(c.id)} className="mr-1 rounded-md p-2 text-muted-text hover:bg-destructive/10 hover:text-destructive">
+                    <Trash2 className="size-3.5" aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (<>
+        <div className={cx("min-h-0 flex-1 space-y-3 overflow-y-auto", compact ? "p-4" : "p-4 sm:p-5")} aria-live="polite">
           {turns.length === 0 && (
-            <div className="space-y-4 py-6 text-center">
-              <Bot className="mx-auto size-10 text-primary" aria-hidden="true" />
-              <p className="text-sm text-muted-text">Ask anything about Recktube, or tell me what to do.</p>
-              <div className="flex flex-wrap justify-center gap-2">
+            <div className="support-in space-y-3">
+              <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
+                <p className="font-medium">Hello, welcome to the Recktube admin assistant.</p>
+                <p className="mt-1 text-muted-text">Ask anything about the business, look into an account, or tell me what to do. Nothing changes until you tap Confirm.</p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
                 {STARTERS.map((s) => (
-                  <button key={s} type="button" onClick={() => void ask(s)} className="min-h-9 rounded-full border border-border px-3 py-1.5 text-xs hover:bg-muted">
+                  <button key={s} type="button" onClick={() => void ask(s)} className="rounded-full border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary">
                     {s}
                   </button>
                 ))}
@@ -131,8 +144,8 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
             </div>
           )}
           {turns.map((t, ti) => (
-            <div key={ti} className={cx("flex", t.role === "admin" ? "justify-end" : "justify-start")}>
-              <div className={cx("max-w-[92%] space-y-2 rounded-2xl px-4 py-3 text-sm", !compact && "sm:max-w-[80%]", t.role === "admin" ? "bg-primary text-primary-foreground" : "bg-muted/60")}>
+            <div key={ti} className={cx("support-in flex", t.role === "admin" ? "justify-end" : "justify-start")}>
+              <div className={cx("max-w-[85%] space-y-2 rounded-2xl px-3.5 py-2 text-sm leading-relaxed", !compact && "sm:max-w-[75%]", t.role === "admin" ? "rounded-br-md bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white" : "rounded-bl-md bg-muted")}>
                 {!!t.lookups?.length && (
                   <p className="flex flex-wrap items-center gap-1 text-[11px] text-muted-text">
                     <Search className="size-3" aria-hidden="true" /> Checked: {[...new Set(t.lookups)].map((l) => LOOKUP_LABEL[l] ?? l).join(", ")}
@@ -169,51 +182,46 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
             </div>
           ))}
           {busy && (
-            <p className="flex items-center gap-2 text-sm text-muted-text">
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Looking into it…
-            </p>
+            <div className="flex items-center gap-1 px-1" aria-label="The assistant is working">
+              <span className="support-dot" /><span className="support-dot" style={{ animationDelay: "0.15s" }} /><span className="support-dot" style={{ animationDelay: "0.3s" }} />
+            </div>
           )}
           {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
           <div ref={end} />
         </div>
         <form
-          className="border-t border-white/10 p-3"
+          className="flex items-end gap-2 border-t border-border p-3"
+          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
           onSubmit={(e) => {
             e.preventDefault();
             void ask(input);
           }}
         >
-          <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-black/30 p-1.5 pl-4 shadow-inner transition focus-within:border-violet-400/60 focus-within:ring-2 focus-within:ring-violet-500/25">
-            <textarea
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void ask(input);
-                }
-              }}
-              rows={1}
-              maxLength={2000}
-              aria-label="Ask the assistant"
-              placeholder="Ask anything or tell me what to do…"
-              className="max-h-40 min-h-10 flex-1 resize-none bg-transparent py-2.5 text-sm leading-5 outline-none placeholder:text-muted-text"
-            />
-            <button
-              type="submit"
-              disabled={busy || !input.trim()}
-              aria-label="Send"
-              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white shadow-lg shadow-violet-900/40 transition hover:brightness-110 disabled:opacity-40 disabled:shadow-none"
-            >
-              {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Send className="size-4" aria-hidden="true" />}
-            </button>
-          </div>
-          <p className="mt-1.5 px-1 text-[10px] text-muted-text">Enter to send · Shift+Enter for a new line · Nothing changes until you tap Confirm</p>
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void ask(input);
+              }
+            }}
+            rows={1}
+            maxLength={2000}
+            aria-label="Ask the assistant"
+            placeholder="Ask or tell me what to do…"
+            className="max-h-32 min-h-[42px] flex-1 resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-base sm:text-sm"
+          />
+          <button
+            type="submit"
+            disabled={busy || !input.trim()}
+            aria-label="Send"
+            className="flex size-[42px] shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white disabled:opacity-40"
+          >
+            <Send className="size-4" aria-hidden="true" />
+          </button>
         </form>
+        </>)}
       </div>
   );
 }
