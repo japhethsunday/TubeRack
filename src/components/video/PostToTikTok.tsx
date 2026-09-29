@@ -80,6 +80,14 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
   const [progress, setProgress] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
   const cancelled = useRef(false);
+  const abort = useRef<AbortController | null>(null);
+
+  /** Stop any work in progress and close. Once TikTok has the video, it keeps processing on its side. */
+  function close() {
+    cancelled.current = true;
+    abort.current?.abort();
+    onClose();
+  }
 
   useEffect(() => {
     // Clean the connect result out of the address bar.
@@ -107,6 +115,9 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
 
   async function post() {
     setMsg(null);
+    cancelled.current = false;
+    const ac = new AbortController();
+    abort.current = ac;
     try {
       let blob = prerendered?.blob ?? null;
       let mime = prerendered?.mime ?? "video/mp4";
@@ -119,6 +130,7 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
           height: source.render?.height ?? source.comp.canvas.height,
           fps: source.render?.fps ?? source.fps,
           assetFor: source.assetFor,
+          signal: ac.signal,
           onProgress: (p) => setProgress(Math.round(p.ratio * 100)),
         });
         blob = out.blob;
@@ -127,7 +139,8 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
       setPhase("upload");
       setProgress(0);
       const cleanMime = mime.split(";")[0] || "video/mp4";
-      const { fileUrl } = await uploadToCloud(blob, cleanMime, (r) => setProgress(Math.round(r * 100)));
+      const { fileUrl } = await uploadToCloud(blob, cleanMime, (r) => setProgress(Math.round(r * 100)), ac.signal);
+      if (ac.signal.aborted) return;
       setPhase("send");
       const res = await api.post<{ publishId: string }>("/api/v1/tiktok/post", {
         fileUrl,
@@ -156,6 +169,7 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
       setPhase("done");
       setMsg("TikTok is still processing the video. It will appear on your profile once TikTok finishes.");
     } catch (e) {
+      if (ac.signal.aborted || cancelled.current) return;
       setPhase("failed");
       setMsg(e instanceof Error ? e.message : "Posting to TikTok failed.");
     }
@@ -172,7 +186,7 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
   };
 
   return (
-    <Modal title="Post to TikTok" description="Send this video to your TikTok account." onClose={busy ? () => undefined : onClose} wide>
+    <Modal title="Post to TikTok" description="Send this video to your TikTok account." onClose={close} wide>
       <div className="space-y-4">
         {notice && <p className={cx("rounded-lg px-3 py-2 text-sm", notice.ok ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive")}>{notice.text}</p>}
         {!info.connection ? (
@@ -257,7 +271,7 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
             {msg && <p className={cx("rounded-lg px-3 py-2 text-sm", phase === "failed" ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success")}>{phase === "done" && <Check className="mr-1 inline size-4" aria-hidden="true" />}{msg}</p>}
 
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={onClose} disabled={busy}>{phase === "done" ? "Close" : "Cancel"}</Button>
+              <Button variant="outline" onClick={close}>{phase === "done" ? "Close" : "Cancel"}</Button>
               {phase !== "done" && (
                 <Button onClick={() => void post()} disabled={!canPost} loading={busy}>
                   {phase === "failed" ? "Try again" : mode === "draft" ? "Send to TikTok" : "Post"}
