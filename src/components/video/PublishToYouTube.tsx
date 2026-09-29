@@ -166,7 +166,15 @@ export function PublishButton({ source, prerendered, openSignal }: { source: Pub
   );
 }
 
-export function PublishDialog({ source, prerendered, onClose, onRendered }: { source: PublishSource; prerendered: Prerendered | null; onClose: () => void; onRendered?: (video: Prerendered) => void }) {
+export interface AutoPublish {
+  title: string;
+  description: string;
+  tags: string[];
+  onDone: (videoId: string) => void;
+  onFail: (message: string) => void;
+}
+
+export function PublishDialog({ source, prerendered, onClose, onRendered, auto }: { source: PublishSource; prerendered: Prerendered | null; onClose: () => void; onRendered?: (video: Prerendered) => void; auto?: AutoPublish }) {
   const pack = usePackaging();
   const seo = pack.seoFor(source.projectId);
   const primary = pack.primaryTitleFor(source.projectId);
@@ -516,6 +524,50 @@ export function PublishDialog({ source, prerendered, onClose, onRendered }: { so
       run.current.abort = null;
     }
   }
+
+  // Hands-free (Promo autopilot): fill in the prepared copy, publish, report the result.
+  const [autoStage, setAutoStage] = useState<"idle" | "filled" | "started">("idle");
+  useEffect(() => {
+    if (!auto || autoStage !== "idle" || conn === null) return;
+    if (!conn.connected) {
+      auto.onFail("YouTube isn't connected. Connect it on the YouTube page first.");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hands-free run: stop once.
+      setAutoStage("started");
+      return;
+    }
+    setTitle(clampTitle(auto.title || title));
+    if (auto.description) setDescription(auto.description.slice(0, YT_DESCRIPTION_MAX));
+    if (auto.tags.length) setTags(normalizeTags(auto.tags).join(", "));
+    setPrivacy("public");
+    setSchedule("");
+    setAutoStage("filled");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once the connection is known.
+  }, [auto, autoStage, conn]);
+  useEffect(() => {
+    if (!auto || autoStage !== "filled") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hands-free run: advance once.
+    setAutoStage("started");
+    void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- start with the copy filled in above.
+  }, [auto, autoStage]);
+  const reported = useRef(false);
+  useEffect(() => {
+    if (!auto || reported.current) return;
+    if (phase === "done" && result) {
+      reported.current = true;
+      auto.onDone(result.videoId);
+    } else if (phase === "failed") {
+      reported.current = true;
+      auto.onFail(stepsRef.current.find((x) => x.state === "failed")?.detail || "Publishing failed.");
+    }
+  }, [auto, phase, result]);
+  // A validation problem stops the hands-free run too.
+  useEffect(() => {
+    if (auto && formError && !reported.current) {
+      reported.current = true;
+      auto.onFail(formError);
+    }
+  }, [auto, formError]);
 
   function skipFailed() {
     const failed = stepsRef.current.find((s) => s.state === "failed");

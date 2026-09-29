@@ -130,3 +130,14 @@ describe("assistant promo videos", () => {
     assert.equal(prepare("write_promo_videos", { feature: "hack" }), null);
   });
 });
+
+describe("assistant hands-free posting", () => {
+  it("make_and_post_videos is limited to 1-5 videos and says it posts to YouTube", async () => {
+    const { prepare, ACTIONS } = await import("@/src/server/admin-agent/actions");
+    const p = prepare("make_and_post_videos", {});
+    assert.equal(p?.args.count, 2);
+    assert.match(p!.summary, /post them to your YouTube channel, hands-free/);
+    assert.equal(prepare("make_and_post_videos", { count: 6 }), null);
+    assert.equal(ACTIONS.make_and_post_videos.permission, "promo.write");
+  });
+});

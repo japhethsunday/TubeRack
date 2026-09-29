@@ -46,7 +46,8 @@ export async function PATCH(request: Request) {
     let result = "";
     if (b.action === "suspend" || b.action === "reactivate") {
       if (!f.email) throw notFound("User");
-      result = await runAction(admin, role, b.action === "suspend" ? "suspend_user" : "reactivate_user", b.action === "suspend" ? { email: String(f.email), reason: "Safety review" } : { email: String(f.email) });
+      const out = await runAction(admin, role, b.action === "suspend" ? "suspend_user" : "reactivate_user", b.action === "suspend" ? { email: String(f.email), reason: "Safety review" } : { email: String(f.email) });
+      result = typeof out === "string" ? out : out.text;
     }
     await adminDb()`
       UPDATE safety_flags SET status = ${b.action === "dismiss" ? "dismissed" : "actioned"}, resolved_by = ${admin.id}, resolved_at = now() WHERE id = ${b.id}`;

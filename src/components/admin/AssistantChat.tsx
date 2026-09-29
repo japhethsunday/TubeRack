@@ -109,10 +109,12 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
   async function confirm(ti: number, pi: number, p: Proposal) {
     setProposal(ti, pi, { state: "busy" });
     try {
-      const r = await api.put<{ result: string }>("/api/v1/admin/assistant", { token: p.token });
+      const r = await api.put<{ result: string; launch?: string }>("/api/v1/admin/assistant", { token: p.token });
       setProposal(ti, pi, { state: "done", result: r.result });
       // Pages behind the assistant show the change straight away.
       refreshAdminData();
+      // Hands-free video posting continues in this tab (only our own admin page).
+      if (r.launch && /^\/admin\/promo\/run\?ids=[0-9a-f,-]+$/.test(r.launch)) window.setTimeout(() => window.location.assign(r.launch!), 1200);
     } catch (e) {
       setProposal(ti, pi, { state: "error", result: e instanceof ApiError ? e.message : "Couldn't do that." });
     }

@@ -5,7 +5,7 @@ import { ProjectPublish } from "@/src/components/video/ProjectPublish";
 import { ProjectSave } from "@/src/components/video/ProjectSave";
 import { sceneSpeech } from "@/src/lib/script/engine";
 import { useProductionContext } from "@/src/components/projects/useProductionContext";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Clapperboard, Crown, Download, Loader2, TriangleAlert, X } from "lucide-react";
 import { usePaid } from "@/src/lib/use-paid";
@@ -132,11 +132,14 @@ export function GenerateVideoDialog({
   sections,
   wpm,
   onClose,
+  auto,
 }: {
   project: { id: string; name: string; topic: string; platform: string; contentType: string };
   sections: ScriptSection[];
   wpm: number;
   onClose: () => void;
+  /** Hands-free (Promo autopilot): start at once, replace any old edit, report the outcome. */
+  auto?: { onDone: () => void; onFail: (message: string) => void };
 }) {
   const router = useRouter();
   const { putScenes } = useScripts();
@@ -173,7 +176,20 @@ export function GenerateVideoDialog({
     }
   }
 
-  async function run() {
+  // Hands-free: start once, with the old edit replaced (a snapshot is still kept).
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!auto || autoStarted.current || writable.length === 0) return;
+    autoStarted.current = true;
+    const t = window.setTimeout(() => {
+      void run().then((ok) => (ok ? auto.onDone() : auto.onFail(fatalRef.current || "Video generation stopped.")));
+    }, 0);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when the dialog opens.
+  }, []);
+  const fatalRef = useRef("");
+
+  async function run(): Promise<boolean> {
     cancelled.current = false;
     setRunning(true);
     setFatal(null);
@@ -212,7 +228,7 @@ export function GenerateVideoDialog({
       });
       putScenes(project.id, scenes);
       set("scenes", { state: "done", detail: `${scenes.length} scenes` });
-      if (isCancelled()) return;
+      if (isCancelled()) return false;
 
       const made: MediaAsset[] = [];
 
@@ -306,14 +322,14 @@ export function GenerateVideoDialog({
       }
       const rest = scenes.slice(voiced);
       await pool(rest, 2, isCancelled, voiceScene);
-      if (isCancelled()) return;
+      if (isCancelled()) return false;
       // One more calm pass, one at a time, for any scene still without a voice.
       const missing = scenes.filter((sc) => !made.some((a) => a.kind === "voice" && a.sceneIds?.includes(sc.id)));
       if (missing.length) {
         voiced -= missing.length;
         voiceErrors.length = 0;
         for (const sc of missing) {
-          if (isCancelled()) return;
+          if (isCancelled()) return false;
           await new Promise((r) => setTimeout(r, 4000));
           await voiceScene(sc);
         }
@@ -402,7 +418,7 @@ export function GenerateVideoDialog({
         drawn += 1;
         set("visuals", { detail: `${drawn}/${beatJobs.length}` });
       });
-      if (isCancelled()) return;
+      if (isCancelled()) return false;
 
       // Paid: turn the first few AI pictures into real moving shots. A beat keeps its picture if this fails.
       let animated = 0;
@@ -442,7 +458,7 @@ export function GenerateVideoDialog({
             // Keep the still picture for this beat.
           }
         });
-        if (isCancelled()) return;
+        if (isCancelled()) return false;
       }
       // Count scenes that have a visual, not files (a scene can have several stock clips, or a picture plus its AI motion shot).
       const visualOf = (sc: Scene) => made.filter((a) => (a.kind === "image" || a.kind === "video") && a.sceneIds.includes(sc.id));
@@ -514,7 +530,7 @@ export function GenerateVideoDialog({
         }
         set("music", { state: "done", detail: added });
       }
-      if (isCancelled()) return;
+      if (isCancelled()) return false;
 
       if (voiceOk === 0 && imgOk === 0) throw new Error("Neither voice-over nor visuals could be generated, so there is nothing to assemble.");
 
@@ -547,8 +563,11 @@ export function GenerateVideoDialog({
         set("thumbnail", { state: "partial", detail: "Couldn't make one — create it later in the Thumbnail tab" });
       }
       setFinished(true);
+      return true;
     } catch (e) {
-      setFatal(e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Video generation failed.");
+      const message = e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Video generation failed.";
+      fatalRef.current = message;
+      setFatal(message);
       setSteps((all) => all.map((s) => (s.state === "running" ? { ...s, state: "failed" } : s)));
     } finally {
       release();
@@ -557,6 +576,7 @@ export function GenerateVideoDialog({
       if (pass && !built) void api.post("/api/v1/credits/video-pass", { refund: pass }).catch(() => {});
       setRunning(false);
     }
+    return false;
   }
 
   const needsConfirm = existingClips > 0 && !replaceOk;

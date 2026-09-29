@@ -51,7 +51,8 @@ export async function PUT(request: Request) {
     await sharedLimit(`admin-agent-token:${p.nonce}`, 1, 20 * 60).catch(() => {
       throw validationError("This action was already done.");
     });
-    return NextResponse.json({ data: { result: await runAction(admin, role, p.action, p.args) } });
+    const out = await runAction(admin, role, p.action, p.args);
+    return NextResponse.json({ data: typeof out === "string" ? { result: out } : { result: out.text, launch: out.launch } });
   } catch (error) {
     return toErrorResponse(error);
   }

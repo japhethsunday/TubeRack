@@ -15,6 +15,7 @@ import { useScripts } from "@/src/components/script/ScriptProvider";
 import { useMedia } from "@/src/components/media/MediaProvider";
 import { useVideo, VideoStorageNote } from "@/src/components/video/VideoProvider";
 import { useIntelQuery } from "@/src/components/intelligence/chrome";
+import { AutopilotRunner } from "@/src/components/video/AutopilotRunner";
 import { TimelinePro } from "@/src/components/video/TimelinePro";
 import { Preview, fmtTimecode } from "@/src/components/video/Preview";
 import { ScenesPanel, MediaPanel, TextPanel, Inspector, ExportPanel } from "@/src/components/video/panels";
@@ -143,6 +144,14 @@ function Studio() {
     const t = window.setTimeout(() => setShowAutoVideo(true), 0);
     return () => window.clearTimeout(t);
   }, [ready, project]);
+  // Hands-free promo posting (?autopost=<promo id>&queue=<more ids>), started by the admin assistant.
+  const [autopost] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const q = new URLSearchParams(window.location.search);
+    const id = q.get("autopost");
+    const ok = (v: string) => /^[0-9a-f-]{36}$/.test(v);
+    return id && ok(id) ? { id, queue: (q.get("queue") ?? "").split(",").filter(ok).slice(0, 10) } : null;
+  });
   const comp = project ? video.compFor(project.id) : null;
   const scenes = useMemo(() => (project ? scriptsApi.scenesFor(project.id) : []), [project, scriptsApi]);
   const scriptSections = project ? scriptsApi.scriptFor(project.id)?.sections ?? [] : [];
@@ -922,7 +931,10 @@ function Studio() {
         </>
       )}
 
-      {showAutoVideo && <GenerateVideoDialog project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} onClose={() => setShowAutoVideo(false)} />}
+      {autopost && ready && project && (
+        <AutopilotRunner project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} promoId={autopost.id} queue={autopost.queue} />
+      )}
+      {showAutoVideo && !autopost && <GenerateVideoDialog project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} onClose={() => setShowAutoVideo(false)} />}
       {confirmBuild && (
         <Modal title="Rebuild timeline?" description="Replaces every clip on the timeline." onClose={() => setConfirmBuild(false)}>
           <p className="text-sm text-muted-text">

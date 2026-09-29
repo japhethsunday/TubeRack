@@ -7,7 +7,7 @@ import { adjustCredits, setCreditPlan } from "@/src/server/credits";
 import { notifyCreditGift } from "@/src/server/credit-emails";
 import { FEATURES, featureFlags, putSetting } from "@/src/server/admin-ops";
 import { normalizeCode } from "@/src/server/growth/codes";
-import { PROMO_FEATURES, PROMO_STYLES, writePromo } from "@/src/server/growth/promo";
+import { PROMO_FEATURES, PROMO_STYLES, createPromoProject, writePromo } from "@/src/server/growth/promo";
 import { runPromoAutopilot } from "@/src/server/growth/promo-autopilot";
 import { sendTeamReply } from "@/src/server/support/emails";
 import { AUDIENCES, EMPTY_CONTENT, audienceCounts, runCampaign, type AudienceKey } from "@/src/server/growth/campaigns";
@@ -93,6 +93,16 @@ export const ACTIONS = {
     describe: (a: { count: number; feature?: string; angle: string }) =>
       `Write ${a.count} new promo video${a.count === 1 ? "" : "s"} for Recktube${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : " (different features and styles)"}${a.angle ? `, angle: “${a.angle}”` : ""}. They appear on the Promo page, ready to produce.`,
   },
+  make_and_post_videos: {
+    permission: "promo.write",
+    args: z.object({
+      count: z.number().int().min(1).max(5).default(2),
+      feature: z.enum(PROMO_FEATURES.map((f) => f.id) as [string, ...string[]]).optional(),
+      angle: z.string().trim().max(300).default(""),
+    }),
+    describe: (a: { count: number; feature?: string; angle: string }) =>
+      `Make ${a.count} promo video${a.count === 1 ? "" : "s"}${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : ""} and post ${a.count === 1 ? "it" : "them"} to your YouTube channel, hands-free. A studio tab does the work: keep it open about 3–5 minutes per video, then you get the links.`,
+  },
   approve_affiliate: {
     permission: "affiliates.manage",
     args: z.object({ email }),
@@ -141,7 +151,7 @@ async function ownedWorkspace(userId: string): Promise<string> {
 }
 
 /** Run a confirmed action as this admin. Returns a short result line. */
-export async function runAction(admin: SessionUser, role: AdminRole, name: ActionName, rawArgs: unknown): Promise<string> {
+export async function runAction(admin: SessionUser, role: AdminRole, name: ActionName, rawArgs: unknown): Promise<string | { text: string; launch: string }> {
   const spec = ACTIONS[name];
   if (!roleAllows(role, spec.permission)) throw forbidden("Your admin role doesn't allow this action.");
   const parsed = spec.args.safeParse(rawArgs);
@@ -248,6 +258,29 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       }
       await log({ count, made });
       return made ? `Wrote ${made} promo video${made === 1 ? "" : "s"}. Open Promo videos and tap Produce video.` : "Couldn't write the promo videos just now. Try again in a minute.";
+    }
+    case "make_and_post_videos": {
+      const count = Number(a.count);
+      const ids: string[] = [];
+      const seed = Math.floor(Date.now() / 1000);
+      for (let i = 0; i < count; i++) {
+        const feature = String(a.feature || PROMO_FEATURES[(seed + i * 3) % PROMO_FEATURES.length].id);
+        const style = PROMO_STYLES[(seed + i) % PROMO_STYLES.length];
+        try {
+          const pkg = await writePromo({ feature, style, platform: "YouTube Shorts", lengthSec: 30, angle: String(a.angle ?? "") });
+          if (!pkg.scenes.length) continue;
+          const projectId = await createPromoProject(admin, { feature, platform: "YouTube Shorts", pkg });
+          const [r] = await adminDb()`
+            INSERT INTO promo_videos (created_by, feature, style, platform, length_sec, package, source, status, project_id)
+            VALUES (${admin.id}, ${feature}, ${style}, ${"YouTube Shorts"}, ${30}, ${JSON.stringify(pkg)}, 'manual', 'producing', ${projectId}) RETURNING id`;
+          ids.push(String(r.id));
+        } catch (error) {
+          console.error("make_and_post write failed:", error instanceof Error ? error.message : String(error));
+        }
+      }
+      await log({ count, made: ids.length });
+      if (!ids.length) return "Couldn't write the videos just now. Try again in a minute.";
+      return { text: `${ids.length} video${ids.length === 1 ? "" : "s"} written. Opening the studio to make and post ${ids.length === 1 ? "it" : "them"} now. Keep that tab open.`, launch: `/admin/promo/run?ids=${ids.join(",")}` };
     }
     case "approve_affiliate": {
       const u = await userByEmail(a.email);

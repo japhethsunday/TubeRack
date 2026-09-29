@@ -9,7 +9,7 @@ import { Loading, PageTitle, Panel, errorText, when } from "@/src/components/adm
 
 interface Scene { durationSec: number; visual: string; onScreenText: string; narration: string }
 interface Pkg { title: string; hook: string; voiceover: string; scenes: Scene[]; cta: string; thumbnailText: string; captions: { platform: string; title: string; caption: string; hashtags: string[] }[] }
-interface Promo { id: string; feature: string; style: string; platform: string; lengthSec: number; pkg: Pkg; projectId: string | null; createdAt: string; auto?: boolean }
+interface Promo { id: string; feature: string; style: string; platform: string; lengthSec: number; pkg: Pkg; projectId: string | null; createdAt: string; auto?: boolean; status?: string; youtubeUrl?: string | null; lastError?: string }
 interface Data { options: { features: { id: string; name: string; pitch: string }[]; styles: string[]; platforms: string[] }; promos: Promo[] }
 
 const select = "h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm";
@@ -184,7 +184,7 @@ export default function AdminPromo() {
                   {data.promos.map((p) => (
                     <li key={p.id}>
                       <button onClick={() => setOpenId(p.id)} className={cx("w-full px-4 py-3 text-left", openId === p.id ? "bg-primary/10" : "hover:bg-muted")}>
-                        <span className="flex items-center gap-1.5 text-sm font-semibold"><span className="truncate">{p.pkg.title}</span>{p.auto && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">Auto</span>}</span>
+                        <span className="flex items-center gap-1.5 text-sm font-semibold"><span className="truncate">{p.pkg.title}</span>{p.auto && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">Auto</span>}{p.youtubeUrl && <span className="shrink-0 rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] font-medium text-success">Posted</span>}{p.status === "failed" && <span className="shrink-0 rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium text-destructive">Failed</span>}</span>
                         <span className="block text-xs text-muted-text">{feature(p.feature)} · {p.platform} · {p.lengthSec}s · {when(p.createdAt)}{p.projectId ? " · in studio" : ""}</span>
                       </button>
                     </li>
@@ -208,6 +208,9 @@ export default function AdminPromo() {
                     <p><span className="text-xs font-semibold uppercase tracking-wider text-muted-text">Call to action</span><br />{open.pkg.cta}</p>
                     <p><span className="text-xs font-semibold uppercase tracking-wider text-muted-text">Cover text</span><br />{open.pkg.thumbnailText}</p>
                     <div className="flex flex-wrap gap-2 pt-1">
+                      {open.youtubeUrl && (
+                        <a href={open.youtubeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-success px-3 text-sm font-medium text-white hover:opacity-90"><ExternalLink className="size-4" /> Watch on YouTube</a>
+                      )}
                       <Button className="bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 text-white" loading={busy === open.id} onClick={() => void produce(open)}>
                         <Wand2 className="size-4" /> Produce video
                       </Button>
@@ -218,6 +221,7 @@ export default function AdminPromo() {
                         </>
                       )}
                     </div>
+                    {open.status === "failed" && open.lastError && <p className="text-xs text-destructive">Last try: {open.lastError}</p>}
                     <p className="text-xs text-muted-text">Produce video makes the voice-over, visuals, music, captions and thumbnail in Video Studio. Check it, export, and post to YouTube with the title and hashtags below.</p>
                   </div>
                 </Panel>

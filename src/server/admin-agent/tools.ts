@@ -117,6 +117,15 @@ export const TOOLS = {
       return { emails: emails.filter((e) => a.mailbox === "all" || e.mailbox === a.mailbox).slice(0, 20).map((e) => ({ id: e.id, to: `${e.mailbox}@recktube.xyz`, from: e.fromName ? `${e.fromName} <${e.from}>` : e.from, subject: e.subject.slice(0, 160), received: e.receivedAt.slice(0, 16) })) };
     },
   },
+  promo_videos: {
+    permission: "promo.list",
+    about: "Recent promo videos: title, status (ready, producing, posted, failed), YouTube link when posted, and any error.",
+    args: z.object({}),
+    run: async () => {
+      const rows = await adminDb()`SELECT package->>'title' AS title, status, youtube_video_id, last_error, created_at FROM promo_videos ORDER BY created_at DESC LIMIT 12`;
+      return { videos: rows.map((r) => ({ title: String(r.title ?? ""), status: String(r.status), youtube: r.youtube_video_id ? `https://youtu.be/${String(r.youtube_video_id)}` : null, error: String(r.last_error ?? "") || null, made: new Date(String(r.created_at)).toISOString().slice(0, 16) })) };
+    },
+  },
   growth_report: {
     permission: "growth.view",
     about: "Where sign-ups came from in the last N days (1–90): sources/campaigns, referrals, affiliates.",
