@@ -8,6 +8,17 @@ import { BackendError } from "@/src/server/errors";
  * refreshed automatically. Scopes: basic profile, upload drafts, direct post.
  */
 export const TIKTOK_SCOPES = ["user.info.basic", "video.upload", "video.publish"];
+/** Stats scopes: requested only once they're enabled on the TikTok app (TIKTOK_STATS=true). */
+export const TIKTOK_STATS_SCOPES = ["user.info.stats", "video.list"];
+
+export function tiktokStatsEnabled(env = getServerEnv()): boolean {
+  return (env.TIKTOK_STATS ?? "").trim().toLowerCase() === "true";
+}
+
+export function hasTikTokStatsScopes(scopes: string): boolean {
+  const have = scopes.split(/[,\s]+/);
+  return TIKTOK_STATS_SCOPES.every((s) => have.includes(s));
+}
 const API = "https://open.tiktokapis.com/v2";
 
 export function isTikTokConfigured(env = getServerEnv()): boolean {
@@ -32,7 +43,7 @@ export function tiktokRedirectUri(origin: string): string {
 export function tiktokAuthUrl(origin: string, state: string): string {
   const q = new URLSearchParams({
     client_key: (getServerEnv().TIKTOK_CLIENT_KEY ?? "").trim(),
-    scope: TIKTOK_SCOPES.join(","),
+    scope: [...TIKTOK_SCOPES, ...(tiktokStatsEnabled() ? TIKTOK_STATS_SCOPES : [])].join(","),
     response_type: "code",
     redirect_uri: tiktokRedirectUri(origin),
     state,
@@ -224,4 +235,44 @@ export async function uploadChunks(uploadUrl: string, bytes: Uint8Array, mime: s
     });
     if (!res.ok && res.status !== 206) throw new BackendError("BACKEND_UNAVAILABLE", `TikTok upload failed (${res.status}). Try again.`);
   }
+}
+
+export interface TikTokStats {
+  followers: number;
+  following: number;
+  likes: number;
+  videoCount: number;
+  videos: { id: string; title: string; cover: string; url: string; created: string; views: number; likes: number; comments: number; shares: number }[];
+}
+
+/** Account totals and recent videos with their counts (needs the stats scopes). */
+export async function tiktokStats(workspaceId: string): Promise<TikTokStats> {
+  const token = await tiktokAccessToken(workspaceId);
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const [me, list] = await Promise.all([
+    tiktokApi<{ user?: Record<string, unknown> }>("/user/info/?fields=follower_count,following_count,likes_count,video_count", token),
+    tiktokApi<{ videos?: Record<string, unknown>[] }>(
+      "/video/list/?fields=id,title,video_description,cover_image_url,share_url,create_time,view_count,like_count,comment_count,share_count",
+      token,
+      { max_count: 20 },
+    ),
+  ]);
+  const u = me.user ?? {};
+  return {
+    followers: n(u.follower_count),
+    following: n(u.following_count),
+    likes: n(u.likes_count),
+    videoCount: n(u.video_count),
+    videos: (list.videos ?? []).map((v) => ({
+      id: String(v.id ?? ""),
+      title: String(v.title || v.video_description || "Untitled").slice(0, 150),
+      cover: String(v.cover_image_url ?? ""),
+      url: String(v.share_url ?? ""),
+      created: v.create_time ? new Date(n(v.create_time) * 1000).toISOString() : "",
+      views: n(v.view_count),
+      likes: n(v.like_count),
+      comments: n(v.comment_count),
+      shares: n(v.share_count),
+    })),
+  };
 }

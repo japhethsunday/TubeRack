@@ -30,6 +30,8 @@ const serverSchema = z.object({
   // TikTok for Developers app (Login Kit + Content Posting API); server-only.
   TIKTOK_CLIENT_KEY: z.string().optional(),
   TIKTOK_CLIENT_SECRET: z.string().optional(),
+  // "true" once user.info.stats + video.list are added to the TikTok app: asks for them and shows TikTok stats.
+  TIKTOK_STATS: z.string().optional(),
   CF_ACCOUNT_ID: z.string().optional(),
   CF_AI_TEXT_MODELS: z.string().optional(),
 
