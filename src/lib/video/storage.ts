@@ -64,6 +64,7 @@ const compositionSchema = z.object({
     width: z.number(),
     height: z.number(),
     background: z.string().optional(),
+    captionStyle: z.string().optional(),
   }),
   updatedAt: z.string(),
 });

@@ -1,3 +1,4 @@
+import { captionStyleFor, drawStyledCaption } from "@/src/lib/video/caption-styles";
 import type { ClipFilters, Composition, TextStyle, TimelineClip } from "@/src/lib/video/types";
 import { IDENTITY_TRANSFORM, NEUTRAL_FILTERS } from "@/src/lib/video/types";
 import { normalizeTransition } from "@/src/lib/video/presets";
@@ -477,10 +478,16 @@ export function textUnit(W: number, H: number): number {
   return Math.min(W, H) / 378;
 }
 
-function drawCaption(ctx: CanvasRenderingContext2D, clip: TimelineClip, W: number, H: number) {
+function drawCaption(ctx: CanvasRenderingContext2D, clip: TimelineClip, t: number, W: number, H: number, comp: Composition) {
   if (!clip.text) return;
   const unit = textUnit(W, H);
   const st: Partial<TextStyle> = clip.style ?? {};
+  // A caption the creator styled by hand (colour box, size…) keeps its own look.
+  const custom = Boolean(clip.style && (clip.style.background || clip.style.color || clip.style.size));
+  if (!custom) {
+    drawStyledCaption(ctx, clip.text, captionStyleFor(comp.projectId, comp.canvas.captionStyle), { local: t - clip.startSec, dur: clip.durationSec, W, H, unit });
+    return;
+  }
   // Default look: big, heavy white words with an outline and soft shadow
   // (short-form style), sitting above the bottom edge — no boxes behind lines.
   const boxed = Boolean(st.background && st.background !== "transparent");
@@ -518,7 +525,7 @@ export function drawComposition(ctx: CanvasRenderingContext2D, comp: Composition
   const overlays: { color: string; alpha: number }[] = [];
   for (const clip of visualStack(comp, t)) {
     if (clip.kind === "text") drawText(ctx, clip, t, W, H);
-    else if (clip.kind === "captions") drawCaption(ctx, clip, W, H);
+    else if (clip.kind === "captions") drawCaption(ctx, clip, t, W, H, comp);
     else {
       const src = o.sourceFor(clip);
       if (!src) continue;

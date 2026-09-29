@@ -102,6 +102,8 @@ export interface CanvasSettings {
   height: number;
   /** Frame background behind all layers. */
   background?: string;
+  /** Caption look for this video (see caption-styles.ts); unset = picked from the project. */
+  captionStyle?: string;
 }
 
 export interface Composition {

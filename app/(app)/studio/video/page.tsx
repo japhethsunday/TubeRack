@@ -19,6 +19,7 @@ import { TimelinePro } from "@/src/components/video/TimelinePro";
 import { Preview, fmtTimecode } from "@/src/components/video/Preview";
 import { ScenesPanel, MediaPanel, TextPanel, Inspector, ExportPanel } from "@/src/components/video/panels";
 import { GeminiCaptions } from "@/src/components/video/GeminiCaptions";
+import { CaptionStylePicker } from "@/src/components/video/CaptionStylePicker";
 import { PublishButton, type Prerendered } from "@/src/components/video/PublishToYouTube";
 import { PostToTikTokButton } from "@/src/components/video/PostToTikTok";
 import { ClipInspector } from "@/src/components/video/ClipInspector";
@@ -679,6 +680,7 @@ function Studio() {
           }}
         />
       )}
+      <CaptionStylePicker projectId={pid} value={canvas.captionStyle} onChange={(captionStyle) => video.setCanvas(pid, { ...canvas, captionStyle })} />
       <GeminiCaptions clips={clips} assets={assets} onCaptions={commit} />
       <SnapshotsPanel projectId={pid} />
     </div>
