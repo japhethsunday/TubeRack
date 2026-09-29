@@ -15,6 +15,12 @@ export const errorText = (e: unknown) => (e instanceof ApiError ? e.message : "S
 /** Last response per admin API path (this tab only): pages open instantly and refresh in the background. */
 const adminCache = new Map<string, unknown>();
 
+/** Ask every open admin page to reload its data (e.g. after the assistant changed something). */
+export function refreshAdminData(): void {
+  adminCache.clear();
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("admin:refresh"));
+}
+
 export function useAdmin<T>(path: string | null) {
   const [data, setData] = useState<T | null>(() => (path ? ((adminCache.get(path) as T | undefined) ?? null) : null));
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +42,9 @@ export function useAdmin<T>(path: string | null) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- show the cached copy for this path, then refresh.
     if (path && adminCache.has(path)) setData(adminCache.get(path) as T);
     void reload();
+    const again = () => void reload();
+    window.addEventListener("admin:refresh", again);
+    return () => window.removeEventListener("admin:refresh", again);
   }, [reload, path]);
   return { data, error, loading, reload };
 }

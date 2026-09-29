@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { refreshAdminData } from "@/src/components/admin/kit";
 import { ArrowLeft, Bot, Check, History, MessageSquarePlus, Plus, Search, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import { useAssistantChats } from "@/src/components/admin/AssistantLauncher";
 import { api, ApiError } from "@/src/lib/api";
@@ -52,6 +53,17 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
   const end = useRef<HTMLDivElement>(null);
   const saved = useAssistantChats();
   const router = useRouter();
+  const pathname = usePathname();
+  /** Go to an admin page; when it's the page already open, reload it with fresh data. */
+  function go(href: string) {
+    const [path, query = ""] = href.split("?");
+    if (path === pathname) {
+      if (query && `?${query}` !== window.location.search) window.location.assign(href);
+      else refreshAdminData();
+      return;
+    }
+    router.push(href);
+  }
   const [showHistory, setShowHistory] = useState(false);
   useEffect(() => {
     // Braces matter: newer browsers return a Promise from scrollIntoView, and
@@ -70,10 +82,11 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
     try {
       const r = await api.post<{ text: string; proposals: Proposal[]; lookups: string[]; open?: string | null }>("/api/v1/admin/assistant", {
         history: next.map((t) => ({ role: t.role, text: t.text })).slice(-30),
+        page: pathname,
       });
       const open = r.open && /^\/admin(\/[a-z-]+)?(\?q=[^#\s]*)?$/.test(r.open) ? r.open : undefined;
       setTurns((all) => [...all, { role: "assistant", text: r.text, proposals: r.proposals.map((p) => ({ ...p, state: "idle" })), lookups: r.lookups, ...(open ? { open } : {}) }]);
-      if (open) router.push(open);
+      if (open) go(open);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "The assistant couldn't answer. Try again.");
     }
@@ -98,6 +111,8 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
     try {
       const r = await api.put<{ result: string }>("/api/v1/admin/assistant", { token: p.token });
       setProposal(ti, pi, { state: "done", result: r.result });
+      // Pages behind the assistant show the change straight away.
+      refreshAdminData();
     } catch (e) {
       setProposal(ti, pi, { state: "error", result: e instanceof ApiError ? e.message : "Couldn't do that." });
     }
@@ -153,7 +168,7 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
                 <ul className="space-y-1.5">
                   {saved.boss.todos.map((t) => (
                     <li key={t.id}>
-                      <button type="button" onClick={() => router.push(t.href)} className="flex w-full items-start gap-2.5 rounded-xl border border-border px-3 py-2 text-left hover:border-primary">
+                      <button type="button" onClick={() => go(t.href)} className="flex w-full items-start gap-2.5 rounded-xl border border-border px-3 py-2 text-left hover:border-primary">
                         <span className={cx("mt-1.5 size-2 shrink-0 rounded-full", t.tone === "urgent" ? "bg-destructive" : t.tone === "good" ? "bg-emerald-400" : "bg-amber-400")} />
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-medium">{t.title}</span>
@@ -199,7 +214,7 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
                 )}
                 <p className="whitespace-pre-wrap break-words">{t.text}</p>
                 {t.open && (
-                  <button type="button" onClick={() => router.push(t.open!)} className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10">
+                  <button type="button" onClick={() => go(t.open!)} className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10">
                     Open {t.open.replace(/^\/admin\/?/, "").split("?")[0] || "overview"} →
                   </button>
                 )}

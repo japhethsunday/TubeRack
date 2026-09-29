@@ -7,6 +7,8 @@ import { adjustCredits, setCreditPlan } from "@/src/server/credits";
 import { notifyCreditGift } from "@/src/server/credit-emails";
 import { FEATURES, featureFlags, putSetting } from "@/src/server/admin-ops";
 import { normalizeCode } from "@/src/server/growth/codes";
+import { PROMO_FEATURES, PROMO_STYLES, writePromo } from "@/src/server/growth/promo";
+import { runPromoAutopilot } from "@/src/server/growth/promo-autopilot";
 import { sendTeamReply } from "@/src/server/support/emails";
 import { AUDIENCES, EMPTY_CONTENT, audienceCounts, runCampaign, type AudienceKey } from "@/src/server/growth/campaigns";
 import { updateAffiliate } from "@/src/server/growth/affiliates";
@@ -80,6 +82,16 @@ export const ACTIONS = {
     }),
     describe: (a: { conversationId: string; message: string; resolve: boolean }) =>
       `Reply in support chat ${a.conversationId.slice(0, 8)}${a.resolve ? " and mark it solved" : ""} (in the app and by email): “${a.message.slice(0, 220)}${a.message.length > 220 ? "…" : ""}”`,
+  },
+  write_promo_videos: {
+    permission: "promo.write",
+    args: z.object({
+      count: z.number().int().min(1).max(5).default(2),
+      feature: z.enum(PROMO_FEATURES.map((f) => f.id) as [string, ...string[]]).optional(),
+      angle: z.string().trim().max(300).default(""),
+    }),
+    describe: (a: { count: number; feature?: string; angle: string }) =>
+      `Write ${a.count} new promo video${a.count === 1 ? "" : "s"} for Recktube${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : " (different features and styles)"}${a.angle ? `, angle: “${a.angle}”` : ""}. They appear on the Promo page, ready to produce.`,
   },
   approve_affiliate: {
     permission: "affiliates.manage",
@@ -217,6 +229,25 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       const emailed = c.email_verified_at ? (await sendTeamReply(String(c.email), String(c.name), String(c.subject) || "your support request", a.message)).sent : false;
       await log({ conversation: a.conversationId, emailed, resolved: a.resolve });
       return `Replied to ${String(c.email)}${emailed ? " (in the app and by email)" : " (in the app)"}${a.resolve ? ", marked solved" : ""}.`;
+    }
+    case "write_promo_videos": {
+      const count = Number(a.count);
+      let made = 0;
+      if (a.feature || a.angle) {
+        const styles = [...PROMO_STYLES];
+        for (let i = 0; i < count; i++) {
+          const feature = String(a.feature || PROMO_FEATURES[i % PROMO_FEATURES.length].id);
+          const style = styles[(Date.now() + i) % styles.length];
+          const pkg = await writePromo({ feature, style, platform: "YouTube Shorts", lengthSec: 30, angle: String(a.angle ?? "") });
+          if (!pkg.scenes.length) continue;
+          await adminDb()`INSERT INTO promo_videos (created_by, feature, style, platform, length_sec, package, source, status) VALUES (${admin.id}, ${feature}, ${style}, ${"YouTube Shorts"}, ${30}, ${JSON.stringify(pkg)}, 'manual', 'ready')`;
+          made++;
+        }
+      } else {
+        made = (await runPromoAutopilot({ force: true, count, createdBy: admin.id })).made;
+      }
+      await log({ count, made });
+      return made ? `Wrote ${made} promo video${made === 1 ? "" : "s"}. Open Promo videos and tap Produce video.` : "Couldn't write the promo videos just now. Try again in a minute.";
     }
     case "approve_affiliate": {
       const u = await userByEmail(a.email);

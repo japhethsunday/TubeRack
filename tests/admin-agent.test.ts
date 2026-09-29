@@ -120,3 +120,13 @@ describe("assistant support replies", () => {
     assert.equal(prepare("reply_support", { conversationId: id, message: "ok" }), null);
   });
 });
+
+describe("assistant promo videos", () => {
+  it("write_promo_videos defaults to 2 and caps at 5", async () => {
+    const { prepare } = await import("@/src/server/admin-agent/actions");
+    assert.equal(prepare("write_promo_videos", {})?.args.count, 2);
+    assert.match(prepare("write_promo_videos", { count: 3, feature: "video-studio" })!.summary, /Write 3 new promo videos for Recktube about Video Studio/);
+    assert.equal(prepare("write_promo_videos", { count: 9 }), null);
+    assert.equal(prepare("write_promo_videos", { feature: "hack" }), null);
+  });
+});
