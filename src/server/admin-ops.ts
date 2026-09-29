@@ -30,7 +30,7 @@ export type FeatureFlags = Record<string, { off: boolean; message: string }>;
 /** Estimated provider cost per successful generation, in US dollars (editable). */
 export const DEFAULT_COST_RATES: Record<string, number> = { text: 0.002, research: 0.001, transcription: 0.01, tts: 0.015, image: 0.04, video: 0.35 };
 
-async function getSetting<T>(key: string, fallback: T): Promise<T> {
+export async function getSetting<T>(key: string, fallback: T): Promise<T> {
   const db = getDb();
   if (!db) return fallback;
   try {
@@ -46,6 +46,7 @@ export async function putSetting(key: string, value: unknown, userId: string): P
     INSERT INTO admin_settings (key, value, updated_by, updated_at) VALUES (${key}, ${JSON.stringify(value)}::jsonb, ${userId}, now())
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()`;
   if (key === "features") flagCache = null;
+  if (key === "cf_models_off") void import("@/src/server/ai/cloudflare").then((m) => m.resetCfModelsOff());
 }
 
 let flagCache: { at: number; flags: FeatureFlags } | null = null;

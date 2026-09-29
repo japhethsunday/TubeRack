@@ -67,6 +67,8 @@ const auth = (env = getServerEnv()) => ({ Authorization: `Bearer ${(env.CF_AI_TO
 
 /** Models Cloudflare lists for a task (cached 6h), so newly added ones are used too. */
 const catalog = new Map<string, { at: number; ids: string[] }>();
+/** Catalog descriptions by model id (filled by discover). */
+const descriptions = new Map<string, string>();
 async function discover(task: string): Promise<string[]> {
   const hit = catalog.get(task);
   if (hit && Date.now() - hit.at < 6 * 3_600_000) return hit.ids;
@@ -74,7 +76,8 @@ async function discover(task: string): Promise<string[]> {
   try {
     const res = await fetch(`${api()}/models/search?per_page=200&task=${encodeURIComponent(task)}`, { headers: auth(), signal: AbortSignal.timeout(8_000) });
     if (res.ok) {
-      const body = (await res.json()) as { result?: { name?: string }[] };
+      const body = (await res.json()) as { result?: { name?: string; description?: string }[] };
+      for (const m of body.result ?? []) if (m.name && m.description) descriptions.set(m.name, String(m.description).slice(0, 220));
       ids = (body.result ?? []).map((m) => String(m.name ?? "")).filter((n) => n.startsWith("@cf/"));
     }
   } catch {
@@ -84,16 +87,55 @@ async function discover(task: string): Promise<string[]> {
   return ids;
 }
 
-/** Known models first (in quality order), then anything new from the catalog. */
-async function withCatalog(known: string[], task: string, skip: RegExp): Promise<string[]> {
+/** Models the owner switched off in Admin → Feature switches (cached 20s). */
+let offCache: { at: number; off: Set<string> } | null = null;
+async function modelsOff(): Promise<Set<string>> {
+  if (offCache && Date.now() - offCache.at < 20_000) return offCache.off;
+  let off = new Set<string>();
+  try {
+    const { getSetting } = await import("@/src/server/admin-ops");
+    off = new Set(await getSetting<string[]>("cf_models_off", []));
+  } catch {
+    off = new Set();
+  }
+  offCache = { at: Date.now(), off };
+  return off;
+}
+export function resetCfModelsOff(): void {
+  offCache = null;
+}
+
+/** Every usable model for a task: known ones first (in quality order), then anything new from the catalog. */
+async function allFor(known: string[], task: string, skip: RegExp): Promise<string[]> {
   const extra = (await discover(task)).filter((id) => !known.includes(id) && !skip.test(id) && !CF_BLOCKED.test(id));
   return [...known, ...extra];
+}
+
+/** The same list minus models switched off in the admin. */
+async function withCatalog(known: string[], task: string, skip: RegExp): Promise<string[]> {
+  const off = await modelsOff();
+  return (await allFor(known, task, skip)).filter((m) => !off.has(m));
+}
+
+const TEXT_SKIP = /guard|lora$|-base$/i;
+const IMAGE_SKIP = /inpaint|img2img/i;
+const ASR_SKIP = /flux$|smart-turn/i;
+
+/** All Cloudflare models by kind, with their on/off state (for the admin). */
+export async function cloudflareModelSwitches(): Promise<{ kind: "text" | "images" | "captions"; models: { id: string; name: string; author: string; description: string; on: boolean }[] }[]> {
+  const off = await modelsOff();
+  const row = (ids: string[]) => ids.map((id) => ({ id, name: id.split("/").pop() ?? id, author: id.split("/")[1] ?? "", description: descriptions.get(id) ?? "", on: !off.has(id) }));
+  return [
+    { kind: "text", models: row(await allFor(CF_TEXT_MODELS, "Text Generation", TEXT_SKIP)) },
+    { kind: "images", models: row(await allFor(CF_IMAGE_MODELS, "Text-to-Image", IMAGE_SKIP)) },
+    { kind: "captions", models: row(await allFor(CF_ASR_MODELS, "Automatic Speech Recognition", ASR_SKIP)) },
+  ];
 }
 
 export async function cloudflareTextModels(): Promise<string[]> {
   const custom = getServerEnv().CF_AI_TEXT_MODELS?.split(",").map((m) => m.trim()).filter(Boolean);
   if (custom?.length) return custom;
-  return withCatalog(CF_TEXT_MODELS, "Text Generation", /guard|lora$|-base$/i);
+  return withCatalog(CF_TEXT_MODELS, "Text Generation", TEXT_SKIP);
 }
 
 function provider(models: string[]): ChatProvider {
@@ -146,7 +188,7 @@ export async function cloudflareImageWith(model: string, prompt: string, aspect:
 }
 
 export async function cloudflareImageModels(): Promise<string[]> {
-  return withCatalog(CF_IMAGE_MODELS, "Text-to-Image", /inpaint|img2img/i);
+  return withCatalog(CF_IMAGE_MODELS, "Text-to-Image", IMAGE_SKIP);
 }
 
 /** Pictures: each Cloudflare picture model in turn until one answers. */
@@ -206,7 +248,7 @@ export async function cloudflareTranscribeWith(model: string, bytes: Uint8Array)
 /** Captions: each Cloudflare speech model in turn until one gives timed lines. */
 export async function cloudflareTranscribe(bytes: Uint8Array): Promise<{ text: string; segments: MistralSegment[]; model: string }> {
   let last: unknown = new Error("No Cloudflare speech model answered.");
-  for (const model of await withCatalog(CF_ASR_MODELS, "Automatic Speech Recognition", /flux$|smart-turn/i)) {
+  for (const model of await withCatalog(CF_ASR_MODELS, "Automatic Speech Recognition", ASR_SKIP)) {
     try {
       const r = await cloudflareTranscribeWith(model, bytes);
       if (r.segments.length) return r;
@@ -259,7 +301,7 @@ export async function testAllCloudflareModels(): Promise<{
   const [text, images, captions] = await Promise.all([
     pool(await cloudflareTextModels(), 6, (m) => timed(m, async () => (await cloudflareTextWith(m, { prompt: "Say OK.", maxTokens: 20 }, { budgetMs: 45_000, attemptMs: 40_000 })).text.slice(0, 40))),
     pool(await cloudflareImageModels(), 3, (m) => timed(m, async () => `${Math.round(((await cloudflareImageWith(m, "A red apple on a table, photo", "1:1")).length * 3) / 4 / 1024)} KB`)),
-    pool(await withCatalog(CF_ASR_MODELS, "Automatic Speech Recognition", /flux$|smart-turn/i), 2, (m) => timed(m, async () => { await cloudflareTranscribeWith(m, tone); return "answered"; })),
+    pool(await withCatalog(CF_ASR_MODELS, "Automatic Speech Recognition", ASR_SKIP), 2, (m) => timed(m, async () => { await cloudflareTranscribeWith(m, tone); return "answered"; })),
   ]);
   const count = (xs: { ok: boolean }[]) => `${xs.filter((x) => x.ok).length}/${xs.length}`;
   return { summary: `Text ${count(text)} · Pictures ${count(images)} · Captions ${count(captions)}`, text, images, captions };
