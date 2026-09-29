@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Clapperboard, Copy, ExternalLink, Film, Sparkles, Trash2 } from "lucide-react";
+import { Bot, Clapperboard, Copy, ExternalLink, Film, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { api } from "@/src/lib/api";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
@@ -9,7 +9,7 @@ import { Loading, PageTitle, Panel, errorText, when } from "@/src/components/adm
 
 interface Scene { durationSec: number; visual: string; onScreenText: string; narration: string }
 interface Pkg { title: string; hook: string; voiceover: string; scenes: Scene[]; cta: string; thumbnailText: string; captions: { platform: string; title: string; caption: string; hashtags: string[] }[] }
-interface Promo { id: string; feature: string; style: string; platform: string; lengthSec: number; pkg: Pkg; projectId: string | null; createdAt: string }
+interface Promo { id: string; feature: string; style: string; platform: string; lengthSec: number; pkg: Pkg; projectId: string | null; createdAt: string; auto?: boolean }
 interface Data { options: { features: { id: string; name: string; pitch: string }[]; styles: string[]; platforms: string[] }; promos: Promo[] }
 
 const select = "h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm";
@@ -43,6 +43,50 @@ export default function AdminPromo() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
 
+  const [auto, setAuto] = useState<{ enabled: boolean; perDay: number } | null>(null);
+  const [autoMsg, setAutoMsg] = useState<string | null>(null);
+  useEffect(() => {
+    api.get<{ enabled: boolean; perDay: number }>("/api/v1/admin/promo/autopilot").then(setAuto).catch(() => undefined);
+  }, []);
+  async function saveAuto(next: { enabled: boolean; perDay: number }) {
+    setAuto(next);
+    setAutoMsg(null);
+    try {
+      await api.put("/api/v1/admin/promo/autopilot", next);
+      setAutoMsg(next.enabled ? `On: ${next.perDay} new promo${next.perDay === 1 ? "" : "s"} every morning, emailed to you.` : "Autopilot is off.");
+    } catch (e) {
+      setAutoMsg(errorText(e));
+    }
+  }
+  async function makeNow() {
+    if (!auto) return;
+    setBusy("auto");
+    setAutoMsg(null);
+    try {
+      const r = await api.post<{ made: number }>("/api/v1/admin/promo/autopilot", { count: auto.perDay });
+      await load();
+      setAutoMsg(r.made ? `${r.made} new promo${r.made === 1 ? "" : "s"} written.` : "Nothing was written. Try again in a moment.");
+    } catch (e) {
+      setAutoMsg(errorText(e));
+    }
+    setBusy(null);
+  }
+
+  /** Create the studio project (once) and open Video Studio with the one-click generator. */
+  async function produce(p: Promo) {
+    setBusy(p.id);
+    setMsg(null);
+    try {
+      const projectId = p.projectId ?? (await api.post<{ projectId: string }>(`/api/v1/admin/promo/${p.id}`, { action: "project" })).projectId;
+      await load();
+      window.open(`/studio/video?project=${encodeURIComponent(projectId)}&generate=1`, "_blank", "noopener");
+      setMsg({ ok: true, text: "Opened in Video Studio: the voice-over, visuals, music, captions and thumbnail are being made. Then export and post to YouTube." });
+    } catch (e) {
+      setMsg({ ok: false, text: errorText(e) });
+    }
+    setBusy(null);
+  }
+
   const load = useCallback(async () => {
     try {
       setData(await api.get<Data>("/api/v1/admin/promo"));
@@ -51,7 +95,7 @@ export default function AdminPromo() {
     }
   }, []);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load from the backend on first view.
+     
     void load();
   }, [load]);
 
@@ -62,20 +106,6 @@ export default function AdminPromo() {
       const p = await api.post<Promo>("/api/v1/admin/promo", form);
       await load();
       setOpenId(p.id);
-    } catch (e) {
-      setMsg({ ok: false, text: errorText(e) });
-    }
-    setBusy(null);
-  }
-
-  async function makeProject(p: Promo) {
-    setBusy(p.id);
-    setMsg(null);
-    try {
-      const r = await api.post<{ projectId: string }>(`/api/v1/admin/promo/${p.id}`, { action: "project" });
-      await load();
-      setMsg({ ok: true, text: "Project created in your studio — generate the voice-over and visuals, then export in Video Studio." });
-      window.open(`/studio/script?project=${encodeURIComponent(r.projectId)}`, "_blank", "noopener");
     } catch (e) {
       setMsg({ ok: false, text: errorText(e) });
     }
@@ -97,6 +127,28 @@ export default function AdminPromo() {
       {!data ? <Loading error={error} onRetry={() => void load()} /> : (
         <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
           <div className="space-y-4">
+            <Panel title="Autopilot" right={<Bot className="size-4 text-primary" aria-hidden="true" />}>
+              {!auto ? <p className="text-sm text-muted-text">Loading…</p> : (
+                <div className="space-y-3 text-sm">
+                  <label className="flex items-center justify-between gap-3">
+                    <span>
+                      <span className="block font-medium">Write promos every morning</span>
+                      <span className="block text-xs text-muted-text">Different features, styles and angles each day. You get an email; nothing posts without you.</span>
+                    </span>
+                    <input type="checkbox" className="size-5 accent-primary" checked={auto.enabled} onChange={(e) => void saveAuto({ ...auto, enabled: e.target.checked })} aria-label="Promo autopilot" />
+                  </label>
+                  <label className="block space-y-1">
+                    <span className="text-xs text-muted-text">Videos per day: {auto.perDay}</span>
+                    <input type="range" min={1} max={5} value={auto.perDay} onChange={(e) => setAuto({ ...auto, perDay: Number(e.target.value) })} onMouseUp={() => void saveAuto(auto)} onTouchEnd={() => void saveAuto(auto)} onKeyUp={() => void saveAuto(auto)} className="w-full accent-primary" />
+                    {auto.perDay > 2 && <span className="block text-[11px] text-warning">More than 2 a day can look repetitive to YouTube. Grow slowly.</span>}
+                  </label>
+                  <Button variant="outline" className="w-full" loading={busy === "auto"} onClick={() => void makeNow()}>
+                    <Wand2 className="size-4" /> {busy === "auto" ? "Writing…" : "Make today's promos now"}
+                  </Button>
+                  {autoMsg && <p className="text-xs text-muted-text">{autoMsg}</p>}
+                </div>
+              )}
+            </Panel>
             <Panel title="New promo">
               <div className="space-y-3 text-sm">
                 <label className="block space-y-1">
@@ -132,7 +184,7 @@ export default function AdminPromo() {
                   {data.promos.map((p) => (
                     <li key={p.id}>
                       <button onClick={() => setOpenId(p.id)} className={cx("w-full px-4 py-3 text-left", openId === p.id ? "bg-primary/10" : "hover:bg-muted")}>
-                        <span className="block truncate text-sm font-semibold">{p.pkg.title}</span>
+                        <span className="flex items-center gap-1.5 text-sm font-semibold"><span className="truncate">{p.pkg.title}</span>{p.auto && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">Auto</span>}</span>
                         <span className="block text-xs text-muted-text">{feature(p.feature)} · {p.platform} · {p.lengthSec}s · {when(p.createdAt)}{p.projectId ? " · in studio" : ""}</span>
                       </button>
                     </li>
@@ -156,16 +208,17 @@ export default function AdminPromo() {
                     <p><span className="text-xs font-semibold uppercase tracking-wider text-muted-text">Call to action</span><br />{open.pkg.cta}</p>
                     <p><span className="text-xs font-semibold uppercase tracking-wider text-muted-text">Cover text</span><br />{open.pkg.thumbnailText}</p>
                     <div className="flex flex-wrap gap-2 pt-1">
-                      {open.projectId ? (
+                      <Button className="bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 text-white" loading={busy === open.id} onClick={() => void produce(open)}>
+                        <Wand2 className="size-4" /> Produce video
+                      </Button>
+                      {open.projectId && (
                         <>
                           <a href={`/studio/script?project=${encodeURIComponent(open.projectId)}`} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-sm hover:bg-muted"><ExternalLink className="size-4" /> Open script</a>
                           <a href={`/studio/video?project=${encodeURIComponent(open.projectId)}`} target="_blank" rel="noopener" className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm text-primary-foreground hover:opacity-90"><Clapperboard className="size-4" /> Open in Video Studio</a>
                         </>
-                      ) : (
-                        <Button loading={busy === open.id} onClick={() => void makeProject(open)}><Clapperboard className="size-4" /> Create project in my studio</Button>
                       )}
                     </div>
-                    <p className="text-xs text-muted-text">In the studio: generate the voice-over from the script, add visuals per scene (screen recordings of Recktube work best), captions and music, then export 9:16 and post it.</p>
+                    <p className="text-xs text-muted-text">Produce video makes the voice-over, visuals, music, captions and thumbnail in Video Studio. Check it, export, and post to YouTube with the title and hashtags below.</p>
                   </div>
                 </Panel>
                 <Panel title={`Scenes · ${open.pkg.scenes.reduce((a, s) => a + s.durationSec, 0)}s`} right={<CopyBtn text={open.pkg.voiceover} />}>

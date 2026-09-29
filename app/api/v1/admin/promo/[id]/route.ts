@@ -19,7 +19,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     if (!p) throw notFound("Promo");
     if (p.project_id) return NextResponse.json({ data: { projectId: String(p.project_id) } });
     const projectId = await createPromoProject(admin, { feature: String(p.feature), platform: String(p.platform), pkg: p.package as PromoPackage });
-    await db`UPDATE promo_videos SET project_id = ${projectId} WHERE id = ${id}`;
+    await db`UPDATE promo_videos SET project_id = ${projectId}, status = 'produced' WHERE id = ${id}`;
     await audit({ userId: admin.id, action: "admin.promo.project", resourceType: "promo_video", resourceId: id, metadata: { projectId } });
     return NextResponse.json({ data: { projectId } });
   } catch (error) {

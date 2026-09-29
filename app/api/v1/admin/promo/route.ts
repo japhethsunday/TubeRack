@@ -12,13 +12,13 @@ export const maxDuration = 120;
 export async function GET(request: Request) {
   try {
     await requireAdmin(request, "promo.list");
-    const rows = await adminDb()`SELECT id, feature, style, platform, length_sec, package, project_id, created_at FROM promo_videos ORDER BY created_at DESC LIMIT 50`;
+    const rows = await adminDb()`SELECT id, feature, style, platform, length_sec, package, project_id, source, status, created_at FROM promo_videos ORDER BY created_at DESC LIMIT 50`;
     return NextResponse.json({
       data: {
         options: { features: PROMO_FEATURES, styles: PROMO_STYLES, platforms: PROMO_PLATFORMS },
         promos: rows.map((r) => ({
           id: String(r.id), feature: String(r.feature), style: String(r.style), platform: String(r.platform), lengthSec: Number(r.length_sec),
-          pkg: r.package, projectId: r.project_id ? String(r.project_id) : null, createdAt: new Date(String(r.created_at)).toISOString(),
+          pkg: r.package, projectId: r.project_id ? String(r.project_id) : null, auto: r.source === "autopilot", createdAt: new Date(String(r.created_at)).toISOString(),
         })),
       },
     }, { headers: { "Cache-Control": "no-store" } });

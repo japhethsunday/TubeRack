@@ -251,6 +251,8 @@ export async function runDaily() {
     }
   };
   return {
+    // First, so the AI has time before the slower scans.
+    promos: await safe("promos", () => import("@/src/server/growth/promo-autopilot").then((m) => m.runPromoAutopilot())),
     abtests: await safe("abtests", rotateDueTests),
     reminders: await safe("reminders", calendarReminders),
     competitors: await safe("competitors", competitorAlerts),

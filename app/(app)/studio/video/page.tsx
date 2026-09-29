@@ -118,6 +118,8 @@ function Studio() {
     };
   }, []);
   const [showAutoVideo, setShowAutoVideo] = useState(false);
+  // Opened with ?generate=1 (e.g. "Produce video" in the admin Promo page): start the one-click generator once.
+  const autoStarted = useRef(false);
   // Phones start on the simple screen; the full timeline editor is opt-in.
   const [fullEditor, setFullEditor] = useState(false);
   const [mobileSave, setMobileSave] = useState(false);
@@ -131,6 +133,16 @@ function Studio() {
 
   const ready = projectsReady && intelReady && scriptsApi.ready && mediaApi.ready && video.ready;
   const project = projects.find((p) => p.id === selectedId);
+  useEffect(() => {
+    if (autoStarted.current || !ready || !project) return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("generate") !== "1" || q.get("project") !== project.id) return;
+    autoStarted.current = true;
+    q.delete("generate");
+    window.history.replaceState(null, "", `${window.location.pathname}?${q}`);
+    const t = window.setTimeout(() => setShowAutoVideo(true), 0);
+    return () => window.clearTimeout(t);
+  }, [ready, project]);
   const comp = project ? video.compFor(project.id) : null;
   const scenes = useMemo(() => (project ? scriptsApi.scenesFor(project.id) : []), [project, scriptsApi]);
   const scriptSections = project ? scriptsApi.scriptFor(project.id)?.sections ?? [] : [];
