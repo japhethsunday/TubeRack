@@ -1,5 +1,6 @@
 "use client";
 
+import { mediaFetch } from "@/src/lib/media/resolve";
 import { chunkedParts, downloadChunked, streamableUrl } from "@/src/lib/media/chunked";
 import { sharedBlob } from "@/src/lib/video/media-cache";
 import type { RenderAsset } from "@/src/lib/video/render";
@@ -37,7 +38,7 @@ async function fetchBytes(url: string): Promise<ArrayBuffer> {
   let last: unknown = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(60_000) });
+      const res = await mediaFetch(url, { cache: "no-store", signal: AbortSignal.timeout(60_000) });
       if (!res.ok) throw new Error(`download failed (${res.status})`);
       return await res.arrayBuffer();
     } catch (error) {

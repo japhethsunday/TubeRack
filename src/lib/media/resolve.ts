@@ -35,3 +35,12 @@ export async function directMediaUrl(url: string): Promise<string> {
   }
   return p;
 }
+
+/**
+ * fetch() for media: stored files are fetched from their direct signed link.
+ * (Following the app's redirect to the storage host makes browsers send
+ * "Origin: null", which the storage CORS rule rightly refuses.)
+ */
+export async function mediaFetch(url: string, init?: RequestInit): Promise<Response> {
+  return fetch(await directMediaUrl(url), init);
+}

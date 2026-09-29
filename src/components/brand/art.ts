@@ -1,5 +1,7 @@
 "use client";
 
+import { directMediaUrl } from "@/src/lib/media/resolve";
+
 /**
  * Brand images drawn in the browser with the real logo file (never redrawn
  * by AI): YouTube banner 2560×1440 (logo and text inside the 1546×423 safe
@@ -14,7 +16,9 @@ export function loadImg(src: string): Promise<HTMLImageElement> {
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Image couldn't be loaded."));
-    img.src = src;
+    void directMediaUrl(src).then((direct) => {
+      img.src = direct;
+    });
   });
 }
 

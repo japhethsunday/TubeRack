@@ -2,7 +2,7 @@
 import { mixGain, MUSIC_DUCK, trackVolume, voiceRanges } from "@/src/lib/video/mix";
 import { chunkedParts, isChunked, streamableUrl } from "@/src/lib/media/chunked";
 import { sharedBlob } from "@/src/lib/video/media-cache";
-import { directMediaUrl } from "@/src/lib/media/resolve";
+import { directMediaUrl, mediaFetch } from "@/src/lib/media/resolve";
 import { loadAudio } from "@/src/lib/video/audio-load";
 
 import type { Composition, TimelineClip } from "@/src/lib/video/types";
@@ -121,7 +121,9 @@ export function loadImage(src: string, signal?: AbortSignal): Promise<HTMLImageE
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("image failed to load"));
-    img.src = src;
+    void directMediaUrl(src).then((direct) => {
+      img.src = direct;
+    });
   });
   return untilDone(p, signal).catch((e) => {
     img.src = "";
@@ -162,7 +164,7 @@ export function assetUrl(a: RenderAsset | null, kind: string): string | null {
 }
 
 async function decode(ctx: BaseAudioContext, url: string): Promise<AudioBuffer> {
-  const res = await fetch(url);
+  const res = await mediaFetch(url);
   if (!res.ok) throw new Error(`audio fetch failed (${res.status})`);
   return ctx.decodeAudioData(await res.arrayBuffer());
 }

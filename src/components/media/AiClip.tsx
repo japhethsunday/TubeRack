@@ -1,5 +1,6 @@
 "use client";
 
+import { mediaFetch } from "@/src/lib/media/resolve";
 import { useEffect, useState } from "react";
 import { Loader2, Sparkles, X } from "lucide-react";
 import { api, ApiError } from "@/src/lib/api";
@@ -12,7 +13,7 @@ type Aspect = "16:9" | "9:16" | "1:1";
 
 /** Shrink an image to at most 1024px on its long side and return it as a JPEG data URL. */
 async function toDataUrl(src: string): Promise<string> {
-  const blob = await (await fetch(src)).blob();
+  const blob = await (await mediaFetch(src)).blob();
   const bitmap = await createImageBitmap(blob);
   const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");

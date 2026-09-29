@@ -1,5 +1,6 @@
 "use client";
 
+import { mediaFetch } from "@/src/lib/media/resolve";
 import { SvgThumb } from "@/src/components/package/SvgThumb";
 
 import { useEffect, useMemo, useState } from "react";
@@ -123,7 +124,7 @@ export function StorageLibrary() {
     if (asset.source === "upload-session") {
       const url = media.blobUrlFor(asset.id);
       if (url) {
-        const blob = await fetch(url).then((r) => r.blob()).catch(() => null);
+        const blob = await mediaFetch(url).then((r) => r.blob()).catch(() => null);
         if (blob) await media.persistBlob(copy.id, blob).catch(() => undefined);
       }
     }

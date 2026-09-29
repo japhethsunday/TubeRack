@@ -1,5 +1,7 @@
 "use client";
 
+import { mediaFetch } from "@/src/lib/media/resolve";
+
 /**
  * Thumbnail bases reference their photo by app URL (kept in file storage so
  * synced SVG stays small). An SVG loaded through <img> or saved as a file
@@ -24,7 +26,7 @@ export async function inlineSvgImages(svg: string): Promise<string> {
   const inlined = new Map<string, string>();
   await Promise.all(
     urls.map(async (u) => {
-      const res = await fetch(u, { credentials: "same-origin" });
+      const res = await mediaFetch(u, { credentials: "same-origin" });
       if (!res.ok) throw new Error("Thumbnail image is unavailable.");
       inlined.set(u, await toDataUrl(await res.blob()));
     }),

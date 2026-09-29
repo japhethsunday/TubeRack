@@ -1,5 +1,5 @@
 "use client";
-import { directMediaUrl } from "@/src/lib/media/resolve";
+import { directMediaUrl, mediaFetch } from "@/src/lib/media/resolve";
 
 /**
  * Timeline visuals: filmstrip frames for video/image clips and waveform
@@ -93,7 +93,7 @@ export function sharedBlob(url: string): Promise<Blob> {
   if (url.startsWith("blob:") || url.startsWith("data:")) return fetch(url).then((r) => r.blob());
   let p = blobs.get(url);
   if (!p) {
-    p = fetch(url).then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))));
+    p = mediaFetch(url).then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))));
     p.then((b) => b.size > MAX_SHARED_BYTES && blobs.delete(url)).catch(() => blobs.delete(url));
     blobs.set(url, p);
   }

@@ -1,3 +1,4 @@
+import { directMediaUrl } from "@/src/lib/media/resolve";
 import type { TextOverlay } from "@/src/lib/package/types";
 import { storeThumbnailImage } from "@/src/lib/package/svg-images";
 
@@ -42,7 +43,7 @@ export function titleOverlays(headline: string): TextOverlay[] {
 export async function uploadToBase(url: string): Promise<string> {
   const img = new Image();
   img.crossOrigin = "anonymous";
-  img.src = url;
+  img.src = await directMediaUrl(url);
   await img.decode();
   const scale = Math.min(1, 1280 / img.naturalWidth);
   const canvas = document.createElement("canvas");
