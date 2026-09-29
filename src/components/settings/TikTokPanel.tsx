@@ -13,7 +13,7 @@ interface Info {
 }
 
 /** Settings → Connections: connect, see and disconnect the TikTok account. */
-export function ConnectionsPanel() {
+export function ConnectionsPanel({ returnTo = "/settings?tab=connections" }: { returnTo?: string } = {}) {
   const [info, setInfo] = useState<Info | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice] = useState(() => {
@@ -57,7 +57,7 @@ export function ConnectionsPanel() {
                 <Button size="sm" variant="outline" loading={busy} onClick={() => void disconnect()}>Disconnect</Button>
               </div>
             ) : (
-              <a href="/api/v1/tiktok/start?returnTo=%2Fsettings%3Ftab%3Dconnections" className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
+              <a href={`/api/v1/tiktok/start?returnTo=${encodeURIComponent(returnTo)}`} className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
                 <Music2 className="size-4" aria-hidden="true" /> Connect TikTok
               </a>
             )}

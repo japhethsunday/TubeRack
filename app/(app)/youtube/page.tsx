@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { LoadingState } from "@/src/components/ui/feedback";
 import { Breadcrumb } from "@/src/components/ui/data";
 import { ChannelHub } from "@/src/components/growth/ChannelHub";
+import { ConnectionsPanel } from "@/src/components/settings/TikTokPanel";
 
 export default function Page() {
   return (
@@ -11,11 +12,12 @@ export default function Page() {
       <Breadcrumb trail={[{ label: "Dashboard", href: "/dashboard" }, { label: "My Channel" }]} />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">My Channel</h1>
-        <p className="mt-1 max-w-prose text-sm text-muted-text">Your private YouTube Analytics, your uploads, and direct upload and scheduling — all from your connected channel.</p>
+        <p className="mt-1 max-w-prose text-sm text-muted-text">Your private YouTube Analytics, your uploads, and direct upload and scheduling — plus your connected TikTok account.</p>
       </div>
       <Suspense fallback={<LoadingState label="Loading My Channel" />}>
         <ChannelHub />
       </Suspense>
+      <ConnectionsPanel returnTo="/youtube" />
     </div>
   );
 }
