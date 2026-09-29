@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { Component, createContext, useContext, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Bot, Maximize2, X } from "lucide-react";
@@ -11,6 +11,32 @@ import { AssistantChat, type Turn } from "@/src/components/admin/AssistantChat";
  * (phone and desktop), sharing one conversation with the full Assistant page.
  * Lives only in the admin console — separate from the creators' support chat.
  */
+
+/** Keeps an assistant crash inside the chat (with Retry) instead of taking down the page; reports it. */
+export class ChatBoundary extends Component<{ children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: Error) {
+    void fetch("/api/v1/client-errors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: `assistant: ${String(error?.message ?? error)}`.slice(0, 500), path: window.location.pathname, stack: String(error?.stack ?? "").slice(0, 2000) }),
+    }).catch(() => undefined);
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm">
+        <p>The assistant hit a problem. It has been reported.</p>
+        <button type="button" onClick={() => this.setState({ failed: false })} className="rounded-lg bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-4 py-2 font-medium text-white">
+          Retry
+        </button>
+      </div>
+    );
+  }
+}
 
 type TurnsState = [Turn[], React.Dispatch<React.SetStateAction<Turn[]>>];
 const Ctx = createContext<TurnsState | null>(null);
@@ -77,7 +103,9 @@ export function AssistantLauncher() {
             </button>
           </div>
           <div className="min-h-0 flex-1">
-            <AssistantChat turns={turns} setTurns={setTurns} compact />
+            <ChatBoundary>
+              <AssistantChat turns={turns} setTurns={setTurns} compact />
+            </ChatBoundary>
           </div>
         </div>
       )}

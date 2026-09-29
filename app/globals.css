@@ -569,11 +569,52 @@ a[class*="rounded-2xl"][class*="border"]:hover {
 
 /* ---------- Admin console only: glass cards that lift on hover and ease in on load. ---------- */
 .admin-fx {
+  background-color: #07060c;
   background-image:
-    radial-gradient(60rem 40rem at 85% -10%, rgba(139, 92, 246, 0.16), transparent 60%),
-    radial-gradient(50rem 36rem at -10% 110%, rgba(217, 70, 239, 0.1), transparent 60%),
-    radial-gradient(40rem 30rem at 50% 50%, rgba(14, 165, 233, 0.06), transparent 70%);
+    /* glossy light streaks, like light across dark glass */
+    linear-gradient(115deg, transparent 38%, rgba(217, 70, 239, 0.1) 44%, transparent 47%),
+    linear-gradient(115deg, transparent 52%, rgba(139, 92, 246, 0.12) 56%, transparent 60%),
+    linear-gradient(118deg, transparent 70%, rgba(14, 165, 233, 0.08) 73%, transparent 76%),
+    radial-gradient(60rem 40rem at 85% -10%, rgba(139, 92, 246, 0.22), transparent 60%),
+    radial-gradient(50rem 36rem at -10% 110%, rgba(217, 70, 239, 0.14), transparent 60%);
   background-attachment: fixed;
+}
+/* Desktop: the whole console sits in one rounded glass frame. */
+@media (min-width: 1024px) {
+  .admin-fx { padding: 1rem; }
+  .admin-fx .admin-frame {
+    min-height: calc(100dvh - 2rem);
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(12, 10, 20, 0.45);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+    backdrop-filter: blur(22px) saturate(140%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 30px 80px -30px rgba(0, 0, 0, 0.8);
+  }
+  .admin-fx .admin-rail { margin: 1rem 0 1rem 1rem; border-radius: 22px; }
+}
+/* Sidebar: glass panel with a glowing brand-gradient edge. */
+.admin-fx .admin-rail {
+  position: relative;
+  background: rgba(16, 12, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+}
+.admin-fx .admin-rail::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, #d946ef, #7c3aed 50%, #0ea5e9);
+  box-shadow: 0 0 24px 2px rgba(124, 58, 237, 0.55);
+}
+.admin-fx .admin-rail > * { position: relative; }
+.admin-fx .admin-rail > div:first-child { border-color: rgba(255, 255, 255, 0.08); }
+.admin-fx .admin-nav-active {
+  background: linear-gradient(90deg, rgba(192, 38, 211, 0.9), rgba(124, 58, 237, 0.9));
+  box-shadow: 0 8px 22px -10px rgba(168, 85, 247, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 .admin-fx .admin-glass,
 .admin-fx main .grid > [class*="rounded-xl"][class*="border"],

@@ -70,7 +70,7 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
             key={n.href}
             href={n.href}
             onClick={() => setOpen(false)}
-            className={cx("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors", active(n.href) ? "bg-primary/15 text-primary" : "text-muted-text hover:bg-muted hover:text-foreground")}
+            className={cx("flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors", active(n.href) ? "admin-nav-active text-white" : "text-muted-text hover:bg-white/5 hover:text-foreground")}
           >
             <n.icon className="size-4" aria-hidden="true" />
             {n.label}
@@ -87,7 +87,7 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
             key={n.href}
             href={n.href}
             onClick={() => setOpen(false)}
-            className={cx("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors", active(n.href) ? "bg-primary/15 text-primary" : "text-muted-text hover:bg-muted hover:text-foreground")}
+            className={cx("flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors", active(n.href) ? "admin-nav-active text-white" : "text-muted-text hover:bg-white/5 hover:text-foreground")}
           >
             <n.icon className="size-4" aria-hidden="true" />
             {n.label}
@@ -106,19 +106,20 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
   return (
     <AssistantProvider>
     <div className="admin-fx dark min-h-screen bg-background text-foreground">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-border bg-surface lg:flex">{sidebar(false)}</aside>
+      <div className="admin-frame lg:flex">
+      <aside className="admin-rail sticky top-4 z-40 hidden h-[calc(100dvh-2rem)] w-60 shrink-0 flex-col lg:flex">{sidebar(false)}</aside>
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button aria-label="Close menu" className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
-          <aside className="relative flex h-full w-[min(18rem,85vw)] flex-col overflow-y-auto border-r border-border bg-surface pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">{sidebar(true)}</aside>
+          <aside className="admin-rail relative flex h-full w-[min(18rem,85vw)] flex-col overflow-y-auto pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">{sidebar(true)}</aside>
         </div>
       )}
-      <div className="lg:pl-60">
-        <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center pt-[env(safe-area-inset-top)] lg:h-14 lg:pt-0 gap-3 border-b border-border bg-background/90 px-4 backdrop-blur lg:px-8">
+      <div className="min-w-0 flex-1">
+        <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-3 border-b border-white/10 bg-black/40 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl lg:top-4 lg:mx-4 lg:h-14 lg:rounded-2xl lg:border lg:pt-0 lg:px-6">
           <button className="rounded-md p-1.5 text-muted-text hover:bg-muted lg:hidden" aria-label="Open menu" onClick={() => setOpen(true)}>
             <Menu className="size-5" />
           </button>
-          <span className="text-sm font-semibold">{items.find((n) => active(n.href))?.label ?? "Admin"}</span>
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold">{items.find((n) => active(n.href))?.label ?? "Admin"}</span>
           <span className="ml-auto hidden items-center gap-2 rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[11px] font-semibold text-success sm:flex">
             <span className="size-1.5 rounded-full bg-success" /> Secure admin session
           </span>
@@ -136,7 +137,7 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
                     <ul className="grid grid-cols-3 gap-2">
                       {list.map((n) => (
                         <li key={n.href}>
-                          <Link href={n.href} className="flex h-full flex-col items-center gap-1.5 rounded-xl border border-border bg-surface px-1 py-3 text-center text-[11px] font-medium leading-tight active:scale-95">
+                          <Link href={n.href} className="admin-glass flex h-full flex-col items-center gap-1.5 rounded-2xl border border-border px-1 py-3 text-center text-[11px] font-medium leading-tight active:scale-95">
                             <span className="flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary"><n.icon className="size-[18px]" aria-hidden="true" /></span>
                             {n.label}
                           </Link>
@@ -149,6 +150,7 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
             </nav>
           )}
           {children}</main>
+      </div>
       </div>
       <AssistantLauncher />
     </div>

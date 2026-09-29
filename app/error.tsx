@@ -12,8 +12,27 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Phase 12 wires this to real observability; console keeps it honest until then.
     console.error("Route error:", error);
+    const message = String(error?.message ?? error);
+    // A page left open during a deploy can't load the new version's files: reload once to pick them up.
+    if (/ChunkLoadError|Loading chunk|dynamically imported module|Failed to fetch dynamically|importing a module script failed/i.test(message)) {
+      try {
+        if (!sessionStorage.getItem("rt_reloaded_for_deploy")) {
+          sessionStorage.setItem("rt_reloaded_for_deploy", "1");
+          window.location.reload();
+          return;
+        }
+      } catch {
+        // storage blocked: just show the page
+      }
+    }
+    // Report it so the team can see what actually broke (message and place only, no personal data).
+    void fetch("/api/v1/client-errors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: message.slice(0, 500), digest: error?.digest ?? "", path: window.location.pathname, stack: String(error?.stack ?? "").slice(0, 2000) }),
+      keepalive: true,
+    }).catch(() => undefined);
   }, [error]);
 
   return (
@@ -28,7 +47,7 @@ export default function Error({
           <button
             type="button"
             onClick={reset}
-            className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+            className="inline-flex h-10 items-center rounded-lg bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-4 text-sm font-medium text-white hover:opacity-90"
           >
             Try again
           </button>
