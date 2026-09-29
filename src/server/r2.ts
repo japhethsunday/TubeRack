@@ -223,3 +223,26 @@ export async function r2Diagnose(): Promise<string | null> {
     return `Couldn't reach R2 (${err instanceof Error ? err.message : "network error"}) — check R2_ACCOUNT_ID.`;
   }
 }
+
+/** Upload a tiny file, fetch it back through a presigned link (as the browser would), then remove it. */
+export async function r2SelfTest(): Promise<{ upload: string; signedGet: string; cors: string }> {
+  const key = `_selftest/${Date.now()}.txt`;
+  const out = { upload: "", signedGet: "", cors: "" };
+  try {
+    await r2Put(key, new TextEncoder().encode("ok"), "text/plain");
+    out.upload = "ok";
+  } catch (e) {
+    out.upload = e instanceof Error ? e.message : "failed";
+    return out;
+  }
+  try {
+    const res = await fetch(r2Presign("GET", key, 300), { headers: { Origin: "https://www.recktube.xyz" }, signal: AbortSignal.timeout(10_000) });
+    const body = await res.text();
+    out.signedGet = res.ok && body === "ok" ? "ok" : `${res.status}: ${body.slice(0, 200)}`;
+    out.cors = res.headers.get("access-control-allow-origin") ?? "missing";
+  } catch (e) {
+    out.signedGet = e instanceof Error ? e.message : "failed";
+  }
+  await r2DeleteMany([key]).catch(() => undefined);
+  return out;
+}

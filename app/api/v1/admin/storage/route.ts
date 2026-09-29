@@ -4,7 +4,7 @@ import { cleanStorage, GRACE_DAYS, moveToR2 } from "@/src/server/storage-cleaner
 import { audit } from "@/src/server/audit";
 import { toErrorResponse, validationError } from "@/src/server/errors";
 import { putSetting } from "@/src/server/admin-ops";
-import { isR2Active, isR2Configured, r2CorsStatus, r2Diagnose, r2Ping, resetR2ActiveCache } from "@/src/server/r2";
+import { isR2Active, isR2Configured, r2CorsStatus, r2Diagnose, r2Ping, r2SelfTest, resetR2ActiveCache } from "@/src/server/r2";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -15,6 +15,9 @@ const days = (r: Request) => Math.min(30, Math.max(3, Number(new URL(r.url).sear
 export async function GET(request: Request) {
   try {
     await requireAdmin(request, "system");
+    if (new URL(request.url).searchParams.get("r2") === "test") {
+      return NextResponse.json({ data: await r2SelfTest() }, { headers: { "Cache-Control": "no-store" } });
+    }
     if (new URL(request.url).searchParams.get("r2") === "1") {
       const configured = isR2Configured();
       const problem = configured ? await r2Diagnose() : null;

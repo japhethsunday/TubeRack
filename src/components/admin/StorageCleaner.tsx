@@ -73,6 +73,17 @@ export function StorageCleaner() {
             {r2.active ? "Switch new files back to Supabase" : "Switch new files to R2"}
           </Button>
         )}
+        {r2?.reachable && (
+          <Button size="sm" variant="outline" className="mt-2 mr-2" onClick={async () => {
+            setMoveMsg("Testing…");
+            try {
+              const t = await api.get<{ upload: string; signedGet: string; cors: string }>("/api/v1/admin/storage?r2=test");
+              setMoveMsg(`Upload: ${t.upload} · Download link: ${t.signedGet} · CORS: ${t.cors}`);
+            } catch (e) {
+              setMoveMsg(errorText(e));
+            }
+          }}>Test R2 links</Button>
+        )}
         <p className="mt-2 text-xs text-muted-text">This moves older files from Supabase (a batch of about 4 minutes per tap) — links keep working.</p>
         <Button
           size="sm"
