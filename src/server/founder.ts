@@ -23,7 +23,7 @@ let cached: { at: number; value: Founder } | null = null;
 export function founderFrom(name: string): Founder {
   const clean = name.replace(/[<>"\r\n]/g, "").trim().slice(0, 60);
   if (!clean) return { name: "", first: "", title: FOUNDER_TITLE, signoff: `Warm regards,\n\nThe Founder\n${FOUNDER_TITLE}`, fromName: "Recktube Founder" };
-  return { name: clean, first: clean.split(/\s+/)[0], title: FOUNDER_TITLE, signoff: `Warm regards,\n\n${clean}\n${FOUNDER_TITLE}`, fromName: `${clean} · Recktube` };
+  return { name: clean, first: clean.split(/\s+/)[0], title: FOUNDER_TITLE, signoff: `Warm regards,\n\n${clean}\n${FOUNDER_TITLE}`, fromName: clean };
 }
 
 export async function founder(): Promise<Founder> {

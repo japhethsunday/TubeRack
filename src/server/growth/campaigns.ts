@@ -129,7 +129,7 @@ export function renderCampaign(
     preheader: c.content.preheader || c.content.body.slice(0, 120),
     eyebrow: ceo ? "A personal note from our founder" : "Recktube",
     heading: c.content.heading || c.subject,
-    intro: first ? `Hi ${first},` : undefined,
+    intro: ceo ? `Dear ${first || "creator"},` : first ? `Hi ${first},` : undefined,
     blocks,
     cta: c.content.ctaLabel ? { label: c.content.ctaLabel, url: link(c.content.ctaUrl || "/dashboard") } : undefined,
     reason: "You're receiving this because you chose to get product news and tips from Recktube.",

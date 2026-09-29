@@ -42,7 +42,7 @@ function senderAddress(from: string): string {
 export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
   const env = getServerEnv();
   if (!env.RESEND_API_KEY) return { sent: false, reason: "Email is not configured (RESEND_API_KEY)." };
-  const name = (request.fromName ?? "").replace(/[<>"]/g, "").trim();
+  const name = (request.fromName ?? "").replace(/[<>"\\\r\n]/g, "").trim();
   // Deliverability: a real mailbox for replies, and one-click unsubscribe on
   // everything that isn't account/security mail (Gmail & Yahoo sender rules).
   const replyTo = request.replyTo ?? "support@recktube.xyz";
@@ -55,7 +55,7 @@ export async function sendEmail(request: EmailRequest): Promise<EmailResult> {
     headers["List-Unsubscribe"] = url ? `<${url}>, <mailto:support@recktube.xyz?subject=unsubscribe>` : "<mailto:support@recktube.xyz?subject=unsubscribe>";
     if (url) headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
   }
-  const from = (address: string) => (name ? `${name} <${address}>` : address === senderAddress(env.EMAIL_FROM) ? env.EMAIL_FROM : address);
+  const from = (address: string) => (name ? `"${name}" <${address}>` : address === senderAddress(env.EMAIL_FROM) ? env.EMAIL_FROM : address);
   const post = (sender: string) =>
     fetch("https://api.resend.com/emails", {
       method: "POST",

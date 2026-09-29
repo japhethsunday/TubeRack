@@ -39,7 +39,7 @@ async function send(
       preheader: m.preheader,
       eyebrow: m.eyebrow,
       heading: m.heading,
-      intro: `${first ? `Hi ${first}, ` : ""}${m.intro}`,
+      intro: ceo ? `Dear ${first || "creator"},\n\n${m.intro}` : `${first ? `Hi ${first}, ` : ""}${m.intro}`,
       blocks: [...(m.blocks ?? []), { type: "text", text: signoff }],
       cta: m.cta,
       reason: m.reason,
