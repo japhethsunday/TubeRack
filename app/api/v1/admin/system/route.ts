@@ -8,10 +8,11 @@ import { getServerEnv } from "@/src/lib/env";
 import { audit } from "@/src/server/audit";
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
+import { cloudflareGenerateText, isCloudflareAiConfigured } from "@/src/server/ai/cloudflare";
 
 export const maxDuration = 300;
 
-const body = z.object({ action: z.enum(["run-daily", "test-email"]) });
+const body = z.object({ action: z.enum(["run-daily", "test-email", "test-cloudflare-ai"]) });
 
 /** POST /api/v1/admin/system — maintenance: run the daily job now, or send a test email to yourself. */
 export async function POST(request: Request) {
@@ -22,6 +23,16 @@ export async function POST(request: Request) {
       const result = await runDaily();
       await audit({ userId: admin.id, action: "admin.system.run-daily", metadata: { result: JSON.stringify(result).slice(0, 400) } });
       return NextResponse.json({ data: result });
+    }
+    if (action === "test-cloudflare-ai") {
+      if (!isCloudflareAiConfigured()) return NextResponse.json({ data: { ok: false, error: "CF_AI_TOKEN isn't set." } });
+      const started = Date.now();
+      try {
+        const r = await cloudflareGenerateText({ prompt: "Reply with one short sentence confirming you are working.", maxTokens: 60 }, { budgetMs: 60_000 });
+        return NextResponse.json({ data: { ok: true, model: r.model, reply: r.text.slice(0, 200), ms: Date.now() - started } });
+      } catch (e) {
+        return NextResponse.json({ data: { ok: false, error: e instanceof Error ? e.message.slice(0, 300) : "failed" } });
+      }
     }
     const app = getServerEnv().APP_URL.replace(/\/$/, "");
     const mail = renderEmail({

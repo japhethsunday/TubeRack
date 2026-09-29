@@ -13,8 +13,8 @@ export default function AdminSystem() {
   const [busy, setBusy] = useState<string | null>(null);
   const [out, setOut] = useState<string | null>(null);
 
-  async function run(action: "run-daily" | "test-email", confirmText: string) {
-    if (!window.confirm(confirmText)) return;
+  async function run(action: "run-daily" | "test-email" | "test-cloudflare-ai", confirmText: string) {
+    if (confirmText && !window.confirm(confirmText)) return;
     setBusy(action);
     setOut(null);
     try {
@@ -51,6 +51,11 @@ export default function AdminSystem() {
               <div className="font-medium">Send a test email</div>
               <p className="mb-2 text-xs text-muted-text">Sends a branded test email to your admin address to confirm email delivery works.</p>
               <Button size="sm" variant="outline" loading={busy === "test-email"} onClick={() => void run("test-email", "Send a test email to yourself?")}><Mail className="size-4" aria-hidden="true" /> Send test email</Button>
+            </div>
+            <div>
+              <div className="font-medium">Test Cloudflare AI</div>
+              <p className="mb-2 text-xs text-muted-text">Asks the free Cloudflare text backup for a one-line reply and shows which model answered.</p>
+              <Button size="sm" variant="outline" loading={busy === "test-cloudflare-ai"} onClick={() => void run("test-cloudflare-ai", "")}><Play className="size-4" aria-hidden="true" /> Test now</Button>
             </div>
             {out && <pre className="max-h-64 overflow-auto rounded-lg bg-background p-3 text-xs">{out}</pre>}
           </div>
