@@ -469,6 +469,10 @@ export function Preview({
     if (!playing) return;
     lastTick.current = performance.now();
     let t = state.current.playhead;
+    // The frame is drawn at full rate here; the rest of the studio (timeline,
+    // time readout) only needs ~15 updates a second, so it isn't re-rendered
+    // 60 times a second while playing.
+    let lastReport = 0;
     const tick = (now: number) => {
       const s = state.current;
       t += (now - lastTick.current) / 1000;
@@ -488,11 +492,18 @@ export function Preview({
       syncVideos(t, true);
       syncAudio(t);
       draw(t);
-      onPlayhead(Math.round(t * 1000) / 1000);
+      if (now - lastReport >= 66) {
+        lastReport = now;
+        onPlayhead(Math.round(t * 1000) / 1000);
+      }
       frame.current = requestAnimationFrame(tick);
     };
     frame.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame.current);
+    return () => {
+      cancelAnimationFrame(frame.current);
+      // Pausing: hand back the exact frame shown, not the last throttled report.
+      if (t < state.current.duration) onPlayhead(Math.round(t * 1000) / 1000);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing]);
 

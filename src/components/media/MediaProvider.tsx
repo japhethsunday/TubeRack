@@ -1,5 +1,6 @@
 "use client";
 
+import { deferSave } from "@/src/lib/defer-save";
 import { loadLocal, removeLocal, saveLocal } from "@/src/lib/media/local-store";
 import { downloadStored, isChunked, isStoredUpload } from "@/src/lib/media/chunked";
 
@@ -253,16 +254,18 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    try {
-      const { assets, voices, consistency } = bundle;
-      localStorage.setItem(MEDIA_STORAGE_KEY, JSON.stringify({ version: 1 as const, assets, voices, consistency }));
-    } catch {
-      // Quota/private mode: session continues in memory. Disclosed in UI.
-    }
-    if (!cloud) return;
-    const tomb = { deletedAssetIds: [...new Set(tombstones.current.assets)] };
-    schedulePush("media", { ...bundle, ...tomb }, () => {
-      tombstones.current = { assets: [] };
+    deferSave("media", () => {
+      try {
+        const { assets, voices, consistency } = bundle;
+        localStorage.setItem(MEDIA_STORAGE_KEY, JSON.stringify({ version: 1 as const, assets, voices, consistency }));
+      } catch {
+        // Quota/private mode: session continues in memory. Disclosed in UI.
+      }
+      if (!cloud) return;
+      const tomb = { deletedAssetIds: [...new Set(tombstones.current.assets)] };
+      schedulePush("media", { ...bundle, ...tomb }, () => {
+        tombstones.current = { assets: [] };
+      });
     });
   }, [bundle, ready, cloud]);
 

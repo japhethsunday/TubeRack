@@ -1,5 +1,6 @@
 "use client";
 
+import { deferSave } from "@/src/lib/defer-save";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { LoopItem, Scene, Script, ScriptSection } from "@/src/lib/script/types";
 import {
@@ -109,21 +110,23 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
   const lastWritten = useRef("");
   useEffect(() => {
     if (!ready) return;
-    // Nothing changed since the last save: skip the write and the state update.
-    const serialized = JSON.stringify(bundle);
-    if (serialized === lastWritten.current) return;
-    lastWritten.current = serialized;
-    try {
-      localStorage.setItem(SCRIPTS_STORAGE_KEY, serialized);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- status reflects the external write above; the effect exists to sync storage.
-      setSavedAt(new Date().toISOString());
-    } catch {
-      // Quota/private mode: session continues in memory. Disclosed in UI.
-    }
-    if (!cloud) return;
-    const tomb = { deletedScripts: [...new Set(tombstones.current.scripts)] };
-    schedulePush("scripts", { ...bundle, ...tomb }, () => {
-      tombstones.current = { scripts: [] };
+    deferSave("scripts", () => {
+      // Nothing changed since the last save: skip the write and the state update.
+      const serialized = JSON.stringify(bundle);
+      if (serialized === lastWritten.current) return;
+      lastWritten.current = serialized;
+      try {
+        localStorage.setItem(SCRIPTS_STORAGE_KEY, serialized);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- status reflects the external write above; the effect exists to sync storage.
+        setSavedAt(new Date().toISOString());
+      } catch {
+        // Quota/private mode: session continues in memory. Disclosed in UI.
+      }
+      if (!cloud) return;
+      const tomb = { deletedScripts: [...new Set(tombstones.current.scripts)] };
+      schedulePush("scripts", { ...bundle, ...tomb }, () => {
+        tombstones.current = { scripts: [] };
+      });
     });
   }, [bundle, ready, cloud]);
 

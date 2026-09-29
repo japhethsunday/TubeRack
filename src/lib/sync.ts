@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { api, ApiError } from "@/src/lib/api";
+import { flushSaves } from "@/src/lib/defer-save";
 import type { SyncKind } from "@/src/lib/sync-map";
 
 /**
@@ -250,6 +251,8 @@ function ensureLifecycleHooks() {
   if (hooked || typeof window === "undefined") return;
   hooked = true;
   const flushAll = () => {
+    // Write any saves still waiting out a typing burst, so they're sent too.
+    flushSaves();
     for (const [kind, p] of queue) {
       if (p.inFlight) continue;
       // keepalive lets the request finish after the tab closes (≤ 64 KB bodies).

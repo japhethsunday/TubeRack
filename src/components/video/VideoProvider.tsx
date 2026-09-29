@@ -1,5 +1,6 @@
 "use client";
 
+import { deferSave } from "@/src/lib/defer-save";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   Composition,
@@ -145,41 +146,43 @@ export function VideoProvider({ children }: { children: React.ReactNode }) {
   const lastWritten = useRef("");
   useEffect(() => {
     if (!ready) return;
-    // Identical content (e.g. a refresh that brought nothing new): no write, no
-    // state update — re-rendering on every no-op fed an update loop.
-    const serialized = JSON.stringify(bundle);
-    if (serialized === lastWritten.current) return;
-    lastWritten.current = serialized;
-    try {
-      localStorage.setItem(VIDEO_STORAGE_KEY, serialized);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- status reflects the external write above.
-      setSavedAt(new Date().toISOString());
-    } catch {
-      // Quota/private mode: session continues in memory. Disclosed in UI.
-    }
-    if (!cloud) return;
-    const tomb = {
-      deletedRequestIds: [...new Set(tombstones.current.requests)],
-      deletedCompositions: [...new Set(tombstones.current.compositions)],
-    };
-    // Send only the projects whose timeline or snapshots changed since the
-    // last successful save (every edit used to re-upload every project).
-    const snapsOf = (pid: string) => bundle.snapshots.filter((sn) => sn.data.projectId === pid);
-    const changed = bundle.compositions.filter((c) => sentRef.current.get(c.projectId) !== JSON.stringify([c, snapsOf(c.projectId)]));
-    const stamps = new Map(changed.map((c) => [c.projectId, JSON.stringify([c, snapsOf(c.projectId)])]));
-    const requestsChanged = JSON.stringify(bundle.requests) !== sentRequests.current;
-    if (!changed.length && !requestsChanged && !tomb.deletedCompositions.length && !tomb.deletedRequestIds.length) return;
-    const body = {
-      ...bundle,
-      compositions: changed,
-      snapshots: changed.flatMap((c) => snapsOf(c.projectId)),
-      ...tomb,
-    };
-    const requestsStamp = JSON.stringify(bundle.requests);
-    schedulePush("video", body, () => {
-      tombstones.current = { requests: [], compositions: [] };
-      for (const [pid, stamp] of stamps) sentRef.current.set(pid, stamp);
-      sentRequests.current = requestsStamp;
+    deferSave("video", () => {
+      // Identical content (e.g. a refresh that brought nothing new): no write, no
+      // state update — re-rendering on every no-op fed an update loop.
+      const serialized = JSON.stringify(bundle);
+      if (serialized === lastWritten.current) return;
+      lastWritten.current = serialized;
+      try {
+        localStorage.setItem(VIDEO_STORAGE_KEY, serialized);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- status reflects the external write above.
+        setSavedAt(new Date().toISOString());
+      } catch {
+        // Quota/private mode: session continues in memory. Disclosed in UI.
+      }
+      if (!cloud) return;
+      const tomb = {
+        deletedRequestIds: [...new Set(tombstones.current.requests)],
+        deletedCompositions: [...new Set(tombstones.current.compositions)],
+      };
+      // Send only the projects whose timeline or snapshots changed since the
+      // last successful save (every edit used to re-upload every project).
+      const snapsOf = (pid: string) => bundle.snapshots.filter((sn) => sn.data.projectId === pid);
+      const changed = bundle.compositions.filter((c) => sentRef.current.get(c.projectId) !== JSON.stringify([c, snapsOf(c.projectId)]));
+      const stamps = new Map(changed.map((c) => [c.projectId, JSON.stringify([c, snapsOf(c.projectId)])]));
+      const requestsChanged = JSON.stringify(bundle.requests) !== sentRequests.current;
+      if (!changed.length && !requestsChanged && !tomb.deletedCompositions.length && !tomb.deletedRequestIds.length) return;
+      const body = {
+        ...bundle,
+        compositions: changed,
+        snapshots: changed.flatMap((c) => snapsOf(c.projectId)),
+        ...tomb,
+      };
+      const requestsStamp = JSON.stringify(bundle.requests);
+      schedulePush("video", body, () => {
+        tombstones.current = { requests: [], compositions: [] };
+        for (const [pid, stamp] of stamps) sentRef.current.set(pid, stamp);
+        sentRequests.current = requestsStamp;
+      });
     });
   }, [bundle, ready, cloud]);
 

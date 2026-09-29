@@ -1,5 +1,6 @@
 "use client";
 
+import { deferSave } from "@/src/lib/defer-save";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ActivityKind,
@@ -210,31 +211,33 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    try {
-      localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(bundle));
-    } catch {
-      // Quota/private mode: session continues in memory. Disclosed in UI.
-    }
-    if (!cloud) return;
-    const sent = { projects: [...tombstones.current.projects], channels: [...tombstones.current.channels] };
-    schedulePush(
-      "workspace",
-      {
-        projects: bundle.projects,
-        channels: bundle.channels,
-        events: bundle.events.slice(0, 200),
-        deletedProjectIds: sent.projects,
-        deletedChannelIds: sent.channels,
-      },
-      () => {
-        // Only clear the tombstones this push actually carried.
-        tombstones.current = {
-          projects: tombstones.current.projects.filter((id) => !sent.projects.includes(id)),
-          channels: tombstones.current.channels.filter((id) => !sent.channels.includes(id)),
-        };
-        writePendingDeletes(tombstones.current);
-      },
-    );
+    deferSave("workspace", () => {
+      try {
+        localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(bundle));
+      } catch {
+        // Quota/private mode: session continues in memory. Disclosed in UI.
+      }
+      if (!cloud) return;
+      const sent = { projects: [...tombstones.current.projects], channels: [...tombstones.current.channels] };
+      schedulePush(
+        "workspace",
+        {
+          projects: bundle.projects,
+          channels: bundle.channels,
+          events: bundle.events.slice(0, 200),
+          deletedProjectIds: sent.projects,
+          deletedChannelIds: sent.channels,
+        },
+        () => {
+          // Only clear the tombstones this push actually carried.
+          tombstones.current = {
+            projects: tombstones.current.projects.filter((id) => !sent.projects.includes(id)),
+            channels: tombstones.current.channels.filter((id) => !sent.channels.includes(id)),
+          };
+          writePendingDeletes(tombstones.current);
+        },
+      );
+    });
   }, [bundle, ready, cloud]);
 
   // Pick up changes made on other devices when this tab regains focus.

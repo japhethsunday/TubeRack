@@ -1,5 +1,6 @@
 "use client";
 
+import { deferSave } from "@/src/lib/defer-save";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { lenientParse } from "@/src/lib/lenient";
@@ -189,13 +190,15 @@ export function IntelProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    try {
-      localStorage.setItem(INTEL_STORAGE_KEY, JSON.stringify(bundle));
-    } catch {
-      // Quota/private mode: session continues in memory. Disclosed in UI.
-    }
-    if (!cloud) return;
-    schedulePush("intel", { ...bundle, deletedOpportunityIds: [] });
+    deferSave("intel", () => {
+      try {
+        localStorage.setItem(INTEL_STORAGE_KEY, JSON.stringify(bundle));
+      } catch {
+        // Quota/private mode: session continues in memory. Disclosed in UI.
+      }
+      if (!cloud) return;
+      schedulePush("intel", { ...bundle, deletedOpportunityIds: [] });
+    });
   }, [bundle, ready, cloud]);
 
   // Pick up changes made on other devices when this tab regains focus.

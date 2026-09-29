@@ -1,5 +1,6 @@
 "use client";
 
+import { deferSave } from "@/src/lib/defer-save";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AnalyticsSnapshot,
@@ -126,20 +127,22 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    try {
-      localStorage.setItem(ANALYTICS_STORAGE_KEY, JSON.stringify(bundle));
-    } catch {
-      // Quota/private mode: session continues in memory. Disclosed in UI.
-    }
-    if (!cloud) return;
-    const tomb = {
-      deletedEntryIds: [...new Set(tombstones.current.entries)],
-      deletedRetentionIds: [...new Set(tombstones.current.retention)],
-      deletedSignalIds: [...new Set(tombstones.current.signals)],
-      deletedSnapshotIds: [...new Set(tombstones.current.snapshots)],
-    };
-    schedulePush("analytics", { ...bundle, ...tomb }, () => {
-      tombstones.current = { entries: [], retention: [], signals: [], snapshots: [] };
+    deferSave("analytics", () => {
+      try {
+        localStorage.setItem(ANALYTICS_STORAGE_KEY, JSON.stringify(bundle));
+      } catch {
+        // Quota/private mode: session continues in memory. Disclosed in UI.
+      }
+      if (!cloud) return;
+      const tomb = {
+        deletedEntryIds: [...new Set(tombstones.current.entries)],
+        deletedRetentionIds: [...new Set(tombstones.current.retention)],
+        deletedSignalIds: [...new Set(tombstones.current.signals)],
+        deletedSnapshotIds: [...new Set(tombstones.current.snapshots)],
+      };
+      schedulePush("analytics", { ...bundle, ...tomb }, () => {
+        tombstones.current = { entries: [], retention: [], signals: [], snapshots: [] };
+      });
     });
   }, [bundle, ready, cloud]);
 

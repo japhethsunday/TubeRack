@@ -1,5 +1,6 @@
 "use client";
 
+import { deferSave } from "@/src/lib/defer-save";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ApprovalStage,
@@ -232,20 +233,22 @@ export function PackagingProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    try {
-      localStorage.setItem(PACKAGE_STORAGE_KEY, JSON.stringify(bundle));
-    } catch {
-      // Quota/private mode: session continues in memory. Disclosed in UI.
-    }
-    if (!cloud) return;
-    const tomb = {
-      deletedVariantIds: [...new Set(tombstones.current.variants)],
-      deletedTitleIds: [...new Set(tombstones.current.titles)],
-      deletedItemIds: [...new Set(tombstones.current.items)],
-      deletedProjects: [] as string[],
-    };
-    schedulePush("packaging", { ...bundle, ...tomb }, () => {
-      tombstones.current = { variants: [], titles: [], items: [] };
+    deferSave("packaging", () => {
+      try {
+        localStorage.setItem(PACKAGE_STORAGE_KEY, JSON.stringify(bundle));
+      } catch {
+        // Quota/private mode: session continues in memory. Disclosed in UI.
+      }
+      if (!cloud) return;
+      const tomb = {
+        deletedVariantIds: [...new Set(tombstones.current.variants)],
+        deletedTitleIds: [...new Set(tombstones.current.titles)],
+        deletedItemIds: [...new Set(tombstones.current.items)],
+        deletedProjects: [] as string[],
+      };
+      schedulePush("packaging", { ...bundle, ...tomb }, () => {
+        tombstones.current = { variants: [], titles: [], items: [] };
+      });
     });
   }, [bundle, ready, cloud]);
 

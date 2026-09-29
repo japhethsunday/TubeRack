@@ -83,7 +83,7 @@ export function SupportWidget() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- open once when arriving from an email link.
     if (new URLSearchParams(window.location.search).get("support") === "open") setOpen(true);
     void loadList();
-    const id = window.setInterval(() => void loadList(), 60_000);
+    const id = window.setInterval(() => document.visibilityState === "visible" && void loadList(), 60_000);
     return () => window.clearInterval(id);
   }, [signedIn, loadList]);
 

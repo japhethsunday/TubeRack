@@ -27,7 +27,8 @@ export function MobileTables() {
       }
     };
     const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(label);
+      // Desktop never needs labels: skip the work on every page change.
+      if (!frame && mq.matches) frame = requestAnimationFrame(label);
     };
     schedule();
     const obs = new MutationObserver(schedule);

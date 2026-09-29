@@ -35,7 +35,7 @@ export function useUnreadCount(enabled: boolean): [number, () => void] {
   }, [enabled]);
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 120_000);
+    const t = setInterval(() => document.visibilityState === "visible" && void refresh(), 120_000);
     return () => clearInterval(t);
   }, [refresh]);
   return [count, refresh];
