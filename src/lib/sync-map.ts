@@ -344,6 +344,12 @@ export function fromEventRow(row: Record<string, unknown>): Record<string, unkno
   };
 }
 
+function num(v: unknown): number | undefined {
+  if (v === null || v === undefined || v === "") return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 export function fromAssetRow(row: Record<string, unknown>): Record<string, unknown> {
   return {
     id: row.id,
@@ -355,11 +361,12 @@ export function fromAssetRow(row: Record<string, unknown>): Record<string, unkno
     title: row.title,
     payload: row.payload ?? "",
     mime: row.mime ?? "",
-    durationSec: row.duration_sec ?? undefined,
-    width: row.width ?? undefined,
-    height: row.height ?? undefined,
-    fileSize: row.file_size ?? undefined,
-    seed: row.seed ?? undefined,
+    // Numbers can arrive as text (bigint/numeric columns); the client expects numbers.
+    durationSec: num(row.duration_sec),
+    width: num(row.width),
+    height: num(row.height),
+    fileSize: num(row.file_size),
+    seed: num(row.seed),
     tags: row.tags ?? [],
     approval: row.approval,
     error: row.error ?? undefined,

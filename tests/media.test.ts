@@ -105,7 +105,12 @@ describe("media storage", () => {
     const bundle = emptyMediaBundle();
     assert.deepEqual(parseMediaBundle(JSON.parse(JSON.stringify(bundle))), bundle);
     assert.throws(() => parseMediaBundle({}), /media file/);
-    assert.throws(() => parseMediaBundle({ version: 1, assets: [{ id: 1 }], voices: [], consistency: [] }), /media file/);
+    // One unreadable item is skipped; the rest of the library still loads.
+    assert.deepEqual(parseMediaBundle({ version: 1, assets: [{ id: 1 }], voices: [], consistency: [] }).assets, []);
+    const good = { id: "a1", projectId: "p", sceneIds: [], kind: "image", source: "provider-output", status: "ready", title: "Art", payload: "/api/v1/generated/x", mime: "image/png", tags: [], approval: "approved", createdAt: "2026-01-01", updatedAt: "2026-01-01" };
+    const out = parseMediaBundle({ version: 1, assets: [{ ...good, fileSize: "12345", width: null }, { id: 2 }], voices: [], consistency: [] });
+    assert.equal(out.assets.length, 1);
+    assert.equal(out.assets[0].fileSize, 12345);
   });
 });
 

@@ -68,7 +68,40 @@ export function emptyMediaBundle(): MediaBundle {
   return { version: 1, assets: [], voices: [], consistency: [] };
 }
 
+/** Keep every valid item; skip (and report) only the ones that don't fit, never the whole list. */
+function keepValid<T>(schema: z.ZodType<T>, items: unknown, label: string): T[] {
+  if (!Array.isArray(items)) return [];
+  const out: T[] = [];
+  for (const item of items) {
+    const r = schema.safeParse(item);
+    if (r.success) out.push(r.data);
+    else console.error(`skipped a ${label} that couldn't be read:`, r.error.issues[0]?.path.join("."), r.error.issues[0]?.message);
+  }
+  return out;
+}
+
 export function parseMediaBundle(data: unknown): MediaBundle {
+  const raw = (data ?? {}) as { version?: unknown; assets?: unknown; voices?: unknown; consistency?: unknown };
+  if (raw.version === 1 && Array.isArray(raw.assets)) {
+    // Coerce numeric fields that may arrive as text, then validate item by item.
+    const assets = raw.assets.map((a) => {
+      if (!a || typeof a !== "object") return a;
+      const o = { ...(a as Record<string, unknown>) };
+      for (const k of ["durationSec", "width", "height", "fileSize", "seed"]) {
+        if (o[k] === null || o[k] === "") delete o[k];
+        else if (typeof o[k] === "string" && Number.isFinite(Number(o[k]))) o[k] = Number(o[k]);
+      }
+      return o;
+    });
+    const bundle: MediaBundle = {
+      version: 1,
+      assets: keepValid(assetSchema, assets, "media item") as MediaAsset[],
+      voices: keepValid(voiceSchema, raw.voices, "voice") as VoiceProfile[],
+      consistency: keepValid(consistencySchema, raw.consistency, "style setting") as ConsistencySettings[],
+    };
+    for (const a of bundle.assets) a.title = a.title.replace(/^Gemini take\b/, "Voice take").replace(/^Gemini art\b/, "Art").replace(/\bGemini\b/g, "Generated");
+    return bundle;
+  }
   const parsed = bundleSchema.safeParse(data);
   if (!parsed.success) {
     throw new Error(
