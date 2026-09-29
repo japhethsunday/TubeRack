@@ -619,7 +619,7 @@ a[class*="rounded-2xl"][class*="border"]:hover {
   border: 1px solid rgba(255, 255, 255, 0.08);
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
-  overflow: hidden;
+  overflow: clip;
 }
 .admin-fx .admin-rail::before {
   /* the curved, glowing band from the reference, in brand colours */

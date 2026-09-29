@@ -115,7 +115,9 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
     <AssistantProvider>
     <div className="admin-fx dark min-h-screen bg-background text-foreground">
       <div className="admin-frame lg:flex">
-      <aside className="admin-rail sticky top-4 z-40 hidden h-[calc(100dvh-2rem)] w-60 shrink-0 flex-col lg:flex">{sidebar(false)}</aside>
+      <aside className="admin-rail z-40 hidden w-60 shrink-0 self-stretch lg:block">
+        <div className="sticky top-4 flex h-[calc(100dvh-4rem)] max-h-full flex-col">{sidebar(false)}</div>
+      </aside>
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button aria-label="Close menu" className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />

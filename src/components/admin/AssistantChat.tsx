@@ -138,30 +138,42 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
           <div ref={end} />
         </div>
         <form
-          className="flex items-end gap-2 border-t border-border p-3"
+          className="border-t border-white/10 p-3"
           onSubmit={(e) => {
             e.preventDefault();
             void ask(input);
           }}
         >
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void ask(input);
-              }
-            }}
-            rows={1}
-            maxLength={2000}
-            aria-label="Ask the assistant"
-            placeholder="e.g. Give ada@example.com 200 credits for the bug she reported"
-            className="max-h-40 min-h-11 flex-1 resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-          />
-          <Button type="submit" className="h-11" disabled={busy || !input.trim()} aria-label="Send">
-            <Send className="size-4" aria-hidden="true" />
-          </Button>
+          <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-black/30 p-1.5 pl-4 shadow-inner transition focus-within:border-violet-400/60 focus-within:ring-2 focus-within:ring-violet-500/25">
+            <textarea
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void ask(input);
+                }
+              }}
+              rows={1}
+              maxLength={2000}
+              aria-label="Ask the assistant"
+              placeholder="Ask anything or tell me what to do…"
+              className="max-h-40 min-h-10 flex-1 resize-none bg-transparent py-2.5 text-sm leading-5 outline-none placeholder:text-muted-text"
+            />
+            <button
+              type="submit"
+              disabled={busy || !input.trim()}
+              aria-label="Send"
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white shadow-lg shadow-violet-900/40 transition hover:brightness-110 disabled:opacity-40 disabled:shadow-none"
+            >
+              {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Send className="size-4" aria-hidden="true" />}
+            </button>
+          </div>
+          <p className="mt-1.5 px-1 text-[10px] text-muted-text">Enter to send · Shift+Enter for a new line · Nothing changes until you tap Confirm</p>
         </form>
       </div>
   );
