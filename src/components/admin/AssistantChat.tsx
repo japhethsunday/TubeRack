@@ -39,7 +39,11 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [turns, busy]);
+  useEffect(() => {
+    // Braces matter: newer browsers return a Promise from scrollIntoView, and
+    // an effect must never return anything but a cleanup function.
+    end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [turns, busy]);
 
   async function ask(text: string) {
     const q = text.trim();

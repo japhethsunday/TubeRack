@@ -36,7 +36,9 @@ export function Modal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   useDismiss(onClose);
-  useEffect(() => panelRef.current?.focus(), []);
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
 
   return (
     <Portal>
@@ -95,7 +97,9 @@ export function Drawer({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   useDismiss(onClose);
-  useEffect(() => panelRef.current?.focus(), []);
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
 
   return (
     <Portal>
