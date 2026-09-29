@@ -566,3 +566,58 @@ a[class*="rounded-2xl"][class*="border"]:hover {
     overflow-x: visible !important;
   }
 }
+
+/* ---------- Admin console only: glass cards that lift on hover and ease in on load. ---------- */
+.admin-fx {
+  background-image:
+    radial-gradient(60rem 40rem at 85% -10%, rgba(139, 92, 246, 0.16), transparent 60%),
+    radial-gradient(50rem 36rem at -10% 110%, rgba(217, 70, 239, 0.1), transparent 60%),
+    radial-gradient(40rem 30rem at 50% 50%, rgba(14, 165, 233, 0.06), transparent 70%);
+  background-attachment: fixed;
+}
+.admin-fx .admin-glass,
+.admin-fx main .grid > [class*="rounded-xl"][class*="border"],
+.admin-fx main .grid > [class*="rounded-2xl"][class*="border"] {
+  background-color: rgba(24, 16, 40, 0.55);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px -18px rgba(0, 0, 0, 0.6);
+}
+/* Cards lift 5px on hover (like whileHover={{ y: -5 }}), with a soft glow. */
+.admin-fx .admin-lift,
+.admin-fx main .grid > [class*="rounded-xl"][class*="border"],
+.admin-fx main .grid > [class*="rounded-2xl"][class*="border"] {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+  will-change: transform;
+}
+@media (hover: hover) {
+  .admin-fx .admin-lift:hover,
+  .admin-fx main .grid > [class*="rounded-xl"][class*="border"]:hover,
+  .admin-fx main .grid > [class*="rounded-2xl"][class*="border"]:hover {
+    transform: translateY(-5px);
+    border-color: rgba(167, 139, 250, 0.35);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 40px -16px rgba(139, 92, 246, 0.45);
+  }
+}
+/* Ease in on load, one after another. */
+@keyframes admin-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.admin-fx .admin-rise,
+.admin-fx main .grid > * {
+  animation: admin-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.admin-fx main .grid > *:nth-child(2) { animation-delay: 0.06s; }
+.admin-fx main .grid > *:nth-child(3) { animation-delay: 0.12s; }
+.admin-fx main .grid > *:nth-child(4) { animation-delay: 0.18s; }
+.admin-fx main .grid > *:nth-child(5) { animation-delay: 0.24s; }
+.admin-fx main .grid > *:nth-child(6) { animation-delay: 0.3s; }
+.admin-fx main .grid > *:nth-child(n + 7) { animation-delay: 0.36s; }
+@media (prefers-reduced-motion: reduce) {
+  .admin-fx .admin-rise,
+  .admin-fx main .grid > * { animation: none; }
+  .admin-fx .admin-lift:hover,
+  .admin-fx main .grid > [class*="rounded-xl"][class*="border"]:hover { transform: none; }
+}

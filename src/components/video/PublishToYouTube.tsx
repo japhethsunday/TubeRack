@@ -166,7 +166,7 @@ export function PublishButton({ source, prerendered, openSignal }: { source: Pub
   );
 }
 
-function PublishDialog({ source, prerendered, onClose }: { source: PublishSource; prerendered: Prerendered | null; onClose: () => void }) {
+export function PublishDialog({ source, prerendered, onClose, onRendered }: { source: PublishSource; prerendered: Prerendered | null; onClose: () => void; onRendered?: (video: Prerendered) => void }) {
   const pack = usePackaging();
   const seo = pack.seoFor(source.projectId);
   const primary = pack.primaryTitleFor(source.projectId);
@@ -407,6 +407,8 @@ function PublishDialog({ source, prerendered, onClose }: { source: PublishSource
             }
             r.blob = out.blob;
             r.mime = out.mime;
+            // Hand the finished render on (e.g. to TikTok next) so it isn't rendered twice.
+            onRendered?.({ blob: out.blob, mime: out.mime });
           }
           finish(`${fmtMb(r.blob.size)} ${r.mime.includes("mp4") ? "MP4" : "WebM"}`);
         }

@@ -4,13 +4,13 @@ import { useEffect, useMemo } from "react";
 import { useVideo } from "@/src/components/video/VideoProvider";
 import { useMedia } from "@/src/components/media/MediaProvider";
 import { useScripts } from "@/src/components/script/ScriptProvider";
-import { PublishButton } from "@/src/components/video/PublishToYouTube";
+import { PublishHub } from "@/src/components/video/PublishHub";
 import { sizeFor } from "@/src/components/video/ExportStudio";
 import { durationOf, healthOf, validateComposition } from "@/src/lib/video/build";
 import type { RenderAsset } from "@/src/lib/video/render";
 
 /**
- * "Publish to YouTube" from the project page: renders the project's timeline
+ * "Publish" from the project page (YouTube, TikTok, or all at once): renders the project's timeline
  * in the browser and runs the same upload flow as the Video Studio.
  */
 export function ProjectPublish({ projectId, projectName, topic }: { projectId: string; projectName: string; topic?: string }) {
@@ -33,7 +33,7 @@ export function ProjectPublish({ projectId, projectName, topic }: { projectId: s
     return a ? { kind: a.kind, source: a.source, payload: a.payload, mime: a.mime, title: a.title, blobUrl: media.blobUrlFor(a.id), durationSec: a.durationSec } : null;
   };
   return (
-    <PublishButton
+    <PublishHub
       source={{
         projectId,
         projectName,

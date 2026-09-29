@@ -11,7 +11,7 @@ import { renderComposition } from "@/src/lib/video/render";
 import { uploadToCloud } from "@/src/lib/media/cloud-upload";
 import type { Prerendered, PublishSource } from "@/src/components/video/PublishToYouTube";
 
-interface Connection {
+export interface TikTokConnection {
   configured: boolean;
   paused: string | null;
   connection: { openId: string; displayName: string; avatarUrl: string } | null;
@@ -45,7 +45,7 @@ const PRIVACY_LABEL: Record<string, string> = {
 
 /** Header button: shown only when TikTok posting is available. */
 export function PostToTikTokButton({ source, prerendered }: { source: PublishSource; prerendered?: Prerendered | null }) {
-  const [info, setInfo] = useState<Connection | null>(null);
+  const [info, setInfo] = useState<TikTokConnection | null>(null);
   // Back from connecting TikTok: reopen the posting window.
   const [open, setOpen] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -53,7 +53,7 @@ export function PostToTikTokButton({ source, prerendered }: { source: PublishSou
     return Boolean(q.get("tiktok_connected") || q.get("tiktok_error"));
   });
   useEffect(() => {
-    void api.get<Connection>("/api/v1/tiktok/connection").then(setInfo).catch(() => setInfo(null));
+    void api.get<TikTokConnection>("/api/v1/tiktok/connection").then(setInfo).catch(() => setInfo(null));
   }, []);
   if (!info?.configured) return null;
   return (
@@ -68,7 +68,7 @@ export function PostToTikTokButton({ source, prerendered }: { source: PublishSou
 
 type Phase = "idle" | "render" | "upload" | "send" | "processing" | "done" | "failed";
 
-function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishSource; prerendered: Prerendered | null; info: Connection; onClose: () => void }) {
+export function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishSource; prerendered: Prerendered | null; info: TikTokConnection; onClose: () => void }) {
   const [creator, setCreator] = useState<Creator | null>(null);
   const [creatorErr, setCreatorErr] = useState<string | null>(null);
   const [notice] = useState(() => {

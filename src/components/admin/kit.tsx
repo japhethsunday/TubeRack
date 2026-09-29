@@ -48,7 +48,7 @@ export function PageTitle({ title, sub, actions }: { title: string; sub?: string
 
 export function Panel({ title, children, className, right }: { title?: string; children: React.ReactNode; className?: string; right?: React.ReactNode }) {
   return (
-    <section className={cx("rounded-xl border border-border bg-surface", className)}>
+    <section className={cx("admin-glass admin-rise rounded-xl border border-border bg-surface", className)}>
       {title && (
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold">{title}</h2>
@@ -60,11 +60,37 @@ export function Panel({ title, children, className, right }: { title?: string; c
   );
 }
 
+/** Numbers count up from zero when they first appear (instant for reduced motion). */
+function useCountUp(target: number, ms = 900): number {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    if (typeof window === "undefined" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      const id = requestAnimationFrame(() => setV(target));
+      return () => cancelAnimationFrame(id);
+    }
+    const start = performance.now();
+    let id = 0;
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - start) / ms);
+      setV(target * (1 - (1 - k) ** 3));
+      if (k < 1) id = requestAnimationFrame(tick);
+    };
+    id = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(id);
+  }, [target, ms]);
+  return v;
+}
+
+function CountUp({ value }: { value: number }) {
+  const v = useCountUp(value);
+  return <>{fmt.format(Number.isInteger(value) ? Math.round(v) : v)}</>;
+}
+
 export function Kpi({ label, value, hint, tone }: { label: string; value: string | number; hint?: string; tone?: "good" | "bad" }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="admin-glass admin-lift admin-rise rounded-xl border border-border bg-surface p-4">
       <div className="text-xs font-medium text-muted-text">{label}</div>
-      <div className={cx("mt-1 text-2xl font-bold tabular-nums", tone === "good" && "text-success", tone === "bad" && "text-destructive")}>{typeof value === "number" ? fmt.format(value) : value}</div>
+      <div className={cx("mt-1 text-2xl font-bold tabular-nums", tone === "good" && "text-success", tone === "bad" && "text-destructive")}>{typeof value === "number" ? <CountUp value={value} /> : value}</div>
       {hint && <div className="mt-0.5 text-[11px] text-muted-text">{hint}</div>}
     </div>
   );

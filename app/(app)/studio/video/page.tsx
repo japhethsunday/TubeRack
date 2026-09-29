@@ -20,8 +20,8 @@ import { Preview, fmtTimecode } from "@/src/components/video/Preview";
 import { ScenesPanel, MediaPanel, TextPanel, Inspector, ExportPanel } from "@/src/components/video/panels";
 import { GeminiCaptions } from "@/src/components/video/GeminiCaptions";
 import { CaptionStylePicker } from "@/src/components/video/CaptionStylePicker";
-import { PublishButton, type Prerendered } from "@/src/components/video/PublishToYouTube";
-import { PostToTikTokButton } from "@/src/components/video/PostToTikTok";
+import { type Prerendered } from "@/src/components/video/PublishToYouTube";
+import { PublishHub } from "@/src/components/video/PublishHub";
 import { ClipInspector } from "@/src/components/video/ClipInspector";
 import { MediaImporter } from "@/src/components/video/MediaImporter";
 import { StockLibrary } from "@/src/components/media/StockLibrary";
@@ -762,8 +762,7 @@ function Studio() {
         </Button>
         </span>
       )}
-      {clips.length > 0 && <PublishButton source={publishSource} prerendered={lastExport} openSignal={publishSignal} />}
-      {clips.length > 0 && <PostToTikTokButton source={publishSource} prerendered={lastExport} />}
+      {clips.length > 0 && <PublishHub source={publishSource} prerendered={lastExport} openSignal={publishSignal} />}
       {step?.next && (
         <button
           type="button"

@@ -100,7 +100,7 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
     </>
   );
   return (
-    <div className="dark min-h-screen bg-background text-foreground">
+    <div className="admin-fx dark min-h-screen bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-border bg-surface lg:flex">{sidebar(false)}</aside>
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
