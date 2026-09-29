@@ -8,7 +8,7 @@ import { getServerEnv } from "@/src/lib/env";
 import { audit } from "@/src/server/audit";
 import { toErrorResponse } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
-import { cloudflareGenerateImage, cloudflareGenerateText, isCloudflareAiConfigured } from "@/src/server/ai/cloudflare";
+import { isCloudflareAiConfigured, testAllCloudflareModels } from "@/src/server/ai/cloudflare";
 
 export const maxDuration = 300;
 
@@ -26,16 +26,9 @@ export async function POST(request: Request) {
     }
     if (action === "test-cloudflare-ai") {
       if (!isCloudflareAiConfigured()) return NextResponse.json({ data: { ok: false, error: "CF_AI_TOKEN isn't set." } });
-      const msg = (e: unknown) => (e instanceof Error ? e.message.slice(0, 300) : "failed");
-      const t0 = Date.now();
-      const text = await cloudflareGenerateText({ prompt: "Reply with one short sentence confirming you are working.", maxTokens: 60 }, { budgetMs: 60_000 })
-        .then((r) => ({ ok: true, model: r.model, reply: r.text.slice(0, 200), ms: Date.now() - t0 }))
-        .catch((e) => ({ ok: false, error: msg(e) }));
-      const t1 = Date.now();
-      const image = await cloudflareGenerateImage("A calm mountain lake at sunrise, photo", "16:9")
-        .then((r) => ({ ok: true, model: r.model, kb: Math.round((r.dataUrl.length * 3) / 4 / 1024), ms: Date.now() - t1 }))
-        .catch((e) => ({ ok: false, error: msg(e) }));
-      return NextResponse.json({ data: { text, image } });
+      const result = await testAllCloudflareModels();
+      await audit({ userId: admin.id, action: "admin.system.test-cloudflare-ai", metadata: { summary: result.summary } });
+      return NextResponse.json({ data: result });
     }
     const app = getServerEnv().APP_URL.replace(/\/$/, "");
     const mail = renderEmail({
