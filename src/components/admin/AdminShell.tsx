@@ -8,6 +8,7 @@ import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { cx } from "@/src/components/ui/cx";
 import { MobileTables } from "@/src/components/shell/MobileTables";
+import { AssistantLauncher, AssistantProvider } from "@/src/components/admin/AssistantLauncher";
 
 export const NAV = [
   { href: "/admin", label: "Overview", icon: Gauge, group: "Overview", need: "overview" },
@@ -103,6 +104,7 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
     </>
   );
   return (
+    <AssistantProvider>
     <div className="admin-fx dark min-h-screen bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-border bg-surface lg:flex">{sidebar(false)}</aside>
       {open && (
@@ -148,6 +150,8 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
           )}
           {children}</main>
       </div>
+      <AssistantLauncher />
     </div>
+    </AssistantProvider>
   );
 }
