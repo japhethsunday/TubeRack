@@ -18,6 +18,7 @@ import { scenesFromSections } from "@/src/lib/script/engine";
 import type { Scene, ScriptSection } from "@/src/lib/script/types";
 import type { MediaAsset } from "@/src/lib/media/types";
 import { buildFromScenes } from "@/src/lib/video/build";
+import { beatTag, planBeats } from "@/src/lib/video/beats";
 import { presetById, projectIsShort } from "@/src/lib/video/presets";
 import { useScripts } from "@/src/components/script/ScriptProvider";
 import { useMedia } from "@/src/components/media/MediaProvider";
@@ -62,6 +63,18 @@ export function stockMatches(tags: string, query: string): boolean {
     .split(/\s+/)
     .map((w) => w.replace(/s$/, ""))
     .some((w) => w.length > 2 && !STOP.has(w) && have.has(w));
+}
+
+/** Stricter match for beats: the subject (first word) must be tagged, plus most of the other words. */
+export function stockMatchesStrict(tags: string, query: string): boolean {
+  const have = new Set(tags.toLowerCase().split(/[^\p{L}\p{N}]+/u).map((w) => w.replace(/s$/, "")));
+  const want = query
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => w.replace(/s$/, ""))
+    .filter((w) => w.length > 2 && !STOP.has(w));
+  if (!want.length || !have.has(want[0])) return false;
+  return want.filter((w) => have.has(w)).length >= Math.ceil(want.length / 2);
 }
 
 export function stockQuery(visual: string, words = 3): string {
@@ -177,16 +190,23 @@ export function GenerateVideoDialog({
       // 1. Scenes + shot list.
       set("scenes", { state: "running" });
       const scenes: Scene[] = scenesFromSections(writable, wpm).map((s) => ({ ...s, narration: s.scriptText }));
-      const planned = await retryBusy(() => api.post<{ visuals: { visual: string; onScreenText: string; stockQuery?: string }[] }>("/api/v1/ai/scene-visuals", {
+      const beatsByScene = planBeats(scenes.map((s) => s.scriptText));
+      const planned = await retryBusy(() => api.post<{ visuals: { visual: string; onScreenText: string; stockQuery?: string; beats?: { visual: string; stockQuery: string }[] }[] }>("/api/v1/ai/scene-visuals", {
         topic: production?.topic || project.topic || project.name,
         aspect,
         style: production?.visualStyle ?? "",
         brief: production?.brief ?? "",
-        scenes: scenes.map((s) => ({ title: s.title, text: s.scriptText })),
+        scenes: scenes.map((s, i) => ({ title: s.title, text: s.scriptText, beats: beatsByScene[i].map((b) => b.text) })),
       }));
-      const stockKeywords = new Map<string, string>();
+      // Each beat's visual and stock words, with where it sits in its scene.
+      const beatPlan = new Map<string, { from: number; to: number; visual: string; stockQuery: string }[]>();
       scenes.forEach((s, i) => {
-        stockKeywords.set(s.id, planned.visuals[i]?.stockQuery ?? "");
+        const v = planned.visuals[i];
+        const beats = beatsByScene[i].length ? beatsByScene[i] : [{ text: s.scriptText, from: 0, to: 1 }];
+        beatPlan.set(
+          s.id,
+          beats.map((b, j) => ({ from: b.from, to: b.to, visual: v?.beats?.[j]?.visual || v?.visual || s.title, stockQuery: v?.beats?.[j]?.stockQuery ?? (j === 0 ? v?.stockQuery ?? "" : "") })),
+        );
         s.visual = planned.visuals[i]?.visual ?? s.title;
         s.onScreenText = planned.visuals[i]?.onScreenText ?? "";
       });
@@ -304,124 +324,122 @@ export function GenerateVideoDialog({
       set("voice", { state: voiceOk === scenes.length ? "done" : voiceOk ? "partial" : "failed", detail: voiceOk === scenes.length ? (continuous ? "1 continuous take" : `${voiceOk} takes`) : `${voiceOk}/${scenes.length} — ${voiceErrors[0] ?? "failed"}` });
       putScenes(project.id, scenes); // durations now match the voice
 
-      // 3. Visuals: free stock footage per scene, AI images for the rest (or only one kind).
-      set("visuals", { state: "running", detail: `0/${scenes.length}` });
+      // 3. Visuals: one per spoken beat, so the picture always shows what the voice is saying right now.
+      // Stock footage only when its tags clearly name the beat's subject; otherwise an AI picture of exactly that.
+      const beatJobs = scenes.flatMap((scene) => (beatPlan.get(scene.id) ?? []).map((b, i) => ({ scene, i, ...b })));
+      set("visuals", { state: "running", detail: `0/${beatJobs.length}` });
       let drawn = 0;
       const imageErrors: string[] = [];
       const usedStock = new Set<string>();
       const orientation = vertical ? "vertical" : "horizontal";
-      async function stockFor(scene: Scene): Promise<boolean> {
-        // Several different clips per scene, until they cover its length.
-        let covered = 0;
-        let found = 0;
-        const keywords = stockKeywords.get(scene.id) ?? "";
-        const queries = [keywords, stockQuery(keywords, 2), stockQuery(scene.visual, 3), stockQuery(scene.visual, 2)].filter((q, i, all) => q.length >= 2 && all.indexOf(q) === i);
+      type BeatJob = (typeof beatJobs)[number];
+      const beatTags = (job: BeatJob) => ["auto-video", beatTag(job)];
+      async function stockFor(job: BeatJob): Promise<boolean> {
+        const queries = [job.stockQuery, stockQuery(job.stockQuery, 2)].filter((q, i, all) => q.length >= 2 && all.indexOf(q) === i);
         for (const q of queries) {
           const res = await api
             .get<{ items: StockHit[] }>(`/api/v1/stock/search?${new URLSearchParams({ kind: "video", q, orientation, page: "1" })}`)
             .catch(() => ({ items: [] as StockHit[] }));
-          // Only accept clips whose tags actually mention what the scene is about.
-          const picks = res.items.filter((it) => !usedStock.has(it.id) && stockMatches(it.title, q));
-          for (const pick of picks) {
-            if (covered >= scene.durationSec || found >= 4) break;
+          // The clip's tags must name the beat's subject, not just share any word.
+          for (const pick of res.items.filter((it) => !usedStock.has(it.id) && stockMatchesStrict(it.title, q))) {
             usedStock.add(pick.id);
             try {
               const file = await api.post<{ url: string; mime: string; fileSize: number }>("/api/v1/stock/import", { id: pick.id });
-              const asset = media.addAsset({
-                projectId: project.id,
-                sceneIds: [scene.id],
-                kind: "video",
-                source: "provider-output",
-                status: "ready",
-                title: pick.title || `Stock — scene ${scene.number}`,
-                payload: file.url,
-                mime: file.mime,
-                durationSec: pick.durationSec ?? undefined,
-                width: pick.width || undefined,
-                height: pick.height || undefined,
-                fileSize: file.fileSize,
-                tags: ["auto-video", "stock", `stock:${pick.id}`, "license:Pixabay Content License"],
-                approval: "approved",
-              });
-              made.push(asset);
-              found += 1;
-              covered += pick.durationSec && pick.durationSec > 1 ? pick.durationSec : scene.durationSec;
+              made.push(
+                media.addAsset({
+                  projectId: project.id,
+                  sceneIds: [job.scene.id],
+                  kind: "video",
+                  source: "provider-output",
+                  status: "ready",
+                  title: pick.title || `Stock — scene ${job.scene.number}`,
+                  payload: file.url,
+                  mime: file.mime,
+                  durationSec: pick.durationSec ?? undefined,
+                  width: pick.width || undefined,
+                  height: pick.height || undefined,
+                  fileSize: file.fileSize,
+                  tags: [...beatTags(job), "stock", `stock:${pick.id}`, "license:Pixabay Content License"],
+                  approval: "approved",
+                }),
+              );
+              return true;
             } catch {
               // Try the next clip.
             }
           }
-          if (covered >= scene.durationSec || found >= 4) break;
         }
-        return found > 0;
+        return false;
       }
-      async function aiImageFor(scene: Scene): Promise<boolean> {
-        const out = await generateProviderImage(scene.visual, aspect);
+      async function aiImageFor(job: BeatJob): Promise<boolean> {
+        const out = await generateProviderImage(job.visual, aspect);
         if (!out.ok) {
           imageErrors.push(out.message);
           return false;
         }
         const asset = media.addAsset({
           projectId: project.id,
-          sceneIds: [scene.id],
+          sceneIds: [job.scene.id],
           kind: "image",
           source: "provider-output",
           status: "ready",
-          title: `Visual — scene ${scene.number}`,
+          title: `Visual — scene ${job.scene.number}.${job.i + 1}`,
           payload: out.data.url,
           mime: "image/png",
-          tags: ["auto-video"],
+          tags: beatTags(job),
           approval: "approved",
         });
         made.push(asset);
         void keepLocal(asset, out.data.url);
         return true;
       }
-      await pool(scenes, 2, isCancelled, async (scene) => {
-        // "Mix": footage for most scenes, a designed image for every third one.
-        const wantStock = visualMode === "stock" || (visualMode === "mix" && scene.number % 3 !== 0);
-        const ok = wantStock ? (await stockFor(scene)) || (await aiImageFor(scene)) : (await aiImageFor(scene)) || (visualMode === "mix" && (await stockFor(scene)));
-        if (!ok && !imageErrors.length) imageErrors.push("No stock clip or image could be found");
+      await pool(beatJobs, 3, isCancelled, async (job) => {
+        const ok =
+          visualMode === "ai"
+            ? await aiImageFor(job)
+            : (await stockFor(job)) || (await aiImageFor(job));
+        if (!ok && !imageErrors.length) imageErrors.push("No matching stock clip or image could be made");
         drawn += 1;
-        set("visuals", { detail: `${drawn}/${scenes.length}` });
+        set("visuals", { detail: `${drawn}/${beatJobs.length}` });
       });
       if (isCancelled()) return;
 
-      // Paid: turn the first few AI pictures into real moving shots. A scene keeps its picture if this fails.
+      // Paid: turn the first few AI pictures into real moving shots. A beat keeps its picture if this fails.
       let animated = 0;
       if (aiMotion && paidUser) {
-        const targets = scenes
-          .map((scene) => ({ scene, image: made.find((a) => a.kind === "image" && a.sceneIds.includes(scene.id)) }))
-          .filter((t): t is { scene: Scene; image: MediaAsset } => Boolean(t.image))
+        const targets = beatJobs
+          .map((job) => ({ job, image: made.find((a) => a.kind === "image" && a.tags?.includes(beatTag(job)) && a.sceneIds.includes(job.scene.id)) }))
+          .filter((t): t is { job: BeatJob; image: MediaAsset } => Boolean(t.image))
           .slice(0, AI_MOTION_MAX);
         let tried = 0;
-        await pool(targets, 2, isCancelled, async ({ scene, image }) => {
+        await pool(targets, 2, isCancelled, async ({ job, image }) => {
           set("visuals", { detail: `Animating ${++tried}/${targets.length}…` });
           try {
             const data = await api.post<{ url: string; mime: string; fileSize: number; seconds?: number }>("/api/v1/ai/video-clip", {
-              prompt: `${scene.visual}. Natural, realistic camera and subject motion.`,
+              prompt: `${job.visual}. Natural, realistic camera and subject motion.`,
               image: await toDataUrl(image.payload),
               aspect,
               seconds: 5,
             });
             const clip = media.addAsset({
               projectId: project.id,
-              sceneIds: [scene.id],
+              sceneIds: [job.scene.id],
               kind: "video",
               source: "provider-output",
               status: "ready",
-              title: `AI motion — scene ${scene.number}`,
+              title: `AI motion — scene ${job.scene.number}.${job.i + 1}`,
               payload: data.url,
               mime: data.mime,
               durationSec: data.seconds ?? 5,
               fileSize: data.fileSize,
-              tags: ["auto-video", "ai-clip"],
+              tags: [...beatTags(job), "ai-clip"],
               approval: "approved",
             });
-            // The moving shot leads; the still picture holds the rest of the scene.
+            // The moving shot leads; the still picture holds the rest of the beat.
             made.splice(made.indexOf(image), 0, clip);
             animated += 1;
           } catch {
-            // Keep the still picture for this scene.
+            // Keep the still picture for this beat.
           }
         });
         if (isCancelled()) return;

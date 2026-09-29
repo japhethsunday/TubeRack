@@ -1243,38 +1243,60 @@ export async function writeChannelPlan(input: ChannelInputs, evidence: ChannelEv
   return { plan, model };
 }
 
-export interface SceneVisual {
+export interface BeatVisual {
   visual: string;
-  onScreenText: string;
-  /** 2–3 plain English words to search stock footage for this scene. */
+  /** 2–3 plain English words to search stock footage for this beat. */
   stockQuery: string;
 }
 
-/** Shot list for auto-video: one concrete image prompt + short on-screen text per scene. */
-export async function planSceneVisuals(input: { topic: string; aspect: "16:9" | "9:16"; style: string; brief?: string; scenes: { title: string; text: string; direction?: string }[] }): Promise<{ visuals: SceneVisual[]; model: string }> {
+export interface SceneVisual extends BeatVisual {
+  onScreenText: string;
+  /** One visual per spoken beat, in order (the first equals the scene's own visual). */
+  beats: BeatVisual[];
+}
+
+const cleanQuery = (v: unknown) => String(v ?? "").replace(/[^\p{L}\p{N} ]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+
+/**
+ * Shot list for auto-video. Each scene's narration comes split into beats
+ * (what's said in a few seconds); every beat gets a visual that shows exactly
+ * what that beat talks about, so the picture always matches the voice.
+ */
+export async function planSceneVisuals(input: { topic: string; aspect: "16:9" | "9:16"; style: string; brief?: string; scenes: { title: string; text: string; direction?: string; beats?: string[] }[] }): Promise<{ visuals: SceneVisual[]; model: string }> {
   const provider = new GeminiTextProvider();
+  const beatsOf = (s: { text: string; beats?: string[] }) => (s.beats?.length ? s.beats : [s.text]);
   const list = input.scenes
-    .map((s, i) => `${i + 1}. [${s.title}] ${s.text.slice(0, 600)}${s.direction ? ` (storyboard direction: ${s.direction.slice(0, 200)})` : ""}`)
+    .map((s, i) => {
+      const beats = beatsOf(s).map((b, j) => `   ${i + 1}.${j + 1} "${b.slice(0, 500)}"`).join("\n");
+      return `Scene ${i + 1} [${s.title}]${s.direction ? ` (storyboard direction: ${s.direction.slice(0, 200)})` : ""}\n${beats}`;
+    })
     .join("\n");
+  const shape = input.scenes.map((s) => ({ onScreenText: "", beats: beatsOf(s).map(() => ({ visual: "", stockQuery: "" })) }));
   const { text, model } = await provider.generateText({
     skills: ["content"],
     prompt:
-      `You are the art director for a YouTube video about "${input.topic.slice(0, 200)}". Frame: ${input.aspect}.` +
+      `You are the art director for a video about "${input.topic.slice(0, 200)}". Frame: ${input.aspect}.` +
       (input.style ? ` Visual style: ${input.style.slice(0, 200)}.` : "") +
-      (input.brief ? `\nProduction brief (every image must fit it): ${input.brief.slice(0, 1200)}` : "") +
-      `\nFor each scene below write: visual — one concrete, photographic image prompt (subject, setting, composition, lighting) that shows exactly what that scene's narration is about, for this video's audience; follow the storyboard direction when given; ` +
-      `keep a consistent look across scenes; NO text, letters, logos or watermarks in the image. onScreenText — at most 6 words to overlay, or "" if none is needed. ` +
-      `stockQuery — 2 or 3 plain English words naming the literal, filmable subject of that scene's narration (e.g. "stock market chart", "doctor hospital", "coffee beans") to search a stock video library; concrete nouns only, no adjectives about style or camera.\n` +
-      `Scenes:\n${list}\n\nRespond ONLY with JSON: {"scenes":[{"visual":"","onScreenText":"","stockQuery":""}]} with exactly ${input.scenes.length} items in order.`,
-    maxTokens: 3000,
+      (input.brief ? `\nProduction brief: ${input.brief.slice(0, 1200)}` : "") +
+      `\nThe narration is split into numbered beats; each beat is on screen while those exact words are spoken. For EVERY beat write:\n` +
+      `visual — one concrete, photographic image prompt showing the literal subject of THAT beat's words (if it says cars, show cars; if it says a house, show a house). Name the main subject first, then setting, composition and lighting. Never show something the beat doesn't mention; for abstract lines show the most concrete thing named or implied. Keep one consistent look across the video. NO text, letters, logos or watermarks.\n` +
+      `stockQuery — 2 or 3 plain English words naming that beat's main filmable subject (e.g. "sports car road", "family house", "stock market chart"); the first word must be the subject noun; no style or camera words.\n` +
+      `Per scene also write onScreenText — at most 6 words to overlay, or "".\n` +
+      `Beats:\n${list}\n\nRespond ONLY with JSON in exactly this shape and order: ${JSON.stringify({ scenes: shape })}`,
+    maxTokens: 8000,
     json: true,
   });
   const obj = parseJsonObject(text, "scene visuals");
   const arr = Array.isArray(obj.scenes) ? (obj.scenes as Record<string, unknown>[]) : [];
-  const visuals = input.scenes.map((s, i) => ({
-    visual: String(arr[i]?.visual ?? "").trim().slice(0, 800) || `${s.title} — ${input.topic}`,
-    onScreenText: String(arr[i]?.onScreenText ?? "").trim().slice(0, 60),
-    stockQuery: String(arr[i]?.stockQuery ?? "").replace(/[^\p{L}\p{N} ]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 60),
-  }));
+  const visuals = input.scenes.map((s, i) => {
+    const row = arr[i] ?? {};
+    const got = Array.isArray(row.beats) ? (row.beats as Record<string, unknown>[]) : [];
+    const beats = beatsOf(s).map((b, j) => ({
+      // Older single-visual replies still work; a missing beat falls back to its own words.
+      visual: String(got[j]?.visual ?? (j === 0 ? row.visual ?? "" : "")).trim().slice(0, 800) || `${b.slice(0, 200)} — ${input.topic}`,
+      stockQuery: cleanQuery(got[j]?.stockQuery ?? (j === 0 ? row.stockQuery : "")),
+    }));
+    return { visual: beats[0].visual, stockQuery: beats[0].stockQuery, onScreenText: String(row.onScreenText ?? "").trim().slice(0, 60), beats };
+  });
   return { visuals, model };
 }

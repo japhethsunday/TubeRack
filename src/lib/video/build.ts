@@ -1,5 +1,6 @@
 import { sceneSpeech } from "@/src/lib/script/engine";
 import { CINEMATIC_MOTIONS } from "@/src/lib/video/compositor";
+import { beatOf } from "@/src/lib/video/beats";
 import type {
   ClipKind,
   Composition,
@@ -222,6 +223,75 @@ function voiceFor(sceneId: string, assets: MediaAsset[]): MediaAsset | undefined
   );
 }
 
+interface BeatGroup {
+  from: number;
+  video?: MediaAsset;
+  image?: MediaAsset;
+}
+
+/** A scene's visuals made per spoken beat (auto video), in the order they're said. */
+function beatGroups(sceneId: string, assets: MediaAsset[]): BeatGroup[] {
+  const map = new Map<string, BeatGroup>();
+  for (const a of assets) {
+    if ((a.kind !== "image" && a.kind !== "video") || a.status !== "ready" || !(a.approval === "approved" || a.approval === "used") || !a.sceneIds.includes(sceneId)) continue;
+    const b = beatOf(a.tags);
+    if (!b) continue;
+    const key = b.from.toFixed(3);
+    const g = map.get(key) ?? { from: b.from };
+    if (a.kind === "image") g.image ??= a;
+    // An AI motion shot of the beat's picture beats a stock clip.
+    else if (!g.video || a.tags?.includes("ai-clip")) g.video = a;
+    map.set(key, g);
+  }
+  return [...map.values()].sort((x, y) => x.from - y.from);
+}
+
+function beatClips(seg: { sceneId: string; number: number; startSec: number; durationSec: number }, beats: BeatGroup[], blend: Partial<TimelineClip>, isLast: boolean): TimelineClip[] {
+  const out: TimelineClip[] = [];
+  beats.forEach((b, k) => {
+    // Each beat holds the screen until the next one starts (a beat with no visual is covered by the one before).
+    const from = k === 0 ? 0 : b.from * seg.durationSec;
+    const to = k === beats.length - 1 ? seg.durationSec : beats[k + 1].from * seg.durationSec;
+    const len = Math.round((to - from) * 100) / 100;
+    if (len < 0.3) return;
+    const start = seg.startSec + from;
+    const inBlend = k === 0 ? blend : { transitionIn: "fade", transitionSec: 0.3 };
+    const ends = isLast && k === beats.length - 1 ? { fadeOutSec: 0.8 } : {};
+    const motion = CINEMATIC_MOTIONS[((seg.number - 1) * 3 + k) % CINEMATIC_MOTIONS.length];
+    let at = 0;
+    if (b.video) {
+      const vlen = b.video.durationSec && b.video.durationSec > 1 ? b.video.durationSec : len;
+      // With a picture to fall back on, the clip plays once; otherwise it repeats to fill the beat.
+      const span = b.image ? Math.min(len, vlen) : len;
+      for (let i = 0; at < span - 0.2; i++) {
+        const dur = Math.round(Math.min(vlen, span - at) * 100) / 100;
+        out.push({
+          ...clipBase("track_video", "video", b.video.title, start + at, dur),
+          sceneId: seg.sceneId,
+          assetId: b.video.id,
+          inSec: 0,
+          volume: 0,
+          muted: true,
+          ...(i === 0 ? inBlend : {}),
+          ...(at + dur >= len - 0.2 ? ends : {}),
+        });
+        at += dur;
+      }
+    }
+    if (b.image && at < len - 0.2) {
+      out.push({
+        ...clipBase("track_image", "image", b.image.title, start + at, Math.round((len - at) * 100) / 100),
+        sceneId: seg.sceneId,
+        assetId: b.image.id,
+        motion,
+        ...(at ? { transitionIn: "fade", transitionSec: 0.3 } : inBlend),
+        ...ends,
+      });
+    }
+  });
+  return out;
+}
+
 /**
  * Auto-build: one image + voice + title-text + captions per scene from
  * approved/assigned assets. Uploads resolve via session URLs at preview
@@ -257,6 +327,10 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
     // last picture fades out so the video ends cleanly.
     const blend = seg.number > 1 ? { transitionIn: "fade", transitionSec: 0.4 } : {};
     const isLast = seg.number === scenes.length;
+    const beats = beatGroups(seg.sceneId, assets);
+    if (beats.length) {
+      clips.push(...beatClips(seg, beats, blend, isLast));
+    } else {
     for (let at = 0, i = 0; sceneVideos.length && at < videoSpan - 0.2; i++) {
       const clipAsset = sceneVideos[i % sceneVideos.length];
       const dur = Math.min(lenOf(clipAsset), videoSpan - at);
@@ -284,6 +358,7 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
         ...(from ? { transitionIn: "fade", transitionSec: 0.4 } : blend),
         ...(isLast ? { fadeOutSec: 0.8 } : {}),
       });
+    }
     }
     const voice = voiceFor(seg.sceneId, assets);
     if (voice && voice.sceneIds.length > 1) {

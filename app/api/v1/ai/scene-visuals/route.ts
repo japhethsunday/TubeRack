@@ -12,7 +12,7 @@ const body = z.object({
   aspect: z.enum(["16:9", "9:16"]).default("16:9"),
   style: z.string().trim().max(300).default(""),
   brief: z.string().trim().max(1500).optional(),
-  scenes: z.array(z.object({ title: z.string().max(200), text: z.string().max(4000), direction: z.string().max(600).optional() })).min(1).max(40),
+  scenes: z.array(z.object({ title: z.string().max(200), text: z.string().max(4000), direction: z.string().max(600).optional(), beats: z.array(z.string().max(1500)).max(8).optional() })).min(1).max(40),
 });
 
 /** POST /api/v1/ai/scene-visuals — image prompts + on-screen text per scene (auto-video). */

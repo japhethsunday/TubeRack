@@ -27,6 +27,7 @@ import {
 import { PLATFORM_PRESETS, TRANSITIONS, EFFECTS, MOTIONS, TEXT_PRESETS, brandedTitleStyle, presetById } from "@/src/lib/video/presets";
 import { emptyVideoBundle, parseVideoBundle } from "@/src/lib/video/storage";
 import type { Scene } from "@/src/lib/script/types";
+import { beatTag, splitBeats } from "@/src/lib/video/beats";
 import type { MediaAsset } from "@/src/lib/media/types";
 import type { TimelineClip } from "@/src/lib/video/types";
 
@@ -362,7 +363,7 @@ describe("auto video: stock footage and music", () => {
   });
 });
 
-import { stockMatches, stockQuery } from "@/src/components/video/AutoVideo";
+import { stockMatches, stockMatchesStrict, stockQuery } from "@/src/components/video/AutoVideo";
 describe("auto video: stock search words", () => {
   it("keeps the subject words of a shot description", () => {
     assert.equal(stockQuery("Wide shot of a soldier walking in the desert at sunset"), "soldier walking desert");
@@ -438,5 +439,33 @@ describe("auto video: AI motion", () => {
     assert.equal(vids[0].durationSec, 5);
     assert.equal(img?.startSec, vids[0].startSec + 5);
     assert.ok(String(img?.motion).startsWith("cine-"));
+  });
+});
+
+describe("auto video: visuals follow the voice (beats)", () => {
+  it("splits narration into beats with word-share timing", () => {
+    const beats = splitBeats("Cars are getting faster every year. Engines now make huge power. But houses are getting more expensive too. Rent keeps rising in every city.", 4, 10);
+    assert.ok(beats.length >= 2);
+    assert.equal(beats[0].from, 0);
+    assert.equal(beats[beats.length - 1].to, 1);
+    assert.match(beats[0].text, /Cars/);
+    assert.match(beats[beats.length - 1].text, /Rent/);
+  });
+
+  it("shows each beat's visual while its words are spoken", () => {
+    const clips = buildFromScenes([scene({ id: "sc1", durationSec: 10 })], [
+      asset({ id: "car", kind: "image", sceneIds: ["sc1"], tags: ["auto-video", beatTag({ from: 0, to: 0.5 })] }),
+      asset({ id: "house", kind: "image", sceneIds: ["sc1"], tags: ["auto-video", beatTag({ from: 0.5, to: 1 })] }),
+    ]).filter((c) => c.kind === "image");
+    assert.deepEqual(clips.map((c) => c.assetId), ["car", "house"]);
+    assert.equal(clips[0].startSec, 0);
+    assert.equal(clips[0].durationSec, 5);
+    assert.equal(clips[1].startSec, 5);
+    assert.notEqual(clips[0].motion, clips[1].motion);
+  });
+
+  it("only accepts stock footage whose tags name the subject", () => {
+    assert.equal(stockMatchesStrict("house, home, architecture", "sports car road"), false);
+    assert.equal(stockMatchesStrict("sports, car, road, driving", "car road"), true);
   });
 });
