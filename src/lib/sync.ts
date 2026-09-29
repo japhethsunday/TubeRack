@@ -289,7 +289,7 @@ function ensureLifecycleHooks() {
  * Call `refresh` when this tab regains focus (throttled), so changes made on
  * another device appear without a reload. Skipped while pushes are pending.
  */
-export function useRemoteRefresh(kind: SyncKind, enabled: boolean, refresh: () => void, minIntervalMs = 15_000): void {
+export function useRemoteRefresh(kind: SyncKind, enabled: boolean, refresh: () => void, minIntervalMs = 120_000): void {
   const last = useRef(0);
   const fn = useRef(refresh);
   useEffect(() => {
@@ -305,13 +305,14 @@ export function useRemoteRefresh(kind: SyncKind, enabled: boolean, refresh: () =
       last.current = Date.now();
       fn.current();
     };
+    // Only when the person comes back to the tab — no background timer. Each
+    // check costs server time, and a tab left open all day would otherwise
+    // re-download every bundle every minute.
     document.addEventListener("visibilitychange", maybe);
     window.addEventListener("focus", maybe);
-    const interval = window.setInterval(maybe, 60_000);
     return () => {
       document.removeEventListener("visibilitychange", maybe);
       window.removeEventListener("focus", maybe);
-      window.clearInterval(interval);
     };
   }, [kind, enabled, minIntervalMs]);
 }

@@ -10,6 +10,7 @@ import { audit } from "@/src/server/audit";
 import { sanitizeReturnTo } from "@/src/lib/auth/session";
 import { ATTR_COOKIES, attributeSignup, rewardReferral } from "@/src/server/growth/referrals";
 import { BONUS_COOKIE, redeemAtSignup } from "@/src/server/growth/codes";
+import { AFF_COOKIE, attributeAffiliate } from "@/src/server/growth/affiliates";
 import { limiterFor, clientKey } from "@/src/server/rate-limit";
 
 interface GoogleProfile {
@@ -112,6 +113,7 @@ export async function GET(request: Request) {
         console.error("google signup attribution failed:", error instanceof Error ? error.message : String(error));
       }
       await redeemAtSignup(userId, store.get(BONUS_COOKIE)?.value);
+      await attributeAffiliate(userId, store.get(AFF_COOKIE)?.value).catch(() => undefined);
       await sendWelcomeEmail(request, email, name).catch(() => undefined);
     }
     if (store.get(BONUS_COOKIE)) store.delete(BONUS_COOKIE);

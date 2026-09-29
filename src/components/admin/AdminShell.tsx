@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Activity, Calculator, Clapperboard, Coins, FileDown, FolderKanban, Gauge, Gift, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, ShieldUser, Tags, ToggleRight, Ticket, TriangleAlert, Users, Wallet } from "lucide-react";
+import { Activity, Calculator, Clapperboard, Coins, FileDown, FolderKanban, Gauge, Gift, Handshake, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, ShieldUser, Tags, ToggleRight, Ticket, TriangleAlert, Users, Wallet } from "lucide-react";
 import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { cx } from "@/src/components/ui/cx";
@@ -26,6 +26,7 @@ export const NAV = [
   { href: "/admin/inbox", label: "Inbox", icon: Inbox, group: "People", need: "inbox.list" },
   { href: "/admin/email", label: "Email", icon: Mail, group: "Growth", need: "email.templates" },
   { href: "/admin/growth", label: "Growth", icon: Rocket, group: "Growth", need: "growth.view" },
+  { href: "/admin/affiliates", label: "Affiliates", icon: Handshake, group: "Growth", need: "affiliates.view" },
   { href: "/admin/campaigns", label: "Campaigns", icon: Send, group: "Growth", need: "campaigns.list" },
   { href: "/admin/promo", label: "Promo videos", icon: Clapperboard, group: "Growth", need: "promo.list" },
   { href: "/admin/messages", label: "Announcements", icon: Megaphone, group: "Growth", need: "broadcast" },

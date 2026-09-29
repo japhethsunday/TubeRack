@@ -19,7 +19,7 @@ export function CreditsPill() {
     let alive = true;
     const load = () => void api.get<Credits>("/api/v1/credits/me").then((d) => alive && setC(d)).catch(() => {});
     load();
-    const t = window.setInterval(() => document.visibilityState === "visible" && void load(), 60_000);
+    const t = window.setInterval(() => document.visibilityState === "visible" && void load(), 300_000);
     window.addEventListener("focus", load);
     return () => {
       alive = false;

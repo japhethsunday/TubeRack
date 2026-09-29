@@ -13,6 +13,7 @@ import { sendAccountExistsEmail, sendVerificationEmail } from "@/src/server/emai
 import { cookies } from "next/headers";
 import { ATTR_COOKIES, attributeSignup } from "@/src/server/growth/referrals";
 import { BONUS_COOKIE, redeemAtSignup } from "@/src/server/growth/codes";
+import { AFF_COOKIE, attributeAffiliate } from "@/src/server/growth/affiliates";
 
 const signupSchema = z
   .object({
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
     // Bonus code typed on the form (or remembered from a ?bonus= link).
     const jar = await cookies();
     await redeemAtSignup(String(result.user.id), body.bonusCode || jar.get(BONUS_COOKIE)?.value);
+    await attributeAffiliate(String(result.user.id), jar.get(AFF_COOKIE)?.value).catch(() => undefined);
     jar.delete(BONUS_COOKIE);
 
     // Verification email; its link signs the new user in.

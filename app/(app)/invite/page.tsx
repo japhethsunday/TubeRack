@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Check, Copy, Gift, Mail, Share2, UserPlus, Users } from "lucide-react";
 import { api, ApiError } from "@/src/lib/api";
 import { Button } from "@/src/components/ui/Button";
+import { AffiliatePanel } from "@/src/components/growth/AffiliatePanel";
 
 interface Referral { code: string; link: string; invited: number; joined: number; creditsEarned: number; reward: number; remaining: number; verified: boolean }
 
@@ -82,6 +83,7 @@ export default function InvitePage() {
           </section>
         </>
       )}
+      <AffiliatePanel />
     </div>
   );
 }

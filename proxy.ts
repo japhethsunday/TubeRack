@@ -18,6 +18,9 @@ function rememberAttribution(request: NextRequest, response: NextResponse) {
   const opts = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", maxAge: 30 * 86400 };
   const ref = (q.get("ref") ?? "").toUpperCase();
   if (/^[A-Z2-9]{6,12}$/.test(ref) && !request.cookies.get("rt_ref")) response.cookies.set("rt_ref", ref, opts);
+  // ?aff=CODE: an affiliate link without the /go/ redirect (clicks are counted on /go/ only).
+  const aff = (q.get("aff") ?? "").toLowerCase();
+  if (/^[a-z0-9][a-z0-9-]{2,23}$/.test(aff) && !request.cookies.get("rt_aff")) response.cookies.set("rt_aff", aff, { ...opts, maxAge: 60 * 86400 });
   // ?bonus=CODE links: the code is applied when the visitor creates an account.
   const bonus = (q.get("bonus") ?? "").toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 40);
   if (bonus.length >= 3) response.cookies.set("rt_bonus", bonus, { ...opts, maxAge: 7 * 86400 });
