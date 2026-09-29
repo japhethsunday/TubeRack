@@ -122,10 +122,12 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
   const connectHref = `/api/v1/tiktok/start?returnTo=${encodeURIComponent(returnTo)}`;
   const tooLong = sourceKind === "project" && Boolean(creator?.max_video_post_duration_sec && source.duration > creator.max_video_post_duration_sec);
   const fileMissing = sourceKind === "file" && !picked;
+  const prerenderedWebm = Boolean(prerendered && !/mp4/.test(prerendered.mime));
+  const cantMakeMp4 = sourceKind === "project" && (prerendered ? prerenderedWebm : mp4Ok === false);
   const brandedPrivate = branded && privacy === "SELF_ONLY";
   const busy = phase === "render" || phase === "upload" || phase === "send" || phase === "processing";
   const canPost =
-    !busy && phase !== "done" && !tooLong && !fileMissing && !brandedPrivate && Boolean(creator) &&
+    !busy && phase !== "done" && !tooLong && !fileMissing && !cantMakeMp4 && !brandedPrivate && Boolean(creator) &&
     (mode === "draft" || (privacy && (!commercial || yourBrand || branded)));
 
   async function post() {
@@ -241,15 +243,27 @@ function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishS
               {sourceKind === "file" && (
                 <input
                   type="file"
-                  accept="video/mp4,video/quicktime,video/webm"
+                  accept="video/mp4,video/quicktime,.mp4,.mov"
                   disabled={busy}
-                  onChange={(e) => setPicked(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    // TikTok rejects the WebM files browsers record; only MP4/MOV are sent.
+                    if (f && !/\.(mp4|mov)$/i.test(f.name) && !/^video\/(mp4|quicktime)$/.test(f.type)) {
+                      setPicked(null);
+                      setMsg("TikTok only accepts MP4 or MOV here. This file is " + (f.name.split(".").pop()?.toUpperCase() ?? "another format") + ". Export the project in Chrome or Edge to get an MP4.");
+                      setPhase("failed");
+                      return;
+                    }
+                    setMsg(null);
+                    setPhase("idle");
+                    setPicked(f);
+                  }}
                   className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm"
                 />
               )}
-              {sourceKind === "project" && mp4Ok === false && (
+              {cantMakeMp4 && (
                 <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-                  This browser can&apos;t make the MP4 format TikTok needs (Firefox usually can&apos;t), so TikTok may reject it. Open Recktube in Chrome or Edge to post this project, or choose an MP4 file instead.
+                  TikTok needs an MP4 (H.264 + AAC), and this browser makes WebM instead, which TikTok rejects. Open www.recktube.xyz in Chrome or Microsoft Edge to post this project, or choose an MP4 file.
                 </p>
               )}
             </fieldset>

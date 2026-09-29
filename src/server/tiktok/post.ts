@@ -14,6 +14,7 @@ export async function tiktokPaused(): Promise<string | null> {
 async function readUpload(workspaceId: string, fileUrl: string): Promise<{ bytes: Uint8Array; mime: string }> {
   const m = /^\/api\/v1\/uploads\/([0-9a-f-]{36}\.(mp4|webm|mov))(?:\?parts=(\d{1,2}))?$/.exec(fileUrl);
   if (!m) throw validationError("That video file can't be found. Export it again.");
+  if (m[2] === "webm") throw validationError("TikTok rejects WebM videos. Export the project in Chrome or Microsoft Edge to get an MP4, then try again.");
   const key = `${workspaceId}/uploads/${m[1]}`;
   const parts = Number(m[3] ?? 1);
   // TikTok's limit is 4 GB, but the whole file is held in memory here: keep it to what a server can safely handle.
