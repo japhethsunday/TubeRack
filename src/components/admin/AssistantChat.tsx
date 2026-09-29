@@ -14,6 +14,7 @@ const STARTERS = [
   "Any suspicious accounts or fraud?",
   "What failed in the last 24 hours?",
   "Who is waiting for support?",
+  "Anything new for founder@ or owner@?",
   "Where are new sign-ups coming from?",
 ];
 
@@ -23,6 +24,7 @@ const LOOKUP_LABEL: Record<string, string> = {
   user_details: "account details",
   recent_failures: "failures",
   support_queue: "support queue",
+  inbox: "inbox",
   growth_report: "sign-up sources",
   affiliates_overview: "affiliates",
   safety_flags: "safety flags",

@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Eye, Inbox, LifeBuoy, Paperclip, RefreshCw, Reply, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Crown, Eye, Inbox, LifeBuoy, Briefcase, Paperclip, RefreshCw, Reply, Send, ShieldCheck } from "lucide-react";
 import { api } from "@/src/lib/api";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
 import { AiWriter, Loading, PageTitle, Panel, errorText, when } from "@/src/components/admin/kit";
 
-type Mailbox = "support" | "security";
+type Mailbox = "support" | "security" | "founder" | "owner";
+const BOXES: Mailbox[] = ["support", "security", "founder", "owner"];
+const BOX_LABEL: Record<Mailbox, string> = { support: "Support", security: "Security", founder: "Founder", owner: "Owner" };
 interface Summary { id: string; from: string; fromName: string; subject: string; mailbox: Mailbox; receivedAt: string; attachments: number }
 interface Full extends Summary { to: string[]; replyTo: string; html: string | null; text: string | null }
 
@@ -21,7 +23,10 @@ function loadReplied(): string[] {
 }
 
 const MailboxIcon = ({ m, className }: { m: Mailbox; className?: string }) =>
-  m === "security" ? <ShieldCheck className={cx("text-warning", className)} aria-hidden="true" /> : <LifeBuoy className={cx("text-primary", className)} aria-hidden="true" />;
+  m === "security" ? <ShieldCheck className={cx("text-warning", className)} aria-hidden="true" />
+  : m === "founder" ? <Crown className={cx("text-fuchsia-400", className)} aria-hidden="true" />
+  : m === "owner" ? <Briefcase className={cx("text-success", className)} aria-hidden="true" />
+  : <LifeBuoy className={cx("text-primary", className)} aria-hidden="true" />;
 
 export default function AdminInbox() {
   const [emails, setEmails] = useState<Summary[] | null>(null);
@@ -120,13 +125,13 @@ export default function AdminInbox() {
   }
 
   const shown = useMemo(() => (emails ?? []).filter((e) => filter === "all" || e.mailbox === filter), [emails, filter]);
-  const counts = useMemo(() => ({ support: (emails ?? []).filter((e) => e.mailbox === "support").length, security: (emails ?? []).filter((e) => e.mailbox === "security").length }), [emails]);
+  const counts = useMemo(() => Object.fromEntries(BOXES.map((b) => [b, (emails ?? []).filter((e) => e.mailbox === b).length])) as Record<Mailbox, number>, [emails]);
 
   return (
     <>
       <PageTitle
         title="Inbox"
-        sub="Mail sent to support@ and security@recktube.xyz. Replies go out on the Recktube design from the same address."
+        sub="Mail sent to support@, security@, founder@ and owner@recktube.xyz. Replies go out on the Recktube design from the same address."
         actions={<Button size="sm" variant="outline" loading={loading} onClick={() => void load()}><RefreshCw className="size-4" aria-hidden="true" /> Refresh</Button>}
       />
       {!emails ? (
@@ -134,8 +139,8 @@ export default function AdminInbox() {
       ) : (
         <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
           <div className={cx("space-y-3", openId && "hidden xl:block")}>
-            <div className="flex gap-1 rounded-lg border border-border bg-surface p-1 text-xs font-medium" role="tablist" aria-label="Mailbox">
-              {([["all", `All · ${emails.length}`], ["support", `Support · ${counts.support}`], ["security", `Security · ${counts.security}`]] as const).map(([k, label]) => (
+            <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-surface p-1 text-xs font-medium" role="tablist" aria-label="Mailbox">
+              {([["all", `All · ${emails.length}`], ...BOXES.map((b) => [b, `${BOX_LABEL[b]} · ${counts[b]}`])] as [("all" | Mailbox), string][]).map(([k, label]) => (
                 <button key={k} role="tab" aria-selected={filter === k} onClick={() => setFilter(k)} className={cx("flex-1 rounded-md px-2 py-1.5", filter === k ? "bg-primary/15 text-primary" : "text-muted-text hover:bg-muted")}>
                   {label}
                 </button>
@@ -146,7 +151,7 @@ export default function AdminInbox() {
               {shown.length === 0 ? (
                 <div className="py-10 text-center text-sm text-muted-text">
                   <Inbox className="mx-auto mb-2 size-8 opacity-50" aria-hidden="true" />
-                  No mail yet. New messages to support@ and security@ show up here.
+                  No mail yet. New messages to support@, security@, founder@ and owner@ show up here.
                 </div>
               ) : (
                 <ul className="-m-4 divide-y divide-border">
@@ -204,7 +209,7 @@ export default function AdminInbox() {
                 <Panel title="Reply" right={<Reply className="size-4 text-muted-text" aria-hidden="true" />}>
                   <div className="space-y-3 text-sm">
                     <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1" role="radiogroup" aria-label="Reply from">
-                      {(["support", "security"] as const).map((m) => (
+                      {BOXES.map((m) => (
                         <button key={m} role="radio" aria-checked={from === m} onClick={() => setFrom(m)} className={cx("flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium", from === m ? "bg-primary/15 text-primary" : "text-muted-text hover:bg-muted")}>
                           <MailboxIcon m={m} className="size-3.5" /> {m}@recktube.xyz
                         </button>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/src/server/admin";
 import { getInboxEmail, mailboxAddress, parseAddress } from "@/src/server/inbox";
-import { buildReply } from "@/src/server/admin-mail";
+import { MAILBOX_SENDER, buildReply } from "@/src/server/admin-mail";
 import { sendEmail } from "@/src/server/email";
 import { getServerEnv } from "@/src/lib/env";
 import { audit } from "@/src/server/audit";
@@ -22,7 +22,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
 const body = z.object({
   message: z.string().trim().min(1, "Write your reply.").max(8000),
   name: z.string().trim().max(80).default(""),
-  mailbox: z.enum(["support", "security"]).optional(),
+  mailbox: z.enum(["support", "security", "founder", "owner"]).optional(),
   preview: z.boolean().default(false),
 });
 
@@ -51,8 +51,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       subject: mail.subject,
       html: mail.html,
       text: mail.text,
-      kind: mailbox === "security" ? "security" : "support",
-      fromName: mailbox === "security" ? "Recktube Security" : "Recktube Support",
+      kind: mailbox === "security" ? "security" : mailbox === "support" ? "support" : "account",
+      fromName: MAILBOX_SENDER[mailbox].name,
       fromAddress: from,
       replyTo: from,
       ...(original.messageId ? { headers: { "In-Reply-To": original.messageId, References: original.messageId } } : {}),

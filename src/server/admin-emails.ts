@@ -3,6 +3,7 @@ import { renderEmail, type EmailBlock } from "@/src/server/email-templates";
 import { sendEmail } from "@/src/server/email";
 import { getDb } from "@/src/server/db";
 import { ROLE_LABELS } from "@/src/lib/admin-roles";
+import { MAILBOX_ADDRESS, MAILBOX_SENDER, type Mailbox } from "@/src/server/admin-mail";
 
 const ADMIN_ROLES_LABEL: Record<string, string> = Object.fromEntries(Object.entries(ROLE_LABELS).map(([k, v]) => [k, v.label]));
 
@@ -27,7 +28,7 @@ async function firstName(email: string): Promise<string> {
 
 async function send(
   to: string,
-  m: { subject: string; preheader: string; eyebrow: string; heading: string; intro: string; blocks?: EmailBlock[]; cta?: { label: string; url: string }; reason: string; name?: string },
+  m: { subject: string; preheader: string; eyebrow: string; heading: string; intro: string; blocks?: EmailBlock[]; cta?: { label: string; url: string }; reason: string; name?: string; from?: Mailbox },
 ): Promise<boolean> {
   try {
     const first = m.name ?? (await firstName(to));
@@ -36,12 +37,12 @@ async function send(
       eyebrow: m.eyebrow,
       heading: m.heading,
       intro: `${first ? `Hi ${first}, ` : ""}${m.intro}`,
-      blocks: [...(m.blocks ?? []), { type: "text", text: "Questions? Just reply to this email.\n\nThe Recktube team" }],
+      blocks: [...(m.blocks ?? []), { type: "text", text: `Questions? Just reply to this email.\n\n${m.from ? MAILBOX_SENDER[m.from].signoff : "The Recktube team"}` }],
       cta: m.cta,
       reason: m.reason,
       appUrl: app(),
     });
-    const res = await sendEmail({ to, subject: m.subject, ...mail, kind: "account", fromName: "Recktube", fromAddress: "support@recktube.xyz", replyTo: "support@recktube.xyz" });
+    const res = await sendEmail({ to, subject: m.subject, ...mail, kind: "account", fromName: m.from ? MAILBOX_SENDER[m.from].name : "Recktube", fromAddress: MAILBOX_ADDRESS[m.from ?? "support"], replyTo: MAILBOX_ADDRESS[m.from ?? "support"] });
     return res.sent;
   } catch (error) {
     console.error("admin email failed:", error instanceof Error ? error.message : String(error));
@@ -177,8 +178,9 @@ export function sendPlanChanged(email: string, monthly: number) {
 }
 
 /** A personal message from the team (written by an admin, or drafted by the assistant and approved). */
-export function sendTeamMessage(email: string, subject: string, message: string) {
+export function sendTeamMessage(email: string, subject: string, message: string, from: Mailbox = "support") {
   return send(email, {
+    from,
     subject: subject.slice(0, 140),
     preheader: message.slice(0, 110),
     eyebrow: "Message from the team",

@@ -50,8 +50,8 @@ export const ACTIONS = {
   },
   send_email: {
     permission: "users.action",
-    args: z.object({ email, subject: z.string().trim().min(3).max(140), message: z.string().trim().min(10).max(4000) }),
-    describe: (a: { email: string; subject: string; message: string }) => `Email ${a.email}: “${a.subject}” — ${a.message.slice(0, 160)}${a.message.length > 160 ? "…" : ""}`,
+    args: z.object({ email, subject: z.string().trim().min(3).max(140), message: z.string().trim().min(10).max(4000), from: z.enum(["support", "security", "founder", "owner"]).default("support") }),
+    describe: (a: { email: string; subject: string; message: string; from: string }) => `Email ${a.email} from ${a.from}@recktube.xyz: “${a.subject}” — ${a.message.slice(0, 160)}${a.message.length > 160 ? "…" : ""}`,
   },
   approve_affiliate: {
     permission: "affiliates.manage",
@@ -156,8 +156,8 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
     }
     case "send_email": {
       await userByEmail(a.email);
-      const ok = await sendTeamMessage(a.email, a.subject, a.message);
-      await log({ email: a.email, subject: a.subject });
+      const ok = await sendTeamMessage(a.email, a.subject, a.message, a.from);
+      await log({ email: a.email, subject: a.subject, from: a.from });
       return ok ? `Emailed ${a.email}.` : `Couldn't send the email to ${a.email} (email service unavailable).`;
     }
     case "approve_affiliate": {

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { adminDb, adminOverview, adminUserDetail, adminUsers } from "@/src/server/admin";
 import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
 import { FEATURES, featureFlags } from "@/src/server/admin-ops";
+import { getInboxEmail, listInbox } from "@/src/server/inbox";
 
 /**
  * Read-only look-ups for the admin assistant. Each one is gated by the same
@@ -88,6 +89,20 @@ export const TOOLS = {
         SELECT c.subject, c.category, c.handoff_summary, c.updated_at, u.email FROM support_conversations c JOIN users u ON u.id = c.user_id
         WHERE c.status = 'handoff' ORDER BY c.updated_at DESC LIMIT 10`;
       return { waiting: rows.map((r) => ({ email: String(r.email), subject: String(r.subject), category: String(r.category), summary: String(r.handoff_summary ?? "").slice(0, 400), updated: new Date(String(r.updated_at)).toISOString().slice(0, 16) })) };
+    },
+  },
+  inbox: {
+    permission: "inbox.read",
+    about: "Recent email received at support@, security@, founder@ or owner@ (mailbox: all|support|security|founder|owner). Pass id to read one email's text.",
+    args: z.object({ mailbox: z.enum(["all", "support", "security", "founder", "owner"]).default("all"), id: z.string().trim().max(100).optional() }),
+    run: async (a: { mailbox: string; id?: string }) => {
+      if (a.id) {
+        const e = await getInboxEmail(a.id);
+        const body = (e.text || (e.html ?? "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+        return { id: e.id, to: `${e.mailbox}@recktube.xyz`, from: e.fromName ? `${e.fromName} <${e.from}>` : e.from, subject: e.subject, received: e.receivedAt.slice(0, 16), automated: e.automated, text: body.slice(0, 3000) };
+      }
+      const { emails } = await listInbox();
+      return { emails: emails.filter((e) => a.mailbox === "all" || e.mailbox === a.mailbox).slice(0, 20).map((e) => ({ id: e.id, to: `${e.mailbox}@recktube.xyz`, from: e.fromName ? `${e.fromName} <${e.from}>` : e.from, subject: e.subject.slice(0, 160), received: e.receivedAt.slice(0, 16) })) };
     },
   },
   growth_report: {

@@ -1,7 +1,7 @@
 import { GeminiTextProvider, isTextConfigured } from "@/src/server/ai/gemini";
 import { getDb } from "@/src/server/db";
 import { backendUnavailable, validationError } from "@/src/server/errors";
-import type { AdminTemplate, Mailbox } from "@/src/server/admin-mail";
+import { MAILBOX_SENDER, type AdminTemplate, type Mailbox } from "@/src/server/admin-mail";
 import { PRODUCT_FACTS } from "@/src/server/support/facts";
 
 /**
@@ -73,7 +73,7 @@ export async function draftInboxReply(input: {
   instruction?: string;
 }): Promise<{ name: string; message: string }> {
   const account = await accountContext(input.fromEmail);
-  const team = input.mailbox === "security" ? "Recktube Security team" : "Recktube Support team";
+  const team = `${MAILBOX_SENDER[input.mailbox].name} team`;
   const prompt = `You are writing an email reply on behalf of the ${team}.
 
 ${PRODUCT_FACTS}

@@ -13,7 +13,7 @@ import { PRODUCT_FACTS } from "@/src/server/support/facts";
  * Automatic replies to email sent to support@. The assistant answers only
  * what it can answer safely from the product facts and the sender's own
  * account; everything else is left in the admin inbox for a person.
- * Never: security@ mail, machines (auto-replies, lists, bounces), our own
+ * Never: security@, founder@ or owner@ mail, machines (auto-replies, lists, bounces), our own
  * addresses, more than 3 replies a day to one sender, or the same email twice.
  */
 
@@ -58,7 +58,7 @@ export async function autoReplyToEmail(emailId: string): Promise<AutoReplyResult
     return { sent: false, reason: "Already handled." };
   }
   const email = await getInboxEmail(emailId);
-  if (email.mailbox !== "support") return { sent: false, reason: "Security mail is always handled by a person." };
+  if (email.mailbox !== "support") return { sent: false, reason: "Only support@ mail is answered automatically." };
   if (email.automated) return { sent: false, reason: "Sent by a machine." };
   const to = parseAddress(email.replyTo).address;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) || to.endsWith("@recktube.xyz") || MACHINE.test(to)) return { sent: false, reason: "No real person to reply to." };

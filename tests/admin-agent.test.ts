@@ -49,3 +49,13 @@ describe("admin assistant: proposed actions", () => {
     assert.equal(prepare("__proto__", {}), null);
   });
 });
+
+describe("assistant email aliases", () => {
+  it("send_email defaults to support@ and accepts our other addresses only", async () => {
+    const { prepare } = await import("@/src/server/admin-agent/actions");
+    const base = { email: "ada@example.com", subject: "Hello there", message: "A short personal note." };
+    assert.equal(prepare("send_email", base)?.args.from, "support");
+    assert.match(prepare("send_email", { ...base, from: "founder" })!.summary, /founder@recktube\.xyz/);
+    assert.equal(prepare("send_email", { ...base, from: "ceo" }), null);
+  });
+});

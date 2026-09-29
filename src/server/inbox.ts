@@ -1,9 +1,9 @@
 import { getServerEnv } from "@/src/lib/env";
 import { backendUnavailable, notFound, validationError } from "@/src/server/errors";
-import { SECURITY_ADDRESS, SUPPORT_ADDRESS, type Mailbox } from "@/src/server/admin-mail";
+import { FOUNDER_ADDRESS, MAILBOX_ADDRESS, OWNER_ADDRESS, SECURITY_ADDRESS, type Mailbox } from "@/src/server/admin-mail";
 
 /**
- * Admin inbox. ImprovMX forwards support@ / security@ to Gmail and to the
+ * Admin inbox. ImprovMX forwards support@ / security@ / founder@ / owner@ to Gmail and to the
  * Resend receiving address; the admin console reads them from Resend.
  */
 
@@ -71,7 +71,11 @@ export function mailboxOf(raw: Raw): Mailbox {
   const all = [...list(raw.to), ...list(raw.cc), header(raw, "to"), header(raw, "cc"), header(raw, "delivered-to"), header(raw, "x-original-to")]
     .join(" ")
     .toLowerCase();
-  return all.includes(SECURITY_ADDRESS) ? "security" : "support";
+  // Most sensitive first when one email was sent to several of our addresses.
+  if (all.includes(SECURITY_ADDRESS)) return "security";
+  if (all.includes(FOUNDER_ADDRESS)) return "founder";
+  if (all.includes(OWNER_ADDRESS)) return "owner";
+  return "support";
 }
 
 function summary(raw: Raw): InboxSummary {
@@ -118,4 +122,4 @@ export async function getInboxEmail(id: string): Promise<InboxEmail> {
   };
 }
 
-export const mailboxAddress = (m: Mailbox) => (m === "security" ? SECURITY_ADDRESS : SUPPORT_ADDRESS);
+export const mailboxAddress = (m: Mailbox) => MAILBOX_ADDRESS[m];

@@ -13,6 +13,9 @@ describe("admin inbox", () => {
     assert.equal(mailboxOf({ to: ["abc@inbound.resend.app"], headers: { To: "security@recktube.xyz" } }), "security");
     assert.equal(mailboxOf({ to: ["support@recktube.xyz"] }), "support");
     assert.equal(mailboxOf({ to: ["x@y.z"] }), "support");
+    assert.equal(mailboxOf({ to: ["founder@recktube.xyz"] }), "founder");
+    assert.equal(mailboxOf({ to: ["abc@inbound.resend.app"], headers: { "X-Original-To": "owner@recktube.xyz" } }), "owner");
+    assert.equal(mailboxOf({ to: ["owner@recktube.xyz", "security@recktube.xyz"] }), "security");
   });
 
   it("builds a threaded, branded reply that quotes the original", () => {

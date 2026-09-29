@@ -9,7 +9,20 @@ import { renderEmail, type EmailBlock } from "@/src/server/email-templates";
 export const SUPPORT_ADDRESS = "support@recktube.xyz";
 export const SECURITY_ADDRESS = "security@recktube.xyz";
 
-export type Mailbox = "support" | "security";
+export const OWNER_ADDRESS = "owner@recktube.xyz";
+export const FOUNDER_ADDRESS = "founder@recktube.xyz";
+
+export type Mailbox = "support" | "security" | "owner" | "founder";
+export const MAILBOXES: Mailbox[] = ["support", "security", "founder", "owner"];
+
+export const MAILBOX_ADDRESS: Record<Mailbox, string> = { support: SUPPORT_ADDRESS, security: SECURITY_ADDRESS, owner: OWNER_ADDRESS, founder: FOUNDER_ADDRESS };
+/** How mail from each address is signed. */
+export const MAILBOX_SENDER: Record<Mailbox, { name: string; signoff: string }> = {
+  support: { name: "Recktube Support", signoff: "The Recktube Support team" },
+  security: { name: "Recktube Security", signoff: "Recktube Security" },
+  founder: { name: "Recktube Founder", signoff: "The founder of Recktube" },
+  owner: { name: "Recktube", signoff: "The Recktube team" },
+};
 
 export interface TemplateField {
   key: string;
@@ -35,10 +48,10 @@ const hi = (f: Record<string, string>) => (f.name?.trim() ? `Hi ${f.name.trim()}
 const paragraphs = (s: string): EmailBlock[] => s.split(/\n{2,}/).map((t) => t.trim()).filter(Boolean).map((text) => ({ type: "text", text }));
 
 function mail(mailbox: Mailbox, app: string, subject: string, layout: Omit<Parameters<typeof renderEmail>[0], "appUrl" | "reason"> & { reason?: string }) {
-  const reply = mailbox === "security" ? SECURITY_ADDRESS : SUPPORT_ADDRESS;
+  const reply = MAILBOX_ADDRESS[mailbox];
   const out = renderEmail({
     ...layout,
-    reason: layout.reason ?? `You can reply to this email — it reaches the Recktube ${mailbox} team at ${reply}.`,
+    reason: layout.reason ?? `You can reply to this email — it reaches Recktube at ${reply}.`,
     appUrl: app,
   });
   return { subject, ...out };
@@ -476,11 +489,11 @@ export function buildReply(
   }
   return mail(mailbox, app, subject, {
     preheader: r.message.slice(0, 120),
-    eyebrow: mailbox === "security" ? "Recktube Security" : "Recktube Support",
+    eyebrow: MAILBOX_SENDER[mailbox].name,
     heading: hi({ name: r.name ?? "" }),
     blocks: [
       ...paragraphs(r.message),
-      { type: "text", text: mailbox === "security" ? "Recktube Security" : "The Recktube Support team" },
+      { type: "text", text: MAILBOX_SENDER[mailbox].signoff },
       ...(quote ? ([{ type: "divider" }, { type: "text", text: `On ${when}, ${r.quotedFrom} wrote:\n\n${quote}${(r.quoted ?? "").length > 1500 ? "\n…" : ""}` }] as EmailBlock[]) : []),
     ],
   });
