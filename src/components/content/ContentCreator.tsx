@@ -138,7 +138,7 @@ export function ContentCreator() {
     const short = idea.format === "Short";
     const existing = projects.projects.find((p) => p.channelId === channel.id && p.name.trim().toLowerCase() === idea.title.trim().toLowerCase());
     if (existing) {
-      router.push(`/studio/script?project=${existing.id}`);
+      router.push(`/studio/script?project=${existing.id}&autowrite=1`);
       return;
     }
     const project = projects.create({
@@ -174,7 +174,7 @@ export function ContentCreator() {
       const seo = pack.seoFor(project.id);
       pack.saveSeo({ ...seo, topic: idea.searchPhrase, keywords: [...new Set([idea.searchPhrase, ...seo.keywords])], audience: result.audience || seo.audience });
     }
-    router.push(`/studio/script?project=${project.id}`);
+    router.push(`/studio/script?project=${project.id}&autowrite=1`);
   }
 
   const labelFor = (tag: string, i: number) => `${tag}${i + 1}`;

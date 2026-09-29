@@ -197,7 +197,7 @@ export function ChannelCreator() {
     if (!current) return;
     const existing = existingFor(idea);
     if (existing) {
-      router.push(`/studio/script?project=${existing.id}`);
+      router.push(`/studio/script?project=${existing.id}&autowrite=1`);
       return;
     }
     const p = current.plan;

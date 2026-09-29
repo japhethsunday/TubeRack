@@ -1,6 +1,7 @@
 "use client";
 
 import { SupportWidget } from "@/src/components/support/SupportWidget";
+import { AiActivity } from "@/src/components/shell/AiActivity";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -169,6 +170,7 @@ export function AppShell({
       <MobileTabBar onMore={() => setNavOpen(true)} />
       <MobileTables />
       <SupportWidget />
+      <AiActivity />
     </ToastProvider>
   );
 }

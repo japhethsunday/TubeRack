@@ -180,7 +180,7 @@ export function VideoRecreator() {
     const ch = channel ?? projects.channels[0] ?? projects.addChannel(r.niche || "My channel", r.niche);
     const existing = projects.projects.find((p) => p.channelId === ch.id && p.name.trim().toLowerCase() === title.trim().toLowerCase());
     if (existing) {
-      router.push(`/studio/script?project=${existing.id}`);
+      router.push(`/studio/script?project=${existing.id}&autowrite=1`);
       return;
     }
     const short = bp.format === "Short";
@@ -235,7 +235,7 @@ export function VideoRecreator() {
       notes: blueprintText(r, title),
       updatedAt: now,
     });
-    router.push(`/studio/script?project=${project.id}`);
+    router.push(`/studio/script?project=${project.id}&autowrite=1`);
   }
 
   function blueprintText(r: Recreation, title: string): string {

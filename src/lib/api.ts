@@ -50,7 +50,62 @@ export function setVideoPass(pass: string | null): void {
   videoPass = pass;
 }
 
+/* ---------- AI activity: lets the app show "AI is working…" wherever a generation runs. ---------- */
+
+const AI_LABELS: [RegExp, string][] = [
+  [/^\/api\/v1\/ai\/script/, "Writing your script"],
+  [/^\/api\/v1\/ai\/speech/, "Recording the voice-over"],
+  [/^\/api\/v1\/ai\/(image|scene-visuals)/, "Creating visuals"],
+  [/^\/api\/v1\/ai\/video-clip/, "Making an AI video clip"],
+  [/^\/api\/v1\/ai\/transcribe/, "Making captions"],
+  [/^\/api\/v1\/ai\/(package|rewrite)/, "Writing titles and text"],
+  [/^\/api\/v1\/(ai\/intelligence|content-ideas|recreate|niche|market|trends|competitors)/, "Researching"],
+  [/^\/api\/v1\/channel-plans/, "Building your channel plan"],
+  [/^\/api\/v1\/brand/, "Designing"],
+  [/^\/api\/v1\/credits\/video-pass/, "Generating your video"],
+];
+
+export interface AiTask {
+  id: number;
+  label: string;
+  startedAt: number;
+}
+
+let aiSeq = 0;
+let aiTasks: AiTask[] = [];
+const aiListeners = new Set<(tasks: AiTask[]) => void>();
+
+export function subscribeAiActivity(fn: (tasks: AiTask[]) => void): () => void {
+  aiListeners.add(fn);
+  fn(aiTasks);
+  return () => {
+    aiListeners.delete(fn);
+  };
+}
+
+function trackAi(path: string, method: string): (() => void) | null {
+  if (method === "GET" || method === "DELETE") return null;
+  const label = AI_LABELS.find(([re]) => re.test(path))?.[1];
+  if (!label) return null;
+  const task = { id: ++aiSeq, label, startedAt: Date.now() };
+  aiTasks = [...aiTasks, task];
+  aiListeners.forEach((fn) => fn(aiTasks));
+  return () => {
+    aiTasks = aiTasks.filter((t) => t.id !== task.id);
+    aiListeners.forEach((fn) => fn(aiTasks));
+  };
+}
+
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  const done = trackAi(path, options.method ?? "GET");
+  try {
+    return await request<T>(path, options);
+  } finally {
+    done?.();
+  }
+}
+
+async function request<T>(path: string, options: ApiOptions): Promise<T> {
   let response: Response;
   const headers: Record<string, string> = {};
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
