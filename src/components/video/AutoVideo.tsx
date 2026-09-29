@@ -426,11 +426,16 @@ export function GenerateVideoDialog({
         });
         if (isCancelled()) return;
       }
-      const clipsOk = made.filter((a) => a.kind === "video").length;
-      const imgOk = made.filter((a) => a.kind === "image").length + clipsOk;
+      // Count scenes that have a visual, not files (a scene can have several stock clips, or a picture plus its AI motion shot).
+      const visualOf = (sc: Scene) => made.filter((a) => (a.kind === "image" || a.kind === "video") && a.sceneIds.includes(sc.id));
+      const imgOk = scenes.filter((sc) => visualOf(sc).length > 0).length;
+      const stockScenes = scenes.filter((sc) => visualOf(sc).some((a) => a.kind === "video" && !a.tags?.includes("ai-clip"))).length;
       set("visuals", {
         state: imgOk === scenes.length ? "done" : imgOk ? "partial" : "failed",
-        detail: imgOk === scenes.length ? `${clipsOk - animated} stock clips · ${animated ? `${animated} AI motion · ` : ""}${imgOk - clipsOk} images` : `${imgOk}/${scenes.length} — ${imageErrors[0] ?? "failed"}`,
+        detail:
+          imgOk === scenes.length
+            ? [stockScenes && `${stockScenes} stock`, imgOk - stockScenes && `${imgOk - stockScenes} AI pictures`, animated && `${animated} AI motion`].filter(Boolean).join(" · ")
+            : `${imgOk}/${scenes.length} — ${imageErrors[0] ?? "failed"}`,
       });
 
       // 4. Background music from the free library (optional).

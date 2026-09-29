@@ -380,8 +380,13 @@ function drawMedia(
   const s = tr.scale * m.scale * fx.scale;
   ctx.scale(s * (tr.flipH ? -1 : 1), s * (tr.flipV ? -1 : 1));
   const filters = clip.filters;
-  const base = filterString(filters, W / 1920);
-  const extra = fx.blur > 0.2 ? `blur(${((fx.blur * W) / 1920).toFixed(1)}px)` : "";
+  const cine = clip.kind === "image" && typeof clip.motion === "string" && clip.motion.startsWith("cine-");
+  // Cinematic pictures: a gentle grade (unless the user set their own look) and a focus pull as the shot opens.
+  const userLook = filterString(filters, W / 1920);
+  const base = cine && userLook === "none" ? "contrast(106%) saturate(108%)" : userLook;
+  const focus = cine ? 5 * (1 - easeOut(sec / 0.7)) : 0;
+  const blurPx = fx.blur + focus;
+  const extra = blurPx > 0.2 ? `blur(${((blurPx * W) / 1920).toFixed(1)}px)` : "";
   ctx.filter = extra ? (base === "none" ? extra : `${base} ${extra}`) : base;
   // Moving pictures shimmer with the default resampler.
   ctx.imageSmoothingEnabled = true;
@@ -394,6 +399,70 @@ function drawMedia(
     g.addColorStop(1, `rgba(0,0,0,${Math.min(0.9, filters.vignette / 100)})`);
     ctx.fillStyle = g;
     ctx.fillRect(-dw / 2, -dh / 2, dw, dh);
+  }
+  ctx.restore();
+  if (cine) cineFinish(ctx, W, H, sec, p, (clip.opacity ?? 1) * fx.alpha);
+}
+
+/* ---------- Film finish for cinematic pictures (screen space, drawn over the shot) ---------- */
+
+let grainTile: HTMLCanvasElement | OffscreenCanvas | null = null;
+function grain(): HTMLCanvasElement | OffscreenCanvas | null {
+  if (grainTile) return grainTile;
+  const size = 160;
+  const c = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(size, size) : typeof document !== "undefined" ? document.createElement("canvas") : null;
+  if (!c) return null;
+  c.width = size;
+  c.height = size;
+  const g = c.getContext("2d") as CanvasRenderingContext2D | null;
+  if (!g) return null;
+  const img = g.createImageData(size, size);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 128 + (Math.random() - 0.5) * 110;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  grainTile = c;
+  return c;
+}
+
+function cineFinish(ctx: CanvasRenderingContext2D, W: number, H: number, sec: number, p: number, alpha: number): void {
+  if (alpha <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // Soft light sweep: a wide diagonal glow drifting across the frame once per shot.
+  const q = (p - 0.12) / 0.7;
+  if (q > 0 && q < 1) {
+    const x = -0.4 * W + q * 1.8 * W;
+    const band = ctx.createLinearGradient(x - W * 0.35, 0, x + W * 0.35, H * 0.5);
+    const peak = 0.07 * Math.sin(Math.PI * q);
+    band.addColorStop(0, "rgba(255,244,225,0)");
+    band.addColorStop(0.5, `rgba(255,244,225,${peak.toFixed(3)})`);
+    band.addColorStop(1, "rgba(255,244,225,0)");
+    ctx.globalCompositeOperation = "screen";
+    ctx.fillStyle = band;
+    ctx.fillRect(0, 0, W, H);
+  }
+  // Subtle vignette pulls the eye to the subject.
+  ctx.globalCompositeOperation = "source-over";
+  const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.hypot(W, H) / 2);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(0,0,0,0.32)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+  // Fine moving film grain.
+  const tile = grain();
+  if (tile) {
+    const pattern = ctx.createPattern(tile as CanvasImageSource, "repeat");
+    if (pattern) {
+      const f = Math.floor(sec * 24);
+      ctx.translate(((f * 37) % 160) - 160, ((f * 71) % 160) - 160);
+      ctx.globalCompositeOperation = "overlay";
+      ctx.globalAlpha = alpha * 0.05;
+      ctx.fillStyle = pattern;
+      ctx.fillRect(0, 0, W + 160, H + 160);
+    }
   }
   ctx.restore();
 }
