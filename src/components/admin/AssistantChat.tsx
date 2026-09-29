@@ -11,6 +11,11 @@ import { cx } from "@/src/components/ui/cx";
 export interface Proposal { action: string; summary: string; token: string; state?: "idle" | "busy" | "done" | "error" | "dismissed"; result?: string }
 export interface Turn { role: "admin" | "assistant"; text: string; proposals?: Proposal[]; lookups?: string[]; open?: string }
 
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+
 const STARTERS = [
   "How is the business doing this week?",
   "Any suspicious accounts or fraud?",
@@ -27,6 +32,7 @@ const LOOKUP_LABEL: Record<string, string> = {
   user_details: "account details",
   recent_failures: "failures",
   support_queue: "support queue",
+  boss_todo: "your to-dos",
   inbox: "inbox",
   growth_report: "sign-up sources",
   affiliates_overview: "affiliates",
@@ -128,7 +134,38 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
           </div>
         ) : (<>
         <div className={cx("min-h-0 flex-1 space-y-3 overflow-y-auto", compact ? "p-4" : "p-4 sm:p-5")} aria-live="polite">
-          {turns.length === 0 && (
+          {turns.length === 0 && saved?.boss && (
+            <div className="support-in space-y-3">
+              <div className="max-w-[92%] rounded-2xl rounded-bl-md bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
+                <p className="font-medium">{greeting()}, {saved.boss.name}.</p>
+                <p className="mt-1 text-muted-text">{saved.boss.todos.some((t) => t.tone !== "good") ? "Here's what needs you right now:" : "Everything is under control. Here's today at a glance:"}</p>
+              </div>
+              {saved.boss.todos.length > 0 && (
+                <ul className="space-y-1.5">
+                  {saved.boss.todos.map((t) => (
+                    <li key={t.id}>
+                      <button type="button" onClick={() => router.push(t.href)} className="flex w-full items-start gap-2.5 rounded-xl border border-border px-3 py-2 text-left hover:border-primary">
+                        <span className={cx("mt-1.5 size-2 shrink-0 rounded-full", t.tone === "urgent" ? "bg-destructive" : t.tone === "good" ? "bg-emerald-400" : "bg-amber-400")} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium">{t.title}</span>
+                          <span className="block text-[11px] text-muted-text">{t.detail}</span>
+                        </span>
+                        <span className="mt-0.5 text-xs font-medium text-primary">Open →</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                {["Hi, what needs me today?", ...STARTERS.slice(0, 3)].map((s) => (
+                  <button key={s} type="button" onClick={() => void ask(s)} className="rounded-full border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {turns.length === 0 && !saved?.boss && (
             <div className="support-in space-y-3">
               <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
                 <p className="font-medium">Hello, welcome to the Recktube admin assistant.</p>

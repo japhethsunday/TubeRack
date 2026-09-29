@@ -89,3 +89,22 @@ describe("assistant navigation and credit removal", () => {
     assert.equal(prepare("remove_credits", { email: "ada@example.com", amount: -5 }), null);
   });
 });
+
+describe("boss mode", () => {
+  it("is only for the first owner address, verified and active", async () => {
+    const { isBoss } = await import("@/src/server/admin-agent/boss");
+    const prev = process.env.ADMIN_EMAILS;
+    process.env.ADMIN_EMAILS = "boss@example.com, second@example.com";
+    try {
+      const ok = { email: "Boss@Example.com", emailVerifiedAt: "2026-01-01", status: "active" };
+      assert.equal(isBoss(ok), true);
+      assert.equal(isBoss({ ...ok, email: "second@example.com" }), false);
+      assert.equal(isBoss({ ...ok, emailVerifiedAt: null }), false);
+      assert.equal(isBoss({ ...ok, status: "suspended" }), false);
+      assert.equal(isBoss(null), false);
+    } finally {
+      if (prev === undefined) delete process.env.ADMIN_EMAILS;
+      else process.env.ADMIN_EMAILS = prev;
+    }
+  });
+});

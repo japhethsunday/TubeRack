@@ -3,6 +3,7 @@ import { z } from "zod";
 import { adminRole, requireAdmin } from "@/src/server/admin";
 import { getSessionUser } from "@/src/server/auth";
 import { askAssistant, verifyProposal } from "@/src/server/admin-agent/agent";
+import { isBoss } from "@/src/server/admin-agent/boss";
 import { runAction } from "@/src/server/admin-agent/actions";
 import { sharedLimit } from "@/src/server/shared-limit";
 import { forbidden, toErrorResponse, validationError } from "@/src/server/errors";
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     await sharedLimit(`admin-agent:${admin.id}`, 120, 3600);
     const { history } = await parseBody(request, ask);
     if (history[history.length - 1].role !== "admin") throw validationError("Ask a question first.");
-    return NextResponse.json({ data: await askAssistant(admin.id, role, history) });
+    return NextResponse.json({ data: await askAssistant(admin.id, role, history, isBoss(admin)) });
   } catch (error) {
     return toErrorResponse(error);
   }

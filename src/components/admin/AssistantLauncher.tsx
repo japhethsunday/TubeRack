@@ -41,12 +41,16 @@ export class ChatBoundary extends Component<{ children: React.ReactNode }, { fai
 
 type TurnsState = [Turn[], React.Dispatch<React.SetStateAction<Turn[]>>];
 export interface ChatSummary { id: string; title: string; updatedAt: string }
+export interface BossTodo { id: string; title: string; detail: string; href: string; tone: "urgent" | "normal" | "good" }
+export interface BossInfo { name: string; todos: BossTodo[] }
 interface ChatsState {
   chatId: string | null;
   chats: ChatSummary[];
   newChat: () => void;
   openChat: (id: string, onlyIfUntouched?: boolean) => Promise<void>;
   removeChat: (id: string) => Promise<void>;
+  /** Only for the founder's own account (the server returns 404 to everyone else). */
+  boss: BossInfo | null;
 }
 const Ctx = createContext<{ turns: TurnsState; chats: ChatsState } | null>(null);
 
@@ -59,6 +63,17 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
   const [turns, setTurnsRaw] = useState<Turn[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [boss, setBoss] = useState<BossInfo | null>(null);
+  useEffect(() => {
+    let live = true;
+    const load = () => api.get<BossInfo>("/api/v1/admin/assistant/boss").then((b) => live && setBoss(b)).catch(() => undefined);
+    void load();
+    const t = window.setInterval(load, 5 * 60_000);
+    return () => {
+      live = false;
+      window.clearInterval(t);
+    };
+  }, []);
   const dirty = useRef(false);
   const idRef = useRef<string | null>(null);
   const saving = useRef<Promise<unknown> | null>(null);
@@ -140,7 +155,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
     [newChat, refresh],
   );
 
-  const value = useMemo(() => ({ turns: [turns, setTurns] as TurnsState, chats: { chatId, chats, newChat, openChat, removeChat } }), [turns, setTurns, chatId, chats, newChat, openChat, removeChat]);
+  const value = useMemo(() => ({ turns: [turns, setTurns] as TurnsState, chats: { chatId, chats, newChat, openChat, removeChat, boss } }), [turns, setTurns, chatId, chats, newChat, openChat, removeChat, boss]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
@@ -158,6 +173,7 @@ export function AssistantLauncher() {
   const path = usePathname();
   const [turns, setTurns] = useAssistantTurns();
   const [open, setOpen] = useState(false);
+  const urgent = useAssistantChats()?.boss?.todos.some((t) => t.tone === "urgent") ?? false;
 
   // Close with Escape.
   useEffect(() => {
@@ -181,6 +197,7 @@ export function AssistantLauncher() {
         >
           <span className="support-ring absolute inset-0 rounded-full" aria-hidden="true" />
           <Bot className="relative size-6" aria-hidden="true" />
+          {urgent && <span className="absolute right-0.5 top-0.5 size-3.5 rounded-full border-2 border-background bg-destructive" aria-label="Something needs you" />}
         </button>
       )}
       {open && (
