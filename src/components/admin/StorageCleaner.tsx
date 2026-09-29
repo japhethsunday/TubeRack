@@ -16,7 +16,7 @@ export function StorageCleaner() {
   const [days, setDays] = useState(7);
   const [moving, setMoving] = useState(false);
   const [moveMsg, setMoveMsg] = useState<string | null>(null);
-  const [r2, setR2] = useState<{ configured: boolean; reachable: boolean; cors: string; active: boolean } | null>(null);
+  const [r2, setR2] = useState<{ configured: boolean; reachable: boolean; problem?: string | null; cors: string; active: boolean } | null>(null);
   const [toggling, setToggling] = useState(false);
   useEffect(() => {
     api.get<typeof r2>("/api/v1/admin/storage?r2=1").then(setR2).catch(() => undefined);
@@ -66,7 +66,7 @@ export function StorageCleaner() {
       <div className="mt-4 border-t border-border pt-3">
         <p className="text-sm font-semibold">Cloudflare R2</p>
         <p className="text-xs text-muted-text">
-          {!r2 ? "Checking…" : !r2.configured ? "Not set up (add the R2 settings in Vercel)." : !r2.reachable ? "Set up, but the bucket can't be reached — check the keys." : `Connected · CORS rule: ${r2.cors === "ok" ? "found" : r2.cors === "missing" ? "missing" : "can't check"} · New files: ${r2.active ? "saved on R2" : "still on Supabase"}`}
+          {!r2 ? "Checking…" : !r2.configured ? "Not set up (add the R2 settings in Vercel)." : !r2.reachable ? `Set up, but the bucket can't be reached: ${r2.problem ?? "check the keys."}` : `Connected · CORS rule: ${r2.cors === "ok" ? "found" : r2.cors === "missing" ? "missing" : "can't check"} · New files: ${r2.active ? "saved on R2" : "still on Supabase"}`}
         </p>
         {r2?.reachable && (
           <Button size="sm" variant={r2.active ? "outline" : "primary"} className="mt-2 mr-2" loading={toggling} onClick={() => void toggleR2(!r2.active)}>

@@ -10,9 +10,14 @@ interface R2Env { account: string; key: string; secret: string; bucket: string }
 
 export function r2Env(): R2Env | null {
   const e = getServerEnv();
-  if (!e.R2_ACCOUNT_ID || !e.R2_ACCESS_KEY_ID || !e.R2_SECRET_ACCESS_KEY) return null;
+  const t = (v?: string) => (v ?? "").trim().replace(/^["']|["']$/g, "");
+  // Accept a pasted endpoint URL in place of the account ID.
+  const account = t(e.R2_ACCOUNT_ID).replace(/^https?:\/\//, "").split(/[./]/)[0];
+  const key = t(e.R2_ACCESS_KEY_ID);
+  const secret = t(e.R2_SECRET_ACCESS_KEY);
+  if (!account || !key || !secret) return null;
   // The bucket name isn't secret; default to ours if the variable is missing or misspelt.
-  return { account: e.R2_ACCOUNT_ID, key: e.R2_ACCESS_KEY_ID, secret: e.R2_SECRET_ACCESS_KEY, bucket: e.R2_BUCKET || "recktube-media" };
+  return { account, key, secret, bucket: t(e.R2_BUCKET) || "recktube-media" };
 }
 
 export const isR2Configured = () => Boolean(r2Env());
@@ -192,10 +197,26 @@ export async function r2DeleteMany(keys: string[]): Promise<void> {
 }
 
 export async function r2Ping(): Promise<boolean> {
+  return (await r2Diagnose()) === null;
+}
+
+/** null when the bucket answers; otherwise a plain reason (never includes the keys). */
+export async function r2Diagnose(): Promise<string | null> {
+  const env = r2Env();
+  if (!env) return "The R2 settings are missing in Vercel.";
   try {
-    const res = await r2Request("GET", "", { query: { "list-type": "2", "max-keys": "1" }, timeoutMs: 5000 });
-    return res.ok;
-  } catch {
-    return false;
+    const res = await r2Request("GET", "", { query: { "list-type": "2", "max-keys": "1" }, timeoutMs: 8000 });
+    if (res.ok) return null;
+    const code = tag(await res.text(), "Code")[0] ?? "";
+    const hints: Record<string, string> = {
+      InvalidAccessKeyId: "R2_ACCESS_KEY_ID is wrong (use the Access Key ID from the R2 API token, not the token value).",
+      SignatureDoesNotMatch: "R2_SECRET_ACCESS_KEY is wrong (use the Secret Access Key shown once when the token was created).",
+      NoSuchBucket: `No bucket called "${env.bucket}" in this account — check R2_ACCOUNT_ID.`,
+      AccessDenied: "The R2 token doesn't have access to this bucket — give it Object Read & Write on recktube-media.",
+      Unauthorized: "The R2 keys were rejected — check R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.",
+    };
+    return hints[code] ?? `R2 answered ${res.status}${code ? ` (${code})` : ""}.`;
+  } catch (err) {
+    return `Couldn't reach R2 (${err instanceof Error ? err.message : "network error"}) — check R2_ACCOUNT_ID.`;
   }
 }
