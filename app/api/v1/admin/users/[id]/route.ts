@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sendAccountDeleted, sendAccountReactivated, sendAccountSuspended, sendEmailVerifiedByTeam, sendSignedOutEverywhere } from "@/src/server/admin-emails";
 import { z } from "zod";
 import { adminDb, adminUserDetail, isAdmin, requireAdmin } from "@/src/server/admin";
 import { revokeAllSessions } from "@/src/server/auth";
@@ -31,6 +32,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     } else {
       await db`UPDATE users SET email_verified_at = coalesce(email_verified_at, now()), updated_at = now() WHERE id = ${id}`;
     }
+    // Tell the person (only when something actually changed for them).
+    const to = String(target.email);
+    if (action === "suspend" && target.status !== "suspended") await sendAccountSuspended(to);
+    else if (action === "reactivate" && target.status === "suspended") await sendAccountReactivated(to);
+    else if (action === "sign-out") await sendSignedOutEverywhere(to);
+    else if (action === "verify-email" && !target.email_verified_at) await sendEmailVerifiedByTeam(to);
     await audit({ userId: admin.id, action: `admin.user.${action}`, resourceType: "user", resourceId: id, metadata: { target: String(target.email) } });
     return NextResponse.json({ data: { ok: true } });
   } catch (error) {
@@ -48,7 +55,7 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ id: stri
     const admin = await requireAdmin(request, "users.delete");
     const id = parseId((await ctx.params).id, "user");
     const db = adminDb();
-    const [target] = await db`SELECT id, email, email_verified_at FROM users WHERE id = ${id}`;
+    const [target] = await db`SELECT id, email, name, email_verified_at FROM users WHERE id = ${id}`;
     if (!target) throw notFound("User");
     if (target.id === admin.id) throw forbidden("You can't delete your own admin account.");
     if (isAdmin({ email: String(target.email), emailVerifiedAt: target.email_verified_at ? "y" : null, status: "active" })) {
@@ -66,6 +73,7 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ id: stri
       await tx`DELETE FROM users WHERE id = ${id}`;
       return [{ workspaces: ids.length }];
     });
+    await sendAccountDeleted(String(target.email), String(target.name ?? ""));
     await audit({ userId: admin.id, action: "admin.user.delete", resourceType: "user", resourceId: id, metadata: { target: String(target.email), workspacesDeleted: counts.workspaces } });
     return NextResponse.json({ data: { deleted: true, workspacesDeleted: counts.workspaces } });
   } catch (error) {

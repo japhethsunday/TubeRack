@@ -4,6 +4,7 @@ import { adminCredits, adminDb, requireAdmin } from "@/src/server/admin";
 import { adjustCredits, setCreditPlan } from "@/src/server/credits";
 import { audit } from "@/src/server/audit";
 import { notifyCreditGift } from "@/src/server/credit-emails";
+import { sendPlanChanged, workspaceOwnerEmails } from "@/src/server/admin-emails";
 import { notFound, toErrorResponse, validationError } from "@/src/server/errors";
 import { parseBody, parseId } from "@/src/server/validate";
 
@@ -58,6 +59,10 @@ export async function POST(request: Request) {
       const nowUnlimited = input.unlimited === true && !before?.unlimited;
       if (nowUnlimited) emailed = await notifyCreditGift(workspaceId, { unlimited: true, note: input.reason });
       else if ((input.delta ?? 0) > 0) emailed = await notifyCreditGift(workspaceId, { added: input.delta, balance: state?.unlimited ? undefined : state?.balance, note: input.reason });
+      // A new monthly allowance (their plan) is news too.
+      if (input.monthlyGrant !== undefined && before && Number(before.monthly_grant) !== input.monthlyGrant && !nowUnlimited) {
+        for (const email of await workspaceOwnerEmails(workspaceId)) if (await sendPlanChanged(email, input.monthlyGrant)) emailed++;
+      }
     }
     return NextResponse.json({ data: { ...(state ?? {}), emailed } });
   } catch (error) {

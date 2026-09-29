@@ -5,6 +5,7 @@ import { listTeam } from "@/src/server/admin-ops";
 import { audit } from "@/src/server/audit";
 import { toErrorResponse, validationError } from "@/src/server/errors";
 import { parseBody } from "@/src/server/validate";
+import { sendTeamRemoved, sendTeamWelcome } from "@/src/server/admin-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +27,12 @@ export async function POST(request: Request) {
     const admin = await requireAdmin(request, "team.edit");
     const { email, role } = await parseBody(request, body);
     if (adminEmails().includes(email)) throw validationError("That address is already an owner.");
+    const [before] = await adminDb()`SELECT role FROM admin_members WHERE email = ${email}`;
     await adminDb()`
       INSERT INTO admin_members (email, role, added_by) VALUES (${email}, ${role}, ${admin.id})
       ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role`;
+    // Welcome a new team member, or tell them their role changed (not when nothing changed).
+    if (!before || before.role !== role) await sendTeamWelcome(email, role, !before);
     await audit({ userId: admin.id, action: "admin.team.set", metadata: { email, role } });
     return NextResponse.json({ data: { ok: true } });
   } catch (error) {
@@ -42,7 +46,8 @@ export async function DELETE(request: Request) {
     const admin = await requireAdmin(request, "team.edit");
     const email = (new URL(request.url).searchParams.get("email") ?? "").trim().toLowerCase();
     if (!email) throw validationError("Which member?");
-    await adminDb()`DELETE FROM admin_members WHERE email = ${email}`;
+    const removed = await adminDb()`DELETE FROM admin_members WHERE email = ${email} RETURNING email`;
+    if (removed.length) await sendTeamRemoved(email);
     await audit({ userId: admin.id, action: "admin.team.remove", metadata: { email } });
     return NextResponse.json({ data: { ok: true } });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { getDb } from "@/src/server/db";
 import { backendUnavailable, notFound, validationError } from "@/src/server/errors";
+import { sendAffiliateStatus, sendCommissionUpdate } from "@/src/server/admin-emails";
 
 /**
  * Affiliate program. Partners apply, the team approves them, and they share
@@ -155,11 +156,15 @@ export async function listAffiliates() {
 
 export async function updateAffiliate(id: string, patch: { status?: string; commissionPct?: number; adminNote?: string }): Promise<void> {
   const d = db();
-  const [a] = await d`SELECT id FROM affiliates WHERE id = ${id}`;
+  const [a] = await d`SELECT a.id, a.status, a.code, a.commission_pct, u.email FROM affiliates a JOIN users u ON u.id = a.user_id WHERE a.id = ${id}`;
   if (!a) throw notFound("Affiliate");
   if (patch.status) await d`UPDATE affiliates SET status = ${patch.status}, approved_at = CASE WHEN ${patch.status} = 'approved' THEN coalesce(approved_at, now()) ELSE approved_at END WHERE id = ${id}`;
   if (patch.commissionPct !== undefined) await d`UPDATE affiliates SET commission_pct = ${patch.commissionPct} WHERE id = ${id}`;
   if (patch.adminNote !== undefined) await d`UPDATE affiliates SET admin_note = ${patch.adminNote} WHERE id = ${id}`;
+  // Tell the partner when their status changes.
+  if (patch.status && patch.status !== a.status) {
+    await sendAffiliateStatus(String(a.email), patch.status, String(a.code), patch.commissionPct ?? Number(a.commission_pct));
+  }
 }
 
 /**
@@ -180,6 +185,8 @@ export async function recordSale(adminId: string, input: { email: string; amount
     INSERT INTO affiliate_commissions (affiliate_id, referred_user_id, sale_minor, commission_minor, currency, note, created_by)
     VALUES (${String(u.affiliate_id)}, ${String(u.id)}, ${sale}, ${commission}, ${input.currency}, ${input.note}, ${adminId})
     RETURNING id`;
+  const [aff] = await d`SELECT u.email FROM affiliates a JOIN users u ON u.id = a.user_id WHERE a.id = ${String(u.affiliate_id)}`;
+  if (aff && commission > 0) await sendCommissionUpdate(String(aff.email), "pending", commission / 100, input.currency);
   return { id: String(c.id), commission: commission / 100 };
 }
 
@@ -203,6 +210,8 @@ export async function listCommissions() {
 export async function setCommissionStatus(id: string, status: "approved" | "paid" | "void"): Promise<void> {
   const [c] = await db()`
     UPDATE affiliate_commissions SET status = ${status}, paid_at = CASE WHEN ${status} = 'paid' THEN now() ELSE paid_at END
-    WHERE id = ${id} RETURNING id`;
-  if (!c) throw notFound("Commission");
+    WHERE id = ${id} AND status <> ${status} RETURNING affiliate_id, commission_minor, currency`;
+  if (!c) return; // unknown, or already in that state: nothing to tell anyone
+  const [aff] = await db()`SELECT u.email FROM affiliates a JOIN users u ON u.id = a.user_id WHERE a.id = ${String(c.affiliate_id)}`;
+  if (aff) await sendCommissionUpdate(String(aff.email), status, Number(c.commission_minor) / 100, String(c.currency));
 }
