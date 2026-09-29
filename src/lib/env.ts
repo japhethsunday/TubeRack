@@ -20,6 +20,11 @@ const serverSchema = z.object({
   // service_role key: bypasses RLS, server-only, never NEXT_PUBLIC_.
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_BUCKET: z.string().default("media"),
+  // Cloudflare R2 (preferred file storage when set; Supabase Storage stays as the fallback).
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET: z.string().optional(),
 
   // Transactional email (Resend; server-only)
   RESEND_API_KEY: z.string().optional(),

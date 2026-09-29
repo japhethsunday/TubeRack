@@ -1,6 +1,7 @@
 import { getServerEnv } from "@/src/lib/env";
 import { getDb } from "@/src/server/db";
 import { internalError } from "@/src/server/errors";
+import { isR2Active, isR2Configured, r2DeleteMany, r2Exists, r2Get, r2List, r2Ping, r2Presign, r2Put } from "@/src/server/r2";
 
 /**
  * Object storage adapter for the configured Supabase Storage bucket (private).
@@ -28,8 +29,14 @@ export function objectKey(workspaceId: string, projectId: string, filename: stri
   return `${workspaceId}/${projectId}/${id}-${safeName(filename)}`;
 }
 
-export function isStorageConfigured(env = getServerEnv()): boolean {
+/** Supabase Storage (the original store, kept as fallback for older files). */
+function supaConfigured(env = getServerEnv()): boolean {
   return Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/** Any file storage available: Cloudflare R2 (new files) or Supabase Storage. */
+export function isStorageConfigured(env = getServerEnv()): boolean {
+  return isR2Configured() || supaConfigured(env);
 }
 
 function authHeaders(env: ReturnType<typeof getServerEnv>): Record<string, string> {
@@ -50,8 +57,13 @@ function objectUrl(env: ReturnType<typeof getServerEnv>, key: string): string {
  * failure so callers can fall back to inline storage with a clear message.
  */
 export async function storagePut(key: string, bytes: Uint8Array, mime: string): Promise<StoragePutResult> {
+  if (await isR2Active()) {
+    await r2Put(key, bytes, mime);
+    locationCache.set(key, "r2");
+    return { key, bytes: bytes.byteLength };
+  }
   const env = getServerEnv();
-  if (!isStorageConfigured(env)) throw new Error("Object storage is not configured.");
+  if (!supaConfigured(env)) throw new Error("Object storage is not configured.");
   const type = mime || "application/octet-stream";
   let response: Response;
   try {
@@ -71,8 +83,12 @@ export async function storagePut(key: string, bytes: Uint8Array, mime: string): 
 }
 
 export async function storageGet(key: string): Promise<{ bytes: Uint8Array; mime: string }> {
+  if (isR2Configured()) {
+    const hit = await r2Get(key);
+    if (hit) return hit;
+  }
   const env = getServerEnv();
-  if (!isStorageConfigured(env)) throw new Error("Object storage is not configured.");
+  if (!supaConfigured(env)) throw new Error("Object not found.");
   let response: Response;
   try {
     response = await fetch(objectUrl(env, key), { headers: authHeaders(env) });
@@ -87,8 +103,10 @@ export async function storageGet(key: string): Promise<{ bytes: Uint8Array; mime
 }
 
 export async function storageDelete(key: string): Promise<void> {
+  if (isR2Configured()) await r2DeleteMany([key]).catch(() => undefined);
+  locationCache.delete(key);
   const env = getServerEnv();
-  if (!isStorageConfigured(env)) return;
+  if (!supaConfigured(env)) return;
   try {
     await fetch(objectUrl(env, key), { method: "DELETE", headers: authHeaders(env) });
   } catch {
@@ -98,8 +116,9 @@ export async function storageDelete(key: string): Promise<void> {
 
 /** Reachability probe for /system/status: true when the bucket answers with our key. */
 export async function storagePing(): Promise<boolean> {
+  if (await isR2Active()) return r2Ping();
   const env = getServerEnv();
-  if (!isStorageConfigured(env)) return false;
+  if (!supaConfigured(env)) return false;
   const base = env.SUPABASE_URL!.replace(/\/$/, "");
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
@@ -127,8 +146,12 @@ export async function inlineLimit(): Promise<number> {
  * The server chooses the key; the token is single-use and short-lived.
  */
 export async function storageSignedUpload(key: string): Promise<string> {
+  if (await isR2Active()) {
+    locationCache.set(key, "r2");
+    return r2Presign("PUT", key, 3600);
+  }
   const env = getServerEnv();
-  if (!isStorageConfigured(env)) throw new Error("Object storage is not configured.");
+  if (!supaConfigured(env)) throw new Error("Object storage is not configured.");
   const base = env.SUPABASE_URL!.replace(/\/$/, "");
   const path = key.split("/").map(encodeURIComponent).join("/");
   const response = await fetch(`${base}/storage/v1/object/upload/sign/${encodeURIComponent(env.SUPABASE_BUCKET)}/${path}`, {
@@ -148,6 +171,18 @@ export async function storageSignedUpload(key: string): Promise<string> {
  * the browser use its cached copy instead of downloading the file again.
  */
 const signedCache = new Map<string, { url: string; until: number }>();
+/** Where each file lives (new files: R2; older ones may still be on Supabase). */
+const locationCache = new Map<string, "r2" | "supabase">();
+
+async function locate(key: string): Promise<"r2" | "supabase"> {
+  if (!isR2Configured()) return "supabase";
+  const known = locationCache.get(key);
+  if (known) return known;
+  const where = (await r2Exists(key).catch(() => false)) ? "r2" : supaConfigured() ? "supabase" : "r2";
+  if (locationCache.size > 20000) locationCache.clear();
+  locationCache.set(key, where);
+  return where;
+}
 
 export async function storageSignedUrl(key: string, expiresIn = 3600, downloadAs?: string): Promise<string> {
   const cacheKey = `${key}|${downloadAs ?? ""}`;
@@ -160,8 +195,12 @@ export async function storageSignedUrl(key: string, expiresIn = 3600, downloadAs
 }
 
 async function signFresh(key: string, expiresIn: number, downloadAs?: string): Promise<string> {
+  if ((await locate(key)) === "r2") {
+    const extra: Record<string, string> = downloadAs ? { "response-content-disposition": `attachment; filename="${downloadAs.replace(/"/g, "")}"` } : {};
+    return r2Presign("GET", key, expiresIn, extra);
+  }
   const env = getServerEnv();
-  if (!isStorageConfigured(env)) throw new Error("Object storage is not configured.");
+  if (!supaConfigured(env)) throw new Error("Object storage is not configured.");
   const base = env.SUPABASE_URL!.replace(/\/$/, "");
   const path = key.split("/").map(encodeURIComponent).join("/");
   const response = await fetch(`${base}/storage/v1/object/sign/${encodeURIComponent(env.SUPABASE_BUCKET)}/${path}`, {
@@ -188,8 +227,17 @@ export async function storageList(prefix: string): Promise<StoredObject[]> {
 
 /** Files and sub-folders directly under a folder. */
 export async function storageListAll(prefix: string, search?: string): Promise<{ files: StoredObject[]; folders: string[] }> {
+  const empty = { files: [] as StoredObject[], folders: [] as string[] };
+  const parts = await Promise.all([isR2Configured() ? r2List(prefix, search) : empty, supaConfigured() ? supaListAll(prefix, search) : empty]);
+  const seen = new Set<string>();
+  const files = [...parts[0].files, ...parts[1].files].filter((f) => (seen.has(f.name) ? false : (seen.add(f.name), true)));
+  return { files, folders: [...new Set([...parts[0].folders, ...parts[1].folders])] };
+}
+
+/** Files and folders in Supabase Storage only (used by the move to R2). */
+export async function supaListAll(prefix: string, search?: string): Promise<{ files: StoredObject[]; folders: string[] }> {
   const env = getServerEnv();
-  if (!isStorageConfigured(env)) return { files: [], folders: [] };
+  if (!supaConfigured(env)) return { files: [], folders: [] };
   const base = env.SUPABASE_URL!.replace(/\/$/, "");
   const out: StoredObject[] = [];
   const folders: string[] = [];
@@ -213,8 +261,16 @@ export async function storageListAll(prefix: string, search?: string): Promise<{
 
 /** Delete many files in one call (full keys). */
 export async function storageDeleteMany(keys: string[]): Promise<void> {
+  if (!keys.length) return;
+  if (isR2Configured()) await r2DeleteMany(keys);
+  for (const k of keys) locationCache.delete(k);
+  await supaDeleteMany(keys);
+}
+
+/** Delete from Supabase Storage only. */
+export async function supaDeleteMany(keys: string[]): Promise<void> {
   const env = getServerEnv();
-  if (!isStorageConfigured(env) || !keys.length) return;
+  if (!supaConfigured(env) || !keys.length) return;
   const base = env.SUPABASE_URL!.replace(/\/$/, "");
   const res = await fetch(`${base}/storage/v1/object/${encodeURIComponent(env.SUPABASE_BUCKET)}`, {
     method: "DELETE",

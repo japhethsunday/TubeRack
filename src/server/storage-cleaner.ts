@@ -1,5 +1,44 @@
 import { getDb } from "@/src/server/db";
-import { storageDeleteMany, storageList, storageListAll } from "@/src/server/storage";
+import { storageDeleteMany, storageGet, storageList, storageListAll, supaDeleteMany, supaListAll } from "@/src/server/storage";
+import { isR2Active, isR2Configured, r2Exists, r2Put } from "@/src/server/r2";
+
+/**
+ * Move files from Supabase Storage to Cloudflare R2, a batch per call (time
+ * budgeted). Each file is copied, confirmed on R2, then removed from Supabase.
+ * Files keep the same path, so every link in the app keeps working.
+ */
+export async function moveToR2(budgetMs = 240_000): Promise<{ moved: number; movedMb: number; remaining: number; failed: number }> {
+  if (!isR2Configured()) throw new Error("Cloudflare R2 isn't set up yet (add the R2_* settings in Vercel).");
+  if (!(await isR2Active())) throw new Error("Switch new files to R2 first (after adding the bucket's CORS rule).");
+  const started = Date.now();
+  const all: { key: string; size: number }[] = [];
+  const walk = async (prefix: string, depth: number) => {
+    const { files, folders } = await supaListAll(prefix);
+    for (const f of files) all.push({ key: `${prefix}${f.name}`, size: f.size });
+    if (depth < 4) for (const d of folders) await walk(`${prefix}${d}/`, depth + 1);
+  };
+  await walk("", 0);
+  let moved = 0;
+  let movedBytes = 0;
+  let failed = 0;
+  for (const f of all) {
+    if (Date.now() - started > budgetMs) break;
+    try {
+      if (!(await r2Exists(f.key))) {
+        const file = await storageGet(f.key); // not on R2 yet, so this reads Supabase
+        await r2Put(f.key, file.bytes, file.mime);
+      }
+      if (!(await r2Exists(f.key))) throw new Error("copy not confirmed");
+      await supaDeleteMany([f.key]);
+      moved++;
+      movedBytes += f.size;
+    } catch (error) {
+      failed++;
+      console.error(`[r2 move] ${f.key}:`, error instanceof Error ? error.message : String(error));
+    }
+  }
+  return { moved, movedMb: Math.round((movedBytes / 1048576) * 10) / 10, remaining: all.length - moved - failed, failed };
+}
 
 /**
  * Storage cleaner. Deletes stored files (generated output and uploads) that

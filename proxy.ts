@@ -42,6 +42,8 @@ export function proxy(request: NextRequest) {
   } catch {
     storage = "";
   }
+  // Cloudflare R2 (presigned file links, uploads and downloads).
+  storage += " https://*.r2.cloudflarestorage.com";
   const csp = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
