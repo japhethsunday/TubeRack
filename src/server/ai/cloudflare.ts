@@ -11,41 +11,37 @@ import { toCaptionLines, type MistralSegment } from "@/src/server/ai/mistral";
 
 /** Text models, strongest first. */
 export const CF_TEXT_MODELS = [
-  "@cf/deepseek-ai/deepseek-v4-flash-0731",
-  "@cf/zai-org/glm-5.3-flash",
   "@cf/openai/gpt-oss-120b",
-  "@cf/moonshotai/kimi-k2.6",
-  "@cf/qwen/qwen3.8-27b",
-  "@cf/deepseek-ai/deepseek-v4-pro-0813",
-  "@cf/zai-org/glm-5.3",
-  "@cf/moonshotai/kimi-k2.7-code",
-  "@cf/zai-org/glm-5.2",
+  "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
   "@cf/google/gemma-4-26b-a4b-it",
   "@cf/nvidia/nemotron-3-120b-a12b",
-  "@cf/zai-org/glm-4.7-flash",
-  "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-  "@cf/meta/llama-4-scout-17b-16e-instruct",
   "@cf/mistralai/mistral-small-3.1-24b-instruct",
+  "@cf/meta/llama-4-scout-17b-16e-instruct",
   "@cf/qwen/qwen3-30b-a3b-fp8",
   "@cf/openai/gpt-oss-20b",
   "@cf/aisingapore/gemma-sea-lion-v4-27b-it",
+  "@cf/zai-org/glm-4.7-flash",
   "@cf/qwen/qwq-32b",
-  "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
   "@cf/qwen/qwen2.5-coder-32b-instruct",
   "@cf/ibm-granite/granite-4.0-h-micro",
-  "@cf/meta/llama-3.2-11b-vision-instruct",
+  "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+  "@cf/qwen/qwen3.8-27b",
   "@cf/meta/llama-3.1-8b-instruct-fp8",
-  "@cf/meta/llama-3.1-8b-instruct",
   "@cf/meta/llama-3.2-3b-instruct",
   "@cf/mistral/mistral-7b-instruct-v0.2-lora",
   "@cf/meta/llama-3.2-1b-instruct",
 ];
 
+/**
+ * Not usable on the free plan (paid-only, retired, or needs a licence
+ * agreement) — never tried, even if the catalog lists them.
+ */
+const CF_BLOCKED = /deepseek-v4|glm-5\.|kimi-k2|llama-3\.1-8b-instruct$|llama-3\.2-11b-vision|flux-2-dev/i;
+
 /** Picture models, best first (inpainting needs a source picture, so it's left out). */
 export const CF_IMAGE_MODELS = [
   "@cf/black-forest-labs/flux-2-klein-9b",
   "@cf/black-forest-labs/flux-2-klein-4b",
-  "@cf/black-forest-labs/flux-2-dev",
   "@cf/leonardo/lucid-origin",
   "@cf/leonardo/phoenix-1.0",
   "@cf/black-forest-labs/flux-1-schnell",
@@ -90,7 +86,7 @@ async function discover(task: string): Promise<string[]> {
 
 /** Known models first (in quality order), then anything new from the catalog. */
 async function withCatalog(known: string[], task: string, skip: RegExp): Promise<string[]> {
-  const extra = (await discover(task)).filter((id) => !known.includes(id) && !skip.test(id));
+  const extra = (await discover(task)).filter((id) => !known.includes(id) && !skip.test(id) && !CF_BLOCKED.test(id));
   return [...known, ...extra];
 }
 
@@ -192,9 +188,10 @@ export async function cloudflareTranscribeWith(model: string, bytes: Uint8Array)
   const r = body.result ?? {};
   const alt = r.results?.channels?.[0]?.alternatives?.[0];
   // Segments when given; otherwise group word timings into short lines.
-  let raw = (r.segments ?? []).map((s) => ({ startSec: Number(s.start), endSec: Number(s.end), text: String(s.text ?? "").trim() }));
+  let raw = (Array.isArray(r.segments) ? r.segments : []).map((s) => ({ startSec: Number(s.start), endSec: Number(s.end), text: String(s.text ?? "").trim() }));
   if (raw.length === 0) {
-    const words = (alt?.words ?? r.words ?? []).map((w) => ({ start: Number(w.start), end: Number(w.end), word: String(("punctuated_word" in w ? w.punctuated_word : undefined) ?? w.word ?? "").trim() }));
+    const list = Array.isArray(alt?.words) ? alt.words : Array.isArray(r.words) ? r.words : [];
+    const words = list.map((w) => ({ start: Number(w.start), end: Number(w.end), word: String(("punctuated_word" in w ? w.punctuated_word : undefined) ?? w.word ?? "").trim() }));
     for (let i = 0; i < words.length; i += 8) {
       const g = words.slice(i, i + 8);
       raw.push({ startSec: g[0].start, endSec: g[g.length - 1].end, text: g.map((w) => w.word).join(" ") });
