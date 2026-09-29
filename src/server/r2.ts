@@ -12,7 +12,9 @@ export function r2Env(): R2Env | null {
   const e = getServerEnv();
   const t = (v?: string) => (v ?? "").trim().replace(/^["']|["']$/g, "");
   // Accept a pasted endpoint URL in place of the account ID.
-  const account = t(e.R2_ACCOUNT_ID).replace(/^https?:\/\//, "").split(/[./]/)[0];
+  // Cloudflare account IDs are 32 hex characters; pick that out of whatever was pasted.
+  const rawAccount = t(e.R2_ACCOUNT_ID);
+  const account = rawAccount.match(/[0-9a-f]{32}/i)?.[0].toLowerCase() ?? rawAccount.replace(/^https?:\/\//, "").split(/[./]/)[0];
   const key = t(e.R2_ACCESS_KEY_ID);
   const secret = t(e.R2_SECRET_ACCESS_KEY);
   if (!account || !key || !secret) return null;
@@ -217,6 +219,7 @@ export async function r2Diagnose(): Promise<string | null> {
     };
     return hints[code] ?? `R2 answered ${res.status}${code ? ` (${code})` : ""}.`;
   } catch (err) {
+    if (!/^[0-9a-f]{32}$/.test(env.account)) return `R2_ACCOUNT_ID doesn't look right (it should be 32 letters/numbers, now ${env.account.length} characters). Copy it from the bucket's S3 API address.`;
     return `Couldn't reach R2 (${err instanceof Error ? err.message : "network error"}) — check R2_ACCOUNT_ID.`;
   }
 }
