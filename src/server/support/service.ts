@@ -84,6 +84,12 @@ async function handOff(user: SessionUser, conversationId: string, subject: strin
     SET status = 'handoff', admin_unread = true, handoff_summary = ${summary.slice(0, 2000)}, updated_at = now()
     WHERE id = ${conversationId}`;
   if (already) return;
+  // One person can't flood the team's inbox by opening chat after chat: past 3
+  // hand-overs a day, new ones still reach the admin console, just without an email.
+  const [n] = await d`
+    SELECT count(*) AS n FROM support_conversations
+    WHERE user_id = ${user.id} AND status = 'handoff' AND updated_at > now() - interval '1 day'`;
+  if (Number(n?.n ?? 0) > 3) return;
   // Best effort: the chat is already saved for the team even if an email fails.
   await Promise.allSettled([
     user.emailVerifiedAt ? sendHandoffConfirmation(user.email, user.name, subject) : Promise.resolve(null),
