@@ -1,3 +1,5 @@
+import { adminDb } from "@/src/server/admin";
+import { Masker } from "@/src/server/ai/mask";
 import { founder } from "@/src/server/founder";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { getServerEnv } from "@/src/lib/env";
@@ -116,14 +118,30 @@ export function safeAdminPath(v: unknown): string | null {
   return m[1] + (m[2] ? `?q=${encodeURIComponent(decodeURIComponent(m[2].slice(3)))}` : "");
 }
 
+/** Names of the people whose emails appear in the chat, so they are hidden too. */
+async function learnNamesFor(mask: Masker, history: ChatTurn[]): Promise<void> {
+  const emails = [...new Set(history.flatMap((t) => t.text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) ?? []).map((e) => e.toLowerCase()))].slice(0, 50);
+  if (!emails.length) return;
+  try {
+    const rows = await adminDb()`SELECT name FROM users WHERE lower(email) IN ${adminDb()(emails)}`;
+    for (const r of rows) mask.addName(r.name);
+  } catch {
+    // best effort: emails are still masked
+  }
+}
+
 export async function askAssistant(adminId: string, role: AdminRole, history: ChatTurn[]): Promise<{ text: string; proposals: Proposal[]; lookups: string[]; open?: string | null }> {
   if (!isTextConfigured()) throw backendUnavailable("AI writing");
   const ai = new GeminiTextProvider();
   const ceoName = (await founder()).name;
+  // Identities never reach the AI provider: emails and names become placeholders.
+  const mask = new Masker([ceoName]);
+  await learnNamesFor(mask, history);
+  const masked = history.map((t) => ({ ...t, text: mask.text(t.text) }));
   const steps: string[] = [];
   const lookups: string[] = [];
   for (let i = 0; i < MAX_STEPS; i++) {
-    const { text } = await ai.generateText({ prompt: prompt(role, history, steps, ceoName), maxTokens: 2000, json: true, fast: true });
+    const { text } = await ai.generateText({ prompt: prompt(role, masked, steps, ceoName), maxTokens: 2000, json: true, fast: true });
     let out: Record<string, unknown>;
     try {
       out = parseJsonObject(text);
@@ -131,21 +149,21 @@ export async function askAssistant(adminId: string, role: AdminRole, history: Ch
       return { text: "I couldn't work that out just now. Try asking again, a little more specifically.", proposals: [], lookups };
     }
     if (out.type === "lookup" && typeof out.name === "string" && i < MAX_STEPS - 1) {
-      const result = await runTool(role, out.name, out.args);
+      const result = await runTool(role, out.name, mask.unmask(out.args));
       lookups.push(out.name);
-      steps.push(`${out.name}(${data(out.args ?? {})}) → ${data(result)}`);
+      steps.push(`${out.name}(${data(out.args ?? {})}) → ${data(mask.value(result))}`);
       continue;
     }
-    const reply = typeof out.text === "string" && out.text.trim() ? out.text.trim().slice(0, 6000) : "Done.";
+    const reply = typeof out.text === "string" && out.text.trim() ? mask.unmaskText(out.text.trim()).slice(0, 6000) : "Done.";
     const proposals: Proposal[] = [];
     for (const p of Array.isArray(out.proposals) ? (out.proposals as Record<string, unknown>[]).slice(0, 8) : []) {
-      const ready = prepare(String(p.action ?? ""), p.args);
+      const ready = prepare(String(p.action ?? ""), mask.unmask(p.args));
       if (!ready || !roleAllows(role, ACTIONS[ready.name].permission)) continue;
       proposals.push({ action: ready.name, summary: ready.summary, token: signProposal(adminId, ready.name, ready.args) });
     }
     let open: string | null = null;
     try {
-      open = safeAdminPath(out.open);
+      open = safeAdminPath(typeof out.open === "string" ? mask.unmaskText(out.open) : out.open);
     } catch {
       open = null;
     }

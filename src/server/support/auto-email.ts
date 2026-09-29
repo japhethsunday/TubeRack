@@ -1,3 +1,4 @@
+import { Masker } from "@/src/server/ai/mask";
 import { getServerEnv } from "@/src/lib/env";
 import { GeminiTextProvider, isTextConfigured } from "@/src/server/ai/gemini";
 import { parseJsonObject } from "@/src/server/admin-ai";
@@ -21,7 +22,12 @@ const MACHINE = /^(no-?reply|do-?not-?reply|mailer-daemon|postmaster|bounce[s]?|
 
 export type AutoReplyResult = { sent: boolean; reason: string };
 
-async function decide(input: { fromName: string; fromEmail: string; subject: string; body: string }): Promise<{ reply: boolean; reason: string; name: string; message: string }> {
+async function decide(raw: { fromName: string; fromEmail: string; subject: string; body: string }): Promise<{ reply: boolean; reason: string; name: string; message: string }> {
+  // The sender's identity never reaches the AI provider.
+  const mask = new Masker();
+  mask.addName(raw.fromName);
+  mask.addName(raw.fromName.trim().split(/\s+/)[0]);
+  const input = { fromName: mask.text(raw.fromName), fromEmail: mask.text(raw.fromEmail), subject: mask.text(raw.subject), body: mask.text(raw.body) };
   // Email "From" addresses can be forged, so automatic replies never contain
   // anything about the sender's account — only general product facts.
   const prompt = `You handle email sent to Recktube Support. Decide whether you can SAFELY answer it yourself, and if so write the reply.
@@ -45,7 +51,8 @@ Respond ONLY with JSON: {"reply":true|false,"reason":"one short line on why","na
   const { text } = await new GeminiTextProvider().generateText({ prompt, maxTokens: 1200, json: true });
   const out = parseJsonObject(text);
   const message = String(out.message ?? "").trim();
-  return { reply: out.reply === true && message.length > 20, reason: String(out.reason ?? "").slice(0, 200), name: String(out.name ?? "").trim().split(/\s+/)[0]?.slice(0, 40) ?? "", message: message.slice(0, 6000) };
+  const name = mask.unmaskText(String(out.name ?? "").trim()).split(/\s+/)[0]?.slice(0, 40) ?? "";
+  return { reply: out.reply === true && message.length > 20, reason: String(out.reason ?? "").slice(0, 200), name, message: mask.unmaskText(message).slice(0, 6000) };
 }
 
 export async function autoReplyToEmail(emailId: string): Promise<AutoReplyResult> {

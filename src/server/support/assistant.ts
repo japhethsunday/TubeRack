@@ -1,3 +1,4 @@
+import { Masker } from "@/src/server/ai/mask";
 import { GeminiTextProvider, isTextConfigured } from "@/src/server/ai/gemini";
 import { PRODUCT_FACTS, liveStatus } from "@/src/server/support/facts";
 import type { AccountSnapshot } from "@/src/server/support/snapshot";
@@ -134,8 +135,17 @@ export async function assistantTurn(snapshot: AccountSnapshot | null, history: C
     };
   }
   try {
-    const { text } = await new GeminiTextProvider().generateText({ prompt: buildPrompt(snapshot, history, await liveStatus()), maxTokens: 1200, json: true });
-    return parseTurn(text);
+    // The user's identity never reaches the AI provider: their email and name become placeholders.
+    const mask = new Masker();
+    if (snapshot?.account) {
+      mask.addName(snapshot.account.name);
+      mask.addName(snapshot.account.name?.trim().split(/\s+/)[0]);
+    }
+    const safeSnapshot = snapshot ? mask.value(snapshot) : null;
+    const safeHistory = history.map((m) => ({ ...m, body: mask.text(m.body) }));
+    const { text } = await new GeminiTextProvider().generateText({ prompt: buildPrompt(safeSnapshot, safeHistory, await liveStatus()), maxTokens: 1200, json: true });
+    const turn = parseTurn(text);
+    return { ...turn, reply: mask.unmaskText(turn.reply), subject: mask.unmaskText(turn.subject), handoffSummary: mask.unmaskText(turn.handoffSummary) };
   } catch (error) {
     console.error("support assistant failed:", error instanceof Error ? error.message : String(error));
     return {
