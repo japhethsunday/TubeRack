@@ -54,7 +54,7 @@ export default function AdminSystem() {
             </div>
             <div>
               <div className="font-medium">Test Cloudflare AI</div>
-              <p className="mb-2 text-xs text-muted-text">Asks the free Cloudflare text backup for a one-line reply and shows which model answered.</p>
+              <p className="mb-2 text-xs text-muted-text">Asks the free Cloudflare backups for a one-line reply and a test picture, and shows which models answered.</p>
               <Button size="sm" variant="outline" loading={busy === "test-cloudflare-ai"} onClick={() => void run("test-cloudflare-ai", "")}><Play className="size-4" aria-hidden="true" /> Test now</Button>
             </div>
             {out && <pre className="max-h-64 overflow-auto rounded-lg bg-background p-3 text-xs">{out}</pre>}

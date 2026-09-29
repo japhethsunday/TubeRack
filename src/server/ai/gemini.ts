@@ -9,7 +9,7 @@ import { isNvidiaConfigured, nvidiaGenerateText } from "@/src/server/ai/nvidia";
 import { arkGenerateImage, arkGenerateText, isArkConfigured } from "@/src/server/ai/ark";
 import { hfGenerateImage, hfGenerateText, isHuggingFaceConfigured } from "@/src/server/ai/huggingface";
 import { cleanImagePrompt, isNvidiaImageConfigured, nvidiaGenerateImage } from "@/src/server/ai/nvidia-image";
-import { cloudflareGenerateText, isCloudflareAiConfigured } from "@/src/server/ai/cloudflare";
+import { cloudflareGenerateImage, cloudflareGenerateText, cloudflareTranscribe, isCloudflareAiConfigured } from "@/src/server/ai/cloudflare";
 import { isMistralConfigured, mistralGenerateText, mistralSpeechChunk, mistralTranscribe } from "@/src/server/ai/mistral";
 
 type TextRequest = { prompt: string; maxTokens?: number; json?: boolean; skills?: SkillId[] };
@@ -297,6 +297,14 @@ async function backupImage(prompt: string, aspect: "16:9" | "9:16" | "1:1"): Pro
       return (await hfGenerateImage(cleanImagePrompt(prompt), aspect)).dataUrl;
     } catch (error) {
       console.error("[huggingface] image fallback failed:", error instanceof Error ? error.message.slice(0, 300) : error);
+      if (!/filtered/i.test(last instanceof Error ? last.message : "")) last = error;
+    }
+  }
+  if (isCloudflareAiConfigured(env)) {
+    try {
+      return (await cloudflareGenerateImage(cleanImagePrompt(prompt), aspect)).dataUrl;
+    } catch (error) {
+      console.error("[cloudflare] image fallback failed:", error instanceof Error ? error.message.slice(0, 300) : error);
       if (!/filtered/i.test(last instanceof Error ? last.message : "")) last = error;
     }
   }
@@ -877,6 +885,7 @@ export async function transcribeAudio(bytes: Uint8Array, mimeType: string): Prom
   let lastError: unknown = null;
   const routes: (() => Promise<{ text: string; segments: TimedSegment[]; model: string }>)[] = [];
   if (isMistralConfigured()) routes.push(() => mistralTranscribe(bytes, mimeType));
+  if (isCloudflareAiConfigured()) routes.push(() => cloudflareTranscribe(bytes));
   if (isGeminiConfigured()) routes.push(() => geminiTranscribe(bytes, mimeType));
   if (routes.length === 0) throw new ProviderNotConfiguredError("text", "Generation is not configured.");
   for (const route of routes) {
