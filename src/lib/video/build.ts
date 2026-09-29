@@ -1,4 +1,5 @@
 import { sceneSpeech } from "@/src/lib/script/engine";
+import { CINEMATIC_MOTIONS } from "@/src/lib/video/compositor";
 import type {
   ClipKind,
   Composition,
@@ -246,15 +247,19 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
       if (donor) visualScene = donor.s.id;
     }
     const sceneVideos = videosOf(visualScene);
-    const image = sceneVideos.length ? undefined : approvedImageFor(visualScene, assets);
+    const still = approvedImageFor(visualScene, assets);
+    const lenOf = (a: MediaAsset) => (a.durationSec && a.durationSec > 1 ? a.durationSec : seg.durationSec);
+    // AI motion shots made from the scene's picture: play once, then hold that picture (no looping).
+    const aiShots = sceneVideos.length > 0 && sceneVideos.every((a) => a.tags?.includes("ai-clip"));
+    const videoSpan = still && aiShots ? Math.min(seg.durationSec, sceneVideos.reduce((n, a) => n + lenOf(a), 0)) : seg.durationSec;
+    const image = sceneVideos.length && videoSpan >= seg.durationSec - 0.2 ? undefined : still;
     // Scene changes blend (short crossfade) instead of hard-cutting; the very
     // last picture fades out so the video ends cleanly.
     const blend = seg.number > 1 ? { transitionIn: "fade", transitionSec: 0.4 } : {};
     const isLast = seg.number === scenes.length;
-    for (let at = 0, i = 0; sceneVideos.length && at < seg.durationSec - 0.2; i++) {
+    for (let at = 0, i = 0; sceneVideos.length && at < videoSpan - 0.2; i++) {
       const clipAsset = sceneVideos[i % sceneVideos.length];
-      const len = clipAsset.durationSec && clipAsset.durationSec > 1 ? clipAsset.durationSec : seg.durationSec;
-      const dur = Math.min(len, seg.durationSec - at);
+      const dur = Math.min(lenOf(clipAsset), videoSpan - at);
       const endsVideo = isLast && at + dur >= seg.durationSec - 0.2;
       clips.push({
         ...clipBase("track_video", "video", clipAsset.title, seg.startSec + at, dur),
@@ -269,12 +274,14 @@ export function buildFromScenes(scenes: Scene[], assets: MediaAsset[]): Timeline
       at += dur;
     }
     if (image) {
+      const from = sceneVideos.length ? videoSpan : 0;
       clips.push({
-        ...clipBase("track_image", "image", image.title, seg.startSec, seg.durationSec),
+        ...clipBase("track_image", "image", image.title, seg.startSec + from, seg.durationSec - from),
         sceneId: seg.sceneId,
         assetId: image.id,
-        motion: "kenburns",
-        ...blend,
+        // A different camera move each scene, so consecutive shots never repeat the same motion.
+        motion: CINEMATIC_MOTIONS[(seg.number - 1) % CINEMATIC_MOTIONS.length],
+        ...(from ? { transitionIn: "fade", transitionSec: 0.4 } : blend),
         ...(isLast ? { fadeOutSec: 0.8 } : {}),
       });
     }

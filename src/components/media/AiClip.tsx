@@ -2,7 +2,8 @@
 
 import { mediaFetch } from "@/src/lib/media/resolve";
 import { useEffect, useState } from "react";
-import { Loader2, Sparkles, X } from "lucide-react";
+import { Crown, Loader2, Sparkles, X } from "lucide-react";
+import { usePaid } from "@/src/lib/use-paid";
 import { api, ApiError } from "@/src/lib/api";
 import { useMedia } from "@/src/components/media/MediaProvider";
 import type { MediaAsset } from "@/src/lib/media/types";
@@ -12,7 +13,7 @@ import { cx } from "@/src/components/ui/cx";
 type Aspect = "16:9" | "9:16" | "1:1";
 
 /** Shrink an image to at most 1024px on its long side and return it as a JPEG data URL. */
-async function toDataUrl(src: string): Promise<string> {
+export async function toDataUrl(src: string): Promise<string> {
   const blob = await (await mediaFetch(src)).blob();
   const bitmap = await createImageBitmap(blob);
   const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
@@ -26,7 +27,7 @@ async function toDataUrl(src: string): Promise<string> {
 
 /**
  * Short AI video clips from a description, or by bringing one of the
- * project's images to life. Free engines with a small daily allowance.
+ * project's images to life. Part of the paid plans.
  */
 export function AiClip({
   projectId,
@@ -39,11 +40,12 @@ export function AiClip({
   urlFor: (asset: MediaAsset) => string | null;
   onAdded?: (asset: MediaAsset) => void;
 }) {
+  const paid = usePaid();
   const { addAsset, assetsFor } = useMedia();
   const images = assetsFor(projectId).filter((a) => a.kind === "image" && urlFor(a));
   const [prompt, setPrompt] = useState("");
   const [imageId, setImageId] = useState<string | null>(null);
-  const [seconds, setSeconds] = useState(3);
+  const [seconds, setSeconds] = useState(5);
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export function AiClip({
     setDone(null);
     try {
       const image = picked ? await toDataUrl(urlFor(picked)!) : undefined;
-      const data = await api.post<{ url: string; mime: string; fileSize: number }>("/api/v1/ai/video-clip", {
+      const data = await api.post<{ url: string; mime: string; fileSize: number; seconds?: number }>("/api/v1/ai/video-clip", {
         prompt: prompt.trim(),
         image,
         aspect,
@@ -84,7 +86,7 @@ export function AiClip({
         title: prompt.trim().slice(0, 60),
         payload: data.url,
         mime: data.mime,
-        durationSec: seconds,
+        durationSec: data.seconds ?? seconds,
         fileSize: data.fileSize,
         tags: ["ai-clip"],
         approval: "draft",
@@ -97,10 +99,19 @@ export function AiClip({
     setBusy(false);
   }
 
+  if (paid === null) {
+    return (
+      <div className="flex justify-center py-8" role="status" aria-label="Loading">
+        <Loader2 className="size-5 animate-spin text-muted-text" aria-hidden="true" />
+      </div>
+    );
+  }
+  if (!paid) return <PaidOnly feature="AI video clips" />;
+
   return (
     <section aria-label="AI video clip" className="space-y-3">
       <p className="text-xs text-muted-text">
-        Describe a short shot, or pick one of your images to bring it to life. Clips are {seconds}s long and take 1–4 minutes.
+        Describe a short shot, or pick one of your images to bring it to life. Clips take 1–4 minutes.
       </p>
       <textarea
         value={prompt}
@@ -145,13 +156,13 @@ export function AiClip({
 
       <div className="flex items-center gap-1.5 text-[11px]">
         <span className="text-muted-text">Length:</span>
-        {[2, 3, 5].map((s) => (
+        {[3, 5].map((s) => (
           <button
             key={s}
             type="button"
             aria-pressed={seconds === s}
             onClick={() => setSeconds(s)}
-            className={cx("rounded-full border px-2 py-0.5", seconds === s ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-text hover:bg-muted")}
+            className={cx("min-h-8 rounded-full border px-3 py-0.5 sm:min-h-0 sm:px-2", seconds === s ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-text hover:bg-muted")}
           >
             {s}s
           </button>
@@ -162,7 +173,7 @@ export function AiClip({
         type="button"
         onClick={() => void generate()}
         disabled={busy}
-        className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-60"
+        className="flex h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-primary sm:h-9 text-sm font-semibold text-primary-foreground disabled:opacity-60"
       >
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Sparkles className="size-4" aria-hidden="true" />}
         {busy ? `Making your clip… ${elapsed}s` : picked ? "Animate image" : "Generate clip"}
@@ -170,7 +181,24 @@ export function AiClip({
 
       {error && <Alert tone="bad" title="AI clip">{error}</Alert>}
       {done && <Alert tone="ok" title="Done">{done}</Alert>}
-      <p className="text-[10px] text-muted-text">Beta · free with a small daily limit (5 clips per person per day). Busy times may need a retry.</p>
+      <p className="text-[10px] text-muted-text">Each clip uses video credits. Busy times may need a retry.</p>
     </section>
+  );
+}
+
+/** Shown in place of a paid feature on the free plan. */
+export function PaidOnly({ feature, compact }: { feature: string; compact?: boolean }) {
+  return (
+    <div className={cx("rounded-xl border border-border bg-muted/40 text-center", compact ? "p-3" : "space-y-2 p-5")}>
+      <Crown className="mx-auto size-5 text-primary" aria-hidden="true" />
+      <p className="text-sm font-semibold">{feature} are a paid feature</p>
+      <p className="text-xs text-muted-text">Upgrade your plan to turn text and pictures into real moving video.</p>
+      <a
+        href={`mailto:${process.env.NEXT_PUBLIC_CONTACT_EMAIL || "support@recktube.xyz"}?subject=${encodeURIComponent("Upgrade my plan")}`}
+        className="mt-1 inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground sm:h-9"
+      >
+        <Crown className="size-4" aria-hidden="true" /> Ask to upgrade
+      </a>
+    </div>
   );
 }

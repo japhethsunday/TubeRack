@@ -46,6 +46,14 @@ export async function creditState(workspaceId: string): Promise<CreditState | nu
   return { accountId: String(r.id), balance: Number(r.balance), monthlyGrant: Number(r.monthly_grant), unlimited: Boolean(r.unlimited), refilledAt: r.refilled_at ? new Date(String(r.refilled_at)).toISOString() : null };
 }
 
+/**
+ * Paid access (AI video clips and AI motion): an unlimited account, or a
+ * monthly allowance above the free one. Admins set this per user.
+ */
+export function isPaidPlan(state: Pick<CreditState, "unlimited" | "monthlyGrant"> | null): boolean {
+  return Boolean(state && (state.unlimited || state.monthlyGrant > DEFAULT_MONTHLY_CREDITS));
+}
+
 /** Throw when the workspace can't afford at least one more generation. */
 export async function assertCredits(workspaceId: string, kind = "text"): Promise<void> {
   const state = await creditState(workspaceId);

@@ -7,7 +7,9 @@ import { sceneSpeech } from "@/src/lib/script/engine";
 import { useProductionContext } from "@/src/components/projects/useProductionContext";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Clapperboard, Download, Loader2, TriangleAlert, X } from "lucide-react";
+import { Check, Clapperboard, Crown, Download, Loader2, TriangleAlert, X } from "lucide-react";
+import { usePaid } from "@/src/lib/use-paid";
+import { toDataUrl } from "@/src/components/media/AiClip";
 import { api, ApiError, setVideoPass } from "@/src/lib/api";
 import { keepAwake } from "@/src/lib/wake-lock";
 import { MUSIC_MOODS, musicRecipe } from "@/src/lib/media/audio";
@@ -45,6 +47,9 @@ const INITIAL: Step[] = [
 ];
 
 type VisualMode = "mix" | "stock" | "ai";
+
+/** AI motion clips per generated video (each takes 1–4 minutes and uses video credits). */
+const AI_MOTION_MAX = 3;
 
 const STOP = new Set("a an the of and or to in on at for with by from into over under this that these those is are was be being been as it its their his her our your my close up closeup close-up medium tight extreme over-the-shoulder wide shot shots angle view camera cinematic scene showing shows image photo realistic style lighting background foreground".split(" "));
 
@@ -134,6 +139,8 @@ export function GenerateVideoDialog({
   const [replaceOk, setReplaceOk] = useState(false);
   const [visualMode, setVisualMode] = useState<VisualMode>("mix");
   const [musicMood, setMusicMood] = useState<string>("background");
+  const paidUser = usePaid();
+  const [aiMotion, setAiMotion] = useState(false);
   const cancelled = useRef(false);
 
   const [format, setFormat] = useState<"long" | "short">(projectIsShort(project) ? "short" : "long");
@@ -378,11 +385,52 @@ export function GenerateVideoDialog({
         set("visuals", { detail: `${drawn}/${scenes.length}` });
       });
       if (isCancelled()) return;
+
+      // Paid: turn the first few AI pictures into real moving shots. A scene keeps its picture if this fails.
+      let animated = 0;
+      if (aiMotion && paidUser) {
+        const targets = scenes
+          .map((scene) => ({ scene, image: made.find((a) => a.kind === "image" && a.sceneIds.includes(scene.id)) }))
+          .filter((t): t is { scene: Scene; image: MediaAsset } => Boolean(t.image))
+          .slice(0, AI_MOTION_MAX);
+        let tried = 0;
+        await pool(targets, 2, isCancelled, async ({ scene, image }) => {
+          set("visuals", { detail: `Animating ${++tried}/${targets.length}…` });
+          try {
+            const data = await api.post<{ url: string; mime: string; fileSize: number; seconds?: number }>("/api/v1/ai/video-clip", {
+              prompt: `${scene.visual}. Natural, realistic camera and subject motion.`,
+              image: await toDataUrl(image.payload),
+              aspect,
+              seconds: 5,
+            });
+            const clip = media.addAsset({
+              projectId: project.id,
+              sceneIds: [scene.id],
+              kind: "video",
+              source: "provider-output",
+              status: "ready",
+              title: `AI motion — scene ${scene.number}`,
+              payload: data.url,
+              mime: data.mime,
+              durationSec: data.seconds ?? 5,
+              fileSize: data.fileSize,
+              tags: ["auto-video", "ai-clip"],
+              approval: "approved",
+            });
+            // The moving shot leads; the still picture holds the rest of the scene.
+            made.splice(made.indexOf(image), 0, clip);
+            animated += 1;
+          } catch {
+            // Keep the still picture for this scene.
+          }
+        });
+        if (isCancelled()) return;
+      }
       const clipsOk = made.filter((a) => a.kind === "video").length;
       const imgOk = made.filter((a) => a.kind === "image").length + clipsOk;
       set("visuals", {
         state: imgOk === scenes.length ? "done" : imgOk ? "partial" : "failed",
-        detail: imgOk === scenes.length ? `${clipsOk} stock clips · ${imgOk - clipsOk} images` : `${imgOk}/${scenes.length} — ${imageErrors[0] ?? "failed"}`,
+        detail: imgOk === scenes.length ? `${clipsOk - animated} stock clips · ${animated ? `${animated} AI motion · ` : ""}${imgOk - clipsOk} images` : `${imgOk}/${scenes.length} — ${imageErrors[0] ?? "failed"}`,
       });
 
       // 4. Background music from the free library (optional).
@@ -531,6 +579,30 @@ export function GenerateVideoDialog({
                   <option value="none">No music</option>
                 </select>
               </label>
+              {visualMode !== "stock" && (
+                <label className={cx("flex items-start gap-3 rounded-lg border border-border p-3 text-sm sm:col-span-2", paidUser ? "cursor-pointer hover:bg-muted/50" : "opacity-80")}>
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-5 shrink-0 accent-[var(--primary)] sm:size-4"
+                    checked={aiMotion && Boolean(paidUser)}
+                    disabled={!paidUser}
+                    onChange={(e) => setAiMotion(e.target.checked)}
+                  />
+                  <span className="min-w-0 space-y-0.5">
+                    <span className="flex flex-wrap items-center gap-1.5 font-medium">
+                      AI motion
+                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        <Crown className="size-3" aria-hidden="true" /> Paid
+                      </span>
+                    </span>
+                    <span className="block text-xs text-muted-text">
+                      {paidUser
+                        ? `Turns up to ${AI_MOTION_MAX} AI pictures into real moving shots. Adds a few minutes and uses video credits.`
+                        : "Turn AI pictures into real moving shots. Available on paid plans."}
+                    </span>
+                  </span>
+                </label>
+              )}
             </div>
           )}
           <ol className="space-y-2">

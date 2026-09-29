@@ -113,6 +113,12 @@ export const MOTIONS = [
   "rotate",
   "shake",
   "pop-in",
+  "cine-push",
+  "cine-pull",
+  "cine-truck-left",
+  "cine-truck-right",
+  "cine-rise",
+  "cine-orbit",
 ] as const;
 
 export const MOTION_LABELS: Record<(typeof MOTIONS)[number], string> = {
@@ -133,6 +139,12 @@ export const MOTION_LABELS: Record<(typeof MOTIONS)[number], string> = {
   rotate: "Slow rotate",
   shake: "Handheld",
   "pop-in": "Pop in",
+  "cine-push": "Cinematic push-in",
+  "cine-pull": "Cinematic pull-back",
+  "cine-truck-left": "Cinematic slide left",
+  "cine-truck-right": "Cinematic slide right",
+  "cine-rise": "Cinematic crane",
+  "cine-orbit": "Cinematic orbit",
 };
 export type MotionId = (typeof MOTIONS)[number];
 

@@ -109,12 +109,41 @@ export const FILTER_PRESETS: { id: string; label: string; filters: ClipFilters }
 const easeInOut = (x: number) => 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, x)));
 const easeOut = (x: number) => 1 - (1 - Math.max(0, Math.min(1, x))) ** 3;
 
+/** Always-moving glide: eased at the ends but never stops dead mid-shot, like a real camera move. */
+const glide = (x: number) => 0.72 * Math.max(0, Math.min(1, x)) + 0.28 * easeInOut(x);
+
+/** Tiny organic camera float (a few pixels), so a still never feels locked off. */
+function float(sec: number, a: number): { dx: number; dy: number; rot: number } {
+  return {
+    dx: 0.0035 * a * (Math.sin(sec * 0.91) + 0.6 * Math.sin(sec * 2.17 + 1.3)),
+    dy: 0.003 * a * (Math.sin(sec * 0.73 + 0.8) + 0.5 * Math.sin(sec * 1.91 + 2.1)),
+    rot: 0.12 * a * Math.sin(sec * 0.57 + 0.4),
+  };
+}
+
+/** Cinematic camera moves used for AI pictures (auto video picks a different one per scene). */
+export const CINEMATIC_MOTIONS = ["cine-push", "cine-truck-left", "cine-rise", "cine-pull", "cine-truck-right", "cine-orbit"] as const;
+
 /** Picture animation at progress p (0–1) through the clip; `sec` is seconds into it. */
 export function motionAt(motion: string | undefined, p: number, amount = 1, sec = 0): { scale: number; dx: number; dy: number; rot: number } {
   const e = easeInOut(p);
   const a = Math.max(0.25, Math.min(2, amount));
   const still = { scale: 1, dx: 0, dy: 0, rot: 0 };
+  const g = glide(p);
+  const f = float(sec, a);
   switch (motion) {
+    case "cine-push":
+      return { scale: 1.06 + 0.13 * a * g, dx: f.dx - 0.012 * a * g, dy: f.dy - 0.008 * a * g, rot: f.rot };
+    case "cine-pull":
+      return { scale: 1.19 - 0.13 * a * g, dx: f.dx + 0.01 * a * g, dy: f.dy, rot: f.rot };
+    case "cine-truck-left":
+      return { scale: 1.16 + 0.03 * a * g, dx: f.dx + 0.045 * a * (1 - 2 * g), dy: f.dy, rot: f.rot };
+    case "cine-truck-right":
+      return { scale: 1.16 + 0.03 * a * g, dx: f.dx - 0.045 * a * (1 - 2 * g), dy: f.dy, rot: f.rot };
+    case "cine-rise":
+      return { scale: 1.14 + 0.05 * a * g, dx: f.dx, dy: f.dy + 0.04 * a * (1 - 2 * g), rot: f.rot };
+    case "cine-orbit":
+      return { scale: 1.15 + 0.06 * a * g, dx: f.dx + 0.035 * a * (1 - 2 * g), dy: f.dy + 0.015 * a * (1 - 2 * g), rot: f.rot + (-0.8 + 1.6 * g) * a };
     case "kenburns":
       return { ...still, scale: 1 + 0.14 * a * e, dx: -0.035 * a * e, dy: -0.02 * a * e };
     case "kenburns-right":
@@ -354,6 +383,9 @@ function drawMedia(
   const base = filterString(filters, W / 1920);
   const extra = fx.blur > 0.2 ? `blur(${((fx.blur * W) / 1920).toFixed(1)}px)` : "";
   ctx.filter = extra ? (base === "none" ? extra : `${base} ${extra}`) : base;
+  // Moving pictures shimmer with the default resampler.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(src, cx, cy, cw, ch, -dw / 2, -dh / 2, dw, dh);
   ctx.filter = "none";
   if (filters?.vignette) {

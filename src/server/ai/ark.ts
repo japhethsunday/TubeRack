@@ -90,14 +90,17 @@ export async function arkGenerateImage(prompt: string, aspect: "16:9" | "9:16" |
   throw last;
 }
 
-/** Start a Seedance text-to-video task; returns its id. */
-export async function arkStartVideo(prompt: string, opts: { model: string; aspect: "16:9" | "9:16" | "1:1"; seconds?: number }): Promise<string> {
+/** Start a Seedance task (text-to-video, or image-to-video with a data URL); returns its id. */
+export async function arkStartVideo(prompt: string, opts: { model: string; aspect: "16:9" | "9:16" | "1:1"; seconds?: number; image?: string }): Promise<string> {
   const env = getServerEnv();
-  const text = `${prompt} --ratio ${opts.aspect} --duration ${opts.seconds ?? 5} --watermark false`;
+  // With a start image the ratio follows the picture.
+  const text = `${prompt} --ratio ${opts.image ? "adaptive" : opts.aspect} --duration ${opts.seconds ?? 5} --watermark false`;
+  const content: unknown[] = [{ type: "text", text }];
+  if (opts.image) content.push({ type: "image_url", image_url: { url: opts.image } });
   const res = await fetch(`${base(env)}/contents/generations/tasks`, {
     method: "POST",
     headers: { Authorization: `Bearer ${key(env)}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: opts.model, content: [{ type: "text", text }] }),
+    body: JSON.stringify({ model: opts.model, content }),
     signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw await arkError(res, `video ${opts.model}`);

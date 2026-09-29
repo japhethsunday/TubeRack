@@ -425,3 +425,18 @@ describe("build: one continuous narration", () => {
     assert.deepEqual(clips.map((c) => [c.startSec, c.inSec, c.durationSec]), [[0, 0, 3], [3, 3, 2], [5, 5, 4]]);
   });
 });
+
+describe("auto video: AI motion", () => {
+  it("plays an AI motion shot once, then holds the scene's picture with a camera move", () => {
+    const clips = buildFromScenes([scene({ id: "sc1", durationSec: 12 })], [
+      asset({ id: "img", kind: "image", sceneIds: ["sc1"] }),
+      asset({ id: "ai", kind: "video", sceneIds: ["sc1"], source: "provider-output", durationSec: 5, tags: ["auto-video", "ai-clip"] }),
+    ]);
+    const vids = clips.filter((c) => c.kind === "video");
+    const img = clips.find((c) => c.kind === "image");
+    assert.equal(vids.length, 1);
+    assert.equal(vids[0].durationSec, 5);
+    assert.equal(img?.startSec, vids[0].startSec + 5);
+    assert.ok(String(img?.motion).startsWith("cine-"));
+  });
+});
