@@ -39,7 +39,7 @@ export async function PUT(request: Request) {
     const db = getDb();
     if (!db) throw backendUnavailable("Database");
     if (input.marketing !== undefined) {
-      await db`UPDATE users SET marketing_opt_in = ${input.marketing}, marketing_opt_in_at = ${input.marketing ? new Date().toISOString() : null} WHERE id = ${user.id}`;
+      await db`UPDATE users SET marketing_opt_in = ${input.marketing}, marketing_opt_in_at = ${input.marketing ? new Date().toISOString() : null}, email_unsubscribed_at = ${input.marketing ? null : new Date().toISOString()} WHERE id = ${user.id}`;
       await audit({ userId: user.id, action: input.marketing ? "email.marketing.opt_in" : "email.marketing.opt_out" });
     }
     if (input.briefs !== undefined) await db`UPDATE trend_watches SET email_digest = ${input.briefs} WHERE user_id = ${user.id}`;

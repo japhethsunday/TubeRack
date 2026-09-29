@@ -26,7 +26,7 @@ async function unsubscribe(email: string, scope: UnsubscribeScope, sendId: strin
   const db = getDb();
   if (!db) return;
   if (scope === "marketing") {
-    await db`UPDATE users SET marketing_opt_in = false, marketing_opt_in_at = null WHERE lower(email) = ${email}`;
+    await db`UPDATE users SET marketing_opt_in = false, marketing_opt_in_at = null, email_unsubscribed_at = coalesce(email_unsubscribed_at, now()) WHERE lower(email) = ${email}`;
     if (sendId) await db`UPDATE campaign_sends SET unsubscribed_at = coalesce(unsubscribed_at, now()) WHERE id = ${sendId}`;
     return;
   }

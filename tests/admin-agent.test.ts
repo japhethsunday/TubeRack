@@ -61,12 +61,12 @@ describe("assistant email aliases", () => {
 });
 
 describe("assistant email everyone", () => {
-  it("is one owner-only action, from founder@ to opted-in users by default", async () => {
+  it("is one owner-only action, from founder@ to all users by default", async () => {
     const { prepare, ACTIONS } = await import("@/src/server/admin-agent/actions");
     const { roleAllows } = await import("@/src/lib/admin-roles");
     const p = prepare("email_everyone", { subject: "A note from our founder", message: "Thank you for building with Recktube." });
     assert.equal(p?.args.from, "founder");
-    assert.equal(p?.args.audience, "opted_in");
+    assert.equal(p?.args.audience, "all_users");
     assert.match(p!.summary, /founder@recktube\.xyz/);
     assert.equal(prepare("email_everyone", { subject: "Hi there", message: "Thank you for everything.", audience: "all_users_even_opted_out" }), null);
     for (const r of ["support", "finance", "operations"] as const) assert.equal(roleAllows(r, ACTIONS.email_everyone.permission), false);

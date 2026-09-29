@@ -17,9 +17,10 @@ import { founder, type Founder } from "@/src/server/founder";
  * unsubscribe, open/click tracking, and is paced to protect the domain.
  */
 
-export type AudienceKey = "opted_in" | "active_30" | "inactive_14" | "no_video" | "low_credits" | "new_7";
+export type AudienceKey = "all_users" | "opted_in" | "active_30" | "inactive_14" | "no_video" | "low_credits" | "new_7";
 
 export const AUDIENCES: { key: AudienceKey; label: string; hint: string }[] = [
+  { key: "all_users", label: "All users (announcements)", hint: "Every verified user except people who unsubscribed or turned email off." },
   { key: "opted_in", label: "Everyone who opted in", hint: "All verified users who said yes to product email." },
   { key: "new_7", label: "New this week", hint: "Joined in the last 7 days." },
   { key: "active_30", label: "Active creators", hint: "Used Recktube in the last 30 days." },
@@ -55,6 +56,7 @@ export const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").r
 /** Base consent filter: opted in, verified, active, not deleted. Always applied. */
 function audienceWhere(key: AudienceKey, d: ReturnType<typeof db>) {
   const base = d`u.marketing_opt_in = true AND u.email_verified_at IS NOT NULL AND u.status = 'active' AND u.deleted_at IS NULL`;
+  if (key === "all_users") return d`u.email_verified_at IS NOT NULL AND u.status = 'active' AND u.deleted_at IS NULL AND u.email_unsubscribed_at IS NULL`;
   switch (key) {
     case "new_7":
       return d`${base} AND u.created_at > now() - interval '7 days'`;
@@ -222,14 +224,14 @@ export async function runCampaign(id: string, budgetMs = 240_000): Promise<{ sen
   let failed = 0;
   while (Date.now() - started < budgetMs) {
     const batch = await d`
-      SELECT s.id, s.email, s.user_id, u.name, u.marketing_opt_in, u.status, u.deleted_at
+      SELECT s.id, s.email, s.user_id, u.name, u.marketing_opt_in, u.email_unsubscribed_at, u.status, u.deleted_at
       FROM campaign_sends s LEFT JOIN users u ON u.id = s.user_id
       WHERE s.campaign_id = ${id} AND s.status = 'queued' ORDER BY s.created_at LIMIT 25`;
     if (!batch.length) break;
     for (const r of batch) {
       if (Date.now() - started >= budgetMs) break;
       // Consent can change mid-campaign: re-check right before sending.
-      if (!r.marketing_opt_in || r.status !== "active" || r.deleted_at) {
+      if ((c.audience === "all_users" ? r.email_unsubscribed_at : !r.marketing_opt_in) || r.status !== "active" || r.deleted_at) {
         await d`UPDATE campaign_sends SET status = 'skipped' WHERE id = ${r.id}`;
         continue;
       }

@@ -65,10 +65,10 @@ export const ACTIONS = {
       subject: z.string().trim().min(3).max(140),
       message: z.string().trim().min(10).max(6000),
       from: z.enum(["support", "founder", "owner"]).default("founder"),
-      audience: z.enum(AUDIENCES.map((a) => a.key) as [AudienceKey, ...AudienceKey[]]).default("opted_in"),
+      audience: z.enum(AUDIENCES.map((a) => a.key) as [AudienceKey, ...AudienceKey[]]).default("all_users"),
     }),
     describe: (a: { subject: string; message: string; from: string; audience: string }) =>
-      `Email ${AUDIENCES.find((x) => x.key === a.audience)?.label.toLowerCase() ?? a.audience} from ${a.from}@recktube.xyz: “${a.subject}” — ${a.message.slice(0, 200)}${a.message.length > 200 ? "…" : ""} (branded design, unsubscribe link; people who opted out are skipped)`,
+      `Email ${AUDIENCES.find((x) => x.key === a.audience)?.label.toLowerCase() ?? a.audience} from ${a.from}@recktube.xyz: “${a.subject}” — ${a.message.slice(0, 200)}${a.message.length > 200 ? "…" : ""} (branded design, unsubscribe link; people who unsubscribed are skipped)`,
   },
   approve_affiliate: {
     permission: "affiliates.manage",
