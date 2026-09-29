@@ -12,6 +12,7 @@ import { randomToken, hashToken } from "@/src/server/crypto";
 import { sendAccountExistsEmail, sendVerificationEmail } from "@/src/server/email";
 import { cookies } from "next/headers";
 import { ATTR_COOKIES, attributeSignup } from "@/src/server/growth/referrals";
+import { BONUS_COOKIE, redeemAtSignup } from "@/src/server/growth/codes";
 
 const signupSchema = z
   .object({
@@ -21,6 +22,7 @@ const signupSchema = z
     confirm: z.string().min(1),
     terms: z.literal(true, { message: "Accept the terms to create an account." }),
     marketing: z.boolean().default(false),
+    bonusCode: z.string().trim().max(40).optional(),
   })
   .refine((v) => v.password === v.confirm, { message: "Passwords do not match.", path: ["confirm"] });
 
@@ -82,6 +84,11 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error("signup attribution failed:", error instanceof Error ? error.message : String(error));
     }
+
+    // Bonus code typed on the form (or remembered from a ?bonus= link).
+    const jar = await cookies();
+    await redeemAtSignup(String(result.user.id), body.bonusCode || jar.get(BONUS_COOKIE)?.value);
+    jar.delete(BONUS_COOKIE);
 
     // Verification email; its link signs the new user in.
     try {

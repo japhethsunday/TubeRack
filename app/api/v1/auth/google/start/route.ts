@@ -5,6 +5,7 @@ import { isOAuthConfigured, oauthOrigin } from "@/src/server/google/oauth";
 import { randomToken } from "@/src/server/crypto";
 import { linkOrigin } from "@/src/server/email";
 import { sanitizeReturnTo } from "@/src/lib/auth/session";
+import { BONUS_COOKIE, normalizeCode } from "@/src/server/growth/codes";
 
 /** GET /api/v1/auth/google/start — "Continue with Google": send the visitor to Google's account chooser. */
 export async function GET(request: Request) {
@@ -18,6 +19,9 @@ export async function GET(request: Request) {
   const returnTo = sanitizeReturnTo(new URL(request.url).searchParams.get("returnTo") ?? "/dashboard");
   store.set("g_login_state", state, { httpOnly: true, secure, sameSite: "lax", path: "/api/v1/auth/google", maxAge: 600 });
   store.set("g_login_return", returnTo, { httpOnly: true, secure, sameSite: "lax", path: "/api/v1/auth/google", maxAge: 600 });
+  // A bonus code typed on the sign-up page is applied once the new account exists.
+  const bonus = normalizeCode(new URL(request.url).searchParams.get("bonus") ?? "");
+  if (bonus.length >= 3) store.set(BONUS_COOKIE, bonus, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 3600 });
   const q = new URLSearchParams({
     client_id: getServerEnv().GOOGLE_CLIENT_ID ?? "",
     redirect_uri: `${oauthOrigin(origin)}/api/v1/auth/google/callback`,

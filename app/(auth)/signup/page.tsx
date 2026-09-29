@@ -1,9 +1,9 @@
 "use client";
 
 import { GoogleButton } from "@/src/components/auth/GoogleButton";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Lock, Mail, User } from "lucide-react";
+import { ArrowRight, Check, Gift, Lock, Mail, User } from "lucide-react";
 import { GlowField as Field, GlassAuthCard, stagger } from "@/src/components/auth/SplitAuthCard";
 import { PasswordStrength } from "@/src/components/auth/PasswordStrength";
 import { AuthBoundaryNotice } from "@/src/components/auth/AuthBoundaryNotice";
@@ -27,6 +27,35 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [shake, setShake] = useState(0);
+  // Optional bonus code: typed here or arriving in a ?bonus= / ?code= link.
+  const [bonus, setBonus] = useState("");
+  const [bonusOpen, setBonusOpen] = useState(false);
+  const [bonusState, setBonusState] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const fromLink = (q.get("bonus") ?? q.get("code") ?? "").trim().slice(0, 40);
+    if (!fromLink) return;
+    const id = requestAnimationFrame(() => {
+      setBonus(fromLink.toUpperCase());
+      setBonusOpen(true);
+      void checkBonus(fromLink.toUpperCase());
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  async function checkBonus(code: string) {
+    const c = code.trim();
+    if (!c) {
+      setBonusState(null);
+      return;
+    }
+    try {
+      const r = await api.get<{ ok: boolean; credits?: number; message?: string }>(`/api/v1/codes/check?code=${encodeURIComponent(c)}`);
+      setBonusState(r.ok ? { ok: true, text: `+${r.credits} bonus credits will be added to your new account` } : { ok: false, text: r.message ?? "That code isn't valid." });
+    } catch (e) {
+      setBonusState({ ok: false, text: e instanceof ApiError ? e.message : "Couldn't check the code right now — it will still be tried when you sign up." });
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,7 +69,7 @@ export default function SignupPage() {
     setErrors({});
     setLoading(true);
     try {
-      await api.post("/api/v1/auth/signup", { name, email, password, confirm, terms, marketing });
+      await api.post("/api/v1/auth/signup", { name, email, password, confirm, terms, marketing, bonusCode: bonus.trim() || undefined });
       setSentTo(email);
       setLoading(false);
       return;
@@ -73,7 +102,7 @@ export default function SignupPage() {
             ) : (
               <>
                 <div className="su-from-right mb-4" style={stagger(0)}>
-                  <GoogleButton returnTo="/onboarding" label="Sign up with Google" />
+                  <GoogleButton returnTo="/onboarding" label="Sign up with Google" bonus={bonus.trim() || undefined} />
                 </div>
                 <form key={shake} onSubmit={submit} noValidate className={cx("space-y-3", shake > 0 && "auth-shake")}>
                   <div className="su-from-right" style={stagger(2)}>
@@ -99,8 +128,35 @@ export default function SignupPage() {
                       <Checkbox label="Email me creator tips, product news and offers (optional)" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} />
                     </div>
                   </div>
-                  {formError && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{formError}</p>}
                   <div className="su-from-right" style={stagger(7)}>
+                    {!bonusOpen ? (
+                      <button type="button" onClick={() => setBonusOpen(true)} className="inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+                        <Gift className="size-4" aria-hidden="true" /> Have a bonus code?
+                      </button>
+                    ) : (
+                      <div className="space-y-1">
+                        <Field
+                          icon={Gift}
+                          label="Bonus code (optional)"
+                          autoComplete="off"
+                          value={bonus}
+                          onChange={(e) => {
+                            setBonus(e.target.value.toUpperCase());
+                            setBonusState(null);
+                          }}
+                          onBlur={() => void checkBonus(bonus)}
+                        />
+                        {bonusState && (
+                          <p role="status" className={cx("flex items-center gap-1.5 text-xs", bonusState.ok ? "text-success" : "text-destructive")}>
+                            {bonusState.ok && <Check className="size-3.5" aria-hidden="true" />} {bonusState.text}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-text">Works with Google sign-up too.</p>
+                      </div>
+                    )}
+                  </div>
+                  {formError && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{formError}</p>}
+                  <div className="su-from-right" style={stagger(8)}>
                     <Button type="submit" loading={loading} className="auth-sheen group h-11 w-full rounded-full bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 text-white">
                       {loading ? "Creating your workspace…" : "Sign up"}
                       {!loading && <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />}

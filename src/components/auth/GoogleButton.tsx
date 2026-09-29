@@ -1,9 +1,9 @@
 /** "Continue with Google" — full-page redirect through the server sign-in route. */
-export function GoogleButton({ returnTo = "/dashboard", label = "Continue with Google" }: { returnTo?: string; label?: string }) {
+export function GoogleButton({ returnTo = "/dashboard", label = "Continue with Google", bonus }: { returnTo?: string; label?: string; bonus?: string }) {
   return (
     <div className="space-y-4">
       <a
-        href={`/api/v1/auth/google/start?returnTo=${encodeURIComponent(returnTo)}`}
+        href={`/api/v1/auth/google/start?returnTo=${encodeURIComponent(returnTo)}${bonus ? `&bonus=${encodeURIComponent(bonus)}` : ""}`}
         className="flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border bg-surface text-sm font-medium text-foreground transition-colors hover:bg-muted"
       >
         <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true">

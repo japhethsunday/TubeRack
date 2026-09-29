@@ -18,6 +18,9 @@ function rememberAttribution(request: NextRequest, response: NextResponse) {
   const opts = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", maxAge: 30 * 86400 };
   const ref = (q.get("ref") ?? "").toUpperCase();
   if (/^[A-Z2-9]{6,12}$/.test(ref) && !request.cookies.get("rt_ref")) response.cookies.set("rt_ref", ref, opts);
+  // ?bonus=CODE links: the code is applied when the visitor creates an account.
+  const bonus = (q.get("bonus") ?? "").toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 40);
+  if (bonus.length >= 3) response.cookies.set("rt_bonus", bonus, { ...opts, maxAge: 7 * 86400 });
   const clean = (v: string | null) => (v ?? "").toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 60);
   const src = clean(q.get("utm_source"));
   if (src && !request.cookies.get("rt_src")) {

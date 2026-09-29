@@ -42,3 +42,34 @@ export async function personalCode(userId: string, credits: number, hours: numbe
   }
   throw new Error("Couldn't create a code");
 }
+
+/** Cookie holding a bonus code entered at sign-up (or from a ?bonus= link) until the account exists. */
+export const BONUS_COOKIE = "rt_bonus";
+
+/** Preview a code on the sign-up page: how many credits, or why it won't work. Personal codes stay private. */
+export async function checkCode(raw: string): Promise<{ ok: true; credits: number } | { ok: false; message: string }> {
+  const code = normalizeCode(raw);
+  if (code.length < 3) return { ok: false, message: "Enter a valid code." };
+  const db = getDb();
+  if (!db) return { ok: false, message: "Codes aren't available right now." };
+  const [c] = await db`SELECT credits, active, expires_at, max_uses, uses, user_id FROM promo_codes WHERE code = ${code}`;
+  if (!c || !c.active || c.user_id) return { ok: false, message: "That code isn't valid." };
+  if (c.expires_at && new Date(String(c.expires_at)).getTime() < Date.now()) return { ok: false, message: "That code has expired." };
+  if (c.max_uses !== null && Number(c.uses) >= Number(c.max_uses)) return { ok: false, message: "That code has been fully used." };
+  return { ok: true, credits: Number(c.credits) };
+}
+
+/** Redeem a sign-up bonus code for a brand-new account. Never blocks sign-up. */
+export async function redeemAtSignup(userId: string, raw: string | undefined | null): Promise<number> {
+  if (!raw || normalizeCode(raw).length < 3) return 0;
+  const db = getDb();
+  if (!db) return 0;
+  try {
+    const [w] = await db`SELECT id FROM workspaces WHERE owner_id = ${userId} ORDER BY created_at ASC LIMIT 1`;
+    if (!w) return 0;
+    return (await redeemCode(userId, String(w.id), raw)).credits;
+  } catch (error) {
+    console.warn("sign-up bonus code not applied:", error instanceof Error ? error.message : String(error));
+    return 0;
+  }
+}

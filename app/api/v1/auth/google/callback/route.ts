@@ -9,6 +9,7 @@ import { linkOrigin, sendWelcomeEmail } from "@/src/server/email";
 import { audit } from "@/src/server/audit";
 import { sanitizeReturnTo } from "@/src/lib/auth/session";
 import { ATTR_COOKIES, attributeSignup, rewardReferral } from "@/src/server/growth/referrals";
+import { BONUS_COOKIE, redeemAtSignup } from "@/src/server/growth/codes";
 import { limiterFor, clientKey } from "@/src/server/rate-limit";
 
 interface GoogleProfile {
@@ -110,8 +111,10 @@ export async function GET(request: Request) {
       } catch (error) {
         console.error("google signup attribution failed:", error instanceof Error ? error.message : String(error));
       }
+      await redeemAtSignup(userId, store.get(BONUS_COOKIE)?.value);
       await sendWelcomeEmail(request, email, name).catch(() => undefined);
     }
+    if (store.get(BONUS_COOKIE)) store.delete(BONUS_COOKIE);
 
     const token = await createSession(userId, { userAgent: request.headers.get("user-agent") ?? undefined });
     const cookie = sessionCookie(token);
