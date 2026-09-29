@@ -27,6 +27,9 @@ const serverSchema = z.object({
   R2_BUCKET: z.string().optional(),
   // Cloudflare Workers AI (free daily allowance): API token with Workers AI permission.
   CF_AI_TOKEN: z.string().optional(),
+  // TikTok for Developers app (Login Kit + Content Posting API); server-only.
+  TIKTOK_CLIENT_KEY: z.string().optional(),
+  TIKTOK_CLIENT_SECRET: z.string().optional(),
   CF_ACCOUNT_ID: z.string().optional(),
   CF_AI_TEXT_MODELS: z.string().optional(),
 

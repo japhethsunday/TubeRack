@@ -3,6 +3,7 @@ import { VerifyBanner } from "@/src/components/auth/VerifyBanner";
 import { ProfilePanel, SecurityPanel, SessionsPanel } from "@/src/components/settings/account-panels";
 import { PreferencesPanel, NotificationsPanel } from "@/src/components/settings/preference-panels";
 import { WorkspacePanel, BillingPanel, DataPanel } from "@/src/components/settings/workspace-panels";
+import { ConnectionsPanel } from "@/src/components/settings/TikTokPanel";
 
 const VALID = [
   "profile",
@@ -11,6 +12,7 @@ const VALID = [
   "security",
   "sessions",
   "workspace",
+  "connections",
   "billing",
   "data",
 ] as const;
@@ -45,6 +47,7 @@ export default async function SettingsPage({
           { id: "security", label: "Security", content: <SecurityPanel /> },
           { id: "sessions", label: "Sessions", content: <SessionsPanel /> },
           { id: "workspace", label: "Workspace", content: <WorkspacePanel /> },
+          { id: "connections", label: "Connections", content: <ConnectionsPanel /> },
           { id: "billing", label: "Credits", content: <BillingPanel /> },
           { id: "data", label: "Data", content: <DataPanel /> },
         ]}

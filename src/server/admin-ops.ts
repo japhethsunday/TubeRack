@@ -23,6 +23,7 @@ export const FEATURES = [
   { id: "image", label: "Images", blurb: "Scene images and thumbnails." },
   { id: "video", label: "AI video clips", blurb: "Generated video clips." },
   { id: "transcription", label: "Transcription & captions", blurb: "Caption and transcript generation." },
+  { id: "tiktok", label: "TikTok posting", blurb: "Connect TikTok and post finished videos to it." },
 ] as const;
 
 export type FeatureFlags = Record<string, { off: boolean; message: string }>;
@@ -35,7 +36,10 @@ export async function getSetting<T>(key: string, fallback: T): Promise<T> {
   if (!db) return fallback;
   try {
     const [r] = await db`SELECT value FROM admin_settings WHERE key = ${key}`;
-    return r ? ({ ...fallback, ...(r.value as T) } as T) : fallback;
+    if (!r) return fallback;
+    // Lists are stored whole; objects are merged over their defaults.
+    if (Array.isArray(fallback)) return (Array.isArray(r.value) ? r.value : fallback) as T;
+    return { ...fallback, ...(r.value as T) } as T;
   } catch {
     return fallback;
   }
