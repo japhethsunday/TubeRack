@@ -63,7 +63,7 @@ export function CreditsPill() {
         <span className="hidden font-normal text-muted-text lg:inline">credits</span>
       </button>
       {open && (
-        <div role="dialog" aria-label="Your credits" className="absolute right-0 top-11 z-50 w-72 rounded-xl border border-border bg-elevated p-4 shadow-xl">
+        <div role="dialog" aria-label="Your credits" className="absolute right-0 top-11 z-50 w-72 max-sm:fixed max-sm:inset-x-4 max-sm:top-[calc(4rem+env(safe-area-inset-top))] max-sm:w-auto max-sm:max-h-[70vh] max-sm:overflow-y-auto rounded-xl border border-border bg-elevated p-4 shadow-xl">
           <div className="flex items-baseline justify-between">
             <span className="text-sm font-semibold">Your credits</span>
             <span className={cx("text-2xl font-bold tabular-nums", low && "text-destructive")}>{c.unlimited ? "∞" : c.balance.toLocaleString()}</span>

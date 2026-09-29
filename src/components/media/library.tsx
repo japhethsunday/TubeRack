@@ -250,7 +250,7 @@ function AssignScenes({ asset, sceneOptions }: { asset: MediaAsset; sceneOptions
         Assign to scenes ({asset.sceneIds.length})
       </button>
       {open && (
-        <ul className="absolute z-20 mt-1 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-elevated p-1 shadow-lg" aria-label="Scenes">
+        <ul className="absolute z-20 mt-1 max-h-48 w-56 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-border bg-elevated p-1 shadow-lg" aria-label="Scenes">
           {sceneOptions.map((s) => {
             const on = asset.sceneIds.includes(s.id);
             return (

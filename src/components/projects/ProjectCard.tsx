@@ -109,7 +109,7 @@ export function ProjectCard({
             {menu && (
               <>
                 <span aria-hidden="true" onClick={() => setMenu(false)} className="fixed inset-0 z-10 cursor-default" />
-                <div onClick={() => setMenu(false)} className="absolute right-0 top-full z-20 w-44 rounded-lg border border-border bg-elevated p-1 shadow-lg">
+                <div onClick={() => setMenu(false)} className="absolute right-0 top-full z-20 w-44 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-elevated p-1 shadow-lg">
                   {actions}
                 </div>
               </>

@@ -589,7 +589,7 @@ function TrackVolume({ label, value, onChange }: { label: string; value: number;
         {Math.round(value * 100)}%
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-48 rounded-lg border border-border bg-elevated p-3 shadow-xl">
+        <div className="absolute left-0 top-full z-30 mt-1 w-48 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-elevated p-3 shadow-xl">
           <div className="flex items-center justify-between text-[11px] font-medium">
             <span>{label} volume</span>
             <span className="tabular-nums">{Math.round(value * 100)}%</span>
