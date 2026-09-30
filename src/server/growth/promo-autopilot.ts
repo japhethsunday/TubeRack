@@ -4,7 +4,7 @@ import { adminEmails } from "@/src/server/admin";
 import { getServerEnv } from "@/src/lib/env";
 import { sendEmail } from "@/src/server/email";
 import { renderEmail } from "@/src/server/email-templates";
-import { PROMO_FEATURES, PROMO_STYLES, writePromo, type PromoPackage } from "@/src/server/growth/promo";
+import { PROMO_FEATURES, PROMO_STYLES, styleFor, writePromo, type PromoPackage } from "@/src/server/growth/promo";
 
 /**
  * Promo autopilot: every morning the AI writes a few different promo Shorts
@@ -71,7 +71,9 @@ export async function runPromoAutopilot(opts: { force?: boolean; count?: number;
   const recent = (await db`SELECT feature, style FROM promo_videos WHERE created_at > now() - interval '14 days'`).map((r) => ({ feature: String(r.feature), style: String(r.style) }));
   const owner = opts.createdBy ?? (await ownerId());
   const made: { id: string; pkg: PromoPackage; feature: string }[] = [];
-  for (const c of pickCombos(target, recent)) {
+  for (const [n, c] of pickCombos(target, recent).entries()) {
+    // Mostly teaching Shorts (3 of 4), with the occasional straight promo.
+    c.style = styleFor(n);
     try {
       const pkg = await writePromo({ feature: c.feature, style: c.style, platform: "YouTube Shorts", lengthSec: 30, angle: "" }); // the AI invents a fresh idea, avoiding past ones
       if (!pkg.scenes.length) continue;

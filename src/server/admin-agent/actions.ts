@@ -7,7 +7,7 @@ import { adjustCredits, setCreditPlan } from "@/src/server/credits";
 import { notifyCreditGift } from "@/src/server/credit-emails";
 import { FEATURES, featureFlags, putSetting } from "@/src/server/admin-ops";
 import { normalizeCode } from "@/src/server/growth/codes";
-import { PROMO_FEATURES, PROMO_STYLES, createPromoProject, writePromo } from "@/src/server/growth/promo";
+import { PROMO_FEATURES, createPromoProject, styleFor, writePromo } from "@/src/server/growth/promo";
 import { runPromoAutopilot } from "@/src/server/growth/promo-autopilot";
 import { sendTeamReply } from "@/src/server/support/emails";
 import { AUDIENCES, EMPTY_CONTENT, audienceCounts, runCampaign, type AudienceKey } from "@/src/server/growth/campaigns";
@@ -244,10 +244,9 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       const count = Number(a.count);
       let made = 0;
       if (a.feature || a.angle) {
-        const styles = [...PROMO_STYLES];
         for (let i = 0; i < count; i++) {
           const feature = String(a.feature || PROMO_FEATURES[i % PROMO_FEATURES.length].id);
-          const style = styles[(Date.now() + i) % styles.length];
+          const style = styleFor(i);
           const pkg = await writePromo({ feature, style, platform: "YouTube Shorts", lengthSec: 30, angle: String(a.angle ?? "") });
           if (!pkg.scenes.length) continue;
           await adminDb()`INSERT INTO promo_videos (created_by, feature, style, platform, length_sec, package, source, status) VALUES (${admin.id}, ${feature}, ${style}, ${"YouTube Shorts"}, ${30}, ${JSON.stringify(pkg)}, 'manual', 'ready')`;
@@ -265,7 +264,7 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       const seed = Math.floor(Date.now() / 1000);
       for (let i = 0; i < count; i++) {
         const feature = String(a.feature || PROMO_FEATURES[(seed + i * 3) % PROMO_FEATURES.length].id);
-        const style = PROMO_STYLES[(seed + i) % PROMO_STYLES.length];
+        const style = styleFor(i, seed * 1000);
         try {
           const pkg = await writePromo({ feature, style, platform: "YouTube Shorts", lengthSec: 30, angle: String(a.angle ?? "") });
           if (!pkg.scenes.length) continue;

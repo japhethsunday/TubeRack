@@ -24,3 +24,14 @@ describe("promo autopilot", () => {
     assert.equal(pickCombos(3, all, 7).length, 3);
   });
 });
+
+describe("promo style mix", () => {
+  it("makes 3 of every 4 videos teaching Shorts", async () => {
+    const { styleFor, TEACHING_STYLES } = await import("@/src/server/growth/promo");
+    for (const seed of [0, 12345678, 99999999999]) {
+      const styles = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => styleFor(i, seed));
+      assert.equal(styles.filter((s) => TEACHING_STYLES.has(s)).length, 6);
+      assert.ok(!TEACHING_STYLES.has(styles[3]) && !TEACHING_STYLES.has(styles[7]));
+    }
+  });
+});
