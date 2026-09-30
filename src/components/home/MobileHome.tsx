@@ -1,5 +1,6 @@
 "use client";
 
+import { IdeaStarter } from "@/src/components/content/IdeaStarter";
 import Link from "next/link";
 import { BadgeDollarSign, ChevronRight, Clapperboard, FolderKanban, Lightbulb, PenLine, Play, Radar, Rocket } from "lucide-react";
 import { NewProjectButton } from "@/src/components/projects/NewProjectDialog";
@@ -75,6 +76,8 @@ export function MobileHome() {
           </div>
         </div>
       )}
+
+      <IdeaStarter />
 
       <section aria-labelledby="m-create">
         <h2 id="m-create" className="mb-3 text-base font-semibold">Create</h2>

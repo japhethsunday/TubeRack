@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FlaskConical, PenLine, Clapperboard, ArrowRight } from "lucide-react";
 import { MobileHome } from "@/src/components/home/MobileHome";
+import { IdeaStarter } from "@/src/components/content/IdeaStarter";
 import { NewProjectButton } from "@/src/components/projects/NewProjectDialog";
 import { LocalStorageNote, useProjects } from "@/src/components/projects/ProjectsProvider";
 import { continueLabelFor, progressOf } from "@/src/lib/projects/store";
@@ -59,6 +60,7 @@ export default function DashboardPage() {
         <NewProjectButton />
       </div>
       <LocalStorageNote compact />
+      <IdeaStarter />
 
       {mostRecent && (
         <section
