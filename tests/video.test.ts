@@ -1,3 +1,4 @@
+import { MUSIC_BASE, MUSIC_DUCK } from "@/src/lib/video/mix";
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -349,7 +350,9 @@ describe("auto video: stock footage and music", () => {
     assert.equal(clips.filter((c) => c.kind === "image").length, 0);
     const music = clips.find((c) => c.kind === "music");
     assert.equal(music?.assetId, "mus");
-    assert.ok((music?.volume ?? 1) < 0.3);
+    // Audible bed: clearly under the voice (≈ -18 dB while speaking) but not buried.
+    assert.equal(music?.volume, 0.35);
+    assert.ok(0.35 * MUSIC_BASE * MUSIC_DUCK > 0.1 && 0.35 * MUSIC_BASE * MUSIC_DUCK < 0.15);
   });
 
   it("plays a scene's different stock clips one after another", () => {

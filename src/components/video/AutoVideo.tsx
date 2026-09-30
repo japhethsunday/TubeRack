@@ -479,8 +479,15 @@ export function GenerateVideoDialog({
         set("music", { state: "running" });
         let added = "";
         try {
-          const found = await api.get<{ tracks: { id: string; title: string; creator: string; durationSec: number | null }[] }>(`/api/v1/music/search?mood=${encodeURIComponent(musicMood)}&page=1`);
-          for (const t of found.tracks.slice(0, 5)) {
+          // A different song each video: a random page of the library, shuffled,
+          // skipping tracks this device used recently.
+          const recent = recentTracks();
+          const page = 1 + Math.floor(Math.random() * 4);
+          let found = await api.get<{ tracks: { id: string; title: string; creator: string; durationSec: number | null }[] }>(`/api/v1/music/search?mood=${encodeURIComponent(musicMood)}&page=${page}`);
+          if (!found.tracks.length && page > 1) found = await api.get<typeof found>(`/api/v1/music/search?mood=${encodeURIComponent(musicMood)}&page=1`);
+          const shuffled = [...found.tracks].sort(() => Math.random() - 0.5);
+          const fresh = [...shuffled.filter((t) => !recent.includes(t.id)), ...shuffled.filter((t) => recent.includes(t.id))];
+          for (const t of fresh.slice(0, 6)) {
             try {
               const file = await api.post<{ url: string; mime: string; fileSize: number }>("/api/v1/music/import", { id: t.id });
               const track = media.addAsset({
@@ -499,6 +506,7 @@ export function GenerateVideoDialog({
               });
               made.push(track);
               added = t.title;
+              rememberTrack(t.id);
               break;
             } catch {
               // Some tracks can't be used (license/size): try the next one.
@@ -713,4 +721,24 @@ export function GenerateVideoDialog({
       )}
     </Modal>
   );
+}
+
+const RECENT_KEY = "rt-recent-music";
+
+/** Music tracks this device used for recent videos (newest first). */
+function recentTracks(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 20) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberTrack(id: string): void {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify([id, ...recentTracks().filter((x) => x !== id)].slice(0, 20)));
+  } catch {
+    // Private mode: variety still comes from the random page and shuffle.
+  }
 }

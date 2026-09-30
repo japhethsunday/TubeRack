@@ -7,7 +7,7 @@ import type { Composition, TimelineClip } from "@/src/lib/video/types";
  */
 export const MUSIC_BASE = 0.8;
 /** Music level while a voice clip is playing (fraction of its normal level). */
-export const MUSIC_DUCK = 0.3;
+export const MUSIC_DUCK = 0.45;
 
 export function trackVolume(comp: Pick<Composition, "tracks">, trackId: string): number {
   const v = comp.tracks.find((t) => t.id === trackId)?.volume;
