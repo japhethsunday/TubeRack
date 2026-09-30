@@ -16,7 +16,8 @@ import { useMedia } from "@/src/components/media/MediaProvider";
 import { useVideo, VideoStorageNote } from "@/src/components/video/VideoProvider";
 import { useIntelQuery } from "@/src/components/intelligence/chrome";
 import { useSession } from "@/src/components/auth/useSession";
-import { AutopilotRunner } from "@/src/components/video/AutopilotRunner";
+import { AutopilotRunner, type AutoPlatform } from "@/src/components/video/AutopilotRunner";
+import type { ReleaseTime } from "@/src/lib/video/publish";
 import { TimelinePro } from "@/src/components/video/TimelinePro";
 import { Preview, fmtTimecode } from "@/src/components/video/Preview";
 import { ScenesPanel, MediaPanel, TextPanel, Inspector, ExportPanel } from "@/src/components/video/panels";
@@ -152,7 +153,12 @@ function Studio() {
     const q = new URLSearchParams(window.location.search);
     const id = q.get("autopost");
     const ok = (v: string) => /^[0-9a-f-]{36}$/.test(v);
-    return id && ok(id) ? { id, queue: (q.get("queue") ?? "").split(",").filter(ok).slice(0, 10), index: Math.max(0, Math.min(10, Number(q.get("n")) || 0)) } : null;
+    const at = q.get("at");
+    const when: ReleaseTime = at === "morning" || at === "afternoon" || at === "evening" ? at : "now";
+    const pf = (q.get("pf") ?? "yt").split(",").filter((v): v is AutoPlatform => v === "yt" || v === "tt");
+    return id && ok(id)
+      ? { id, queue: (q.get("queue") ?? "").split(",").filter(ok).slice(0, 10), index: Math.max(0, Math.min(10, Number(q.get("n")) || 0)), when, startInDays: Math.max(0, Math.min(14, Number(q.get("start")) || 0)), platforms: pf.length ? pf : (["yt"] as AutoPlatform[]) }
+      : null;
   });
   const comp = project ? video.compFor(project.id) : null;
   const scenes = useMemo(() => (project ? scriptsApi.scenesFor(project.id) : []), [project, scriptsApi]);
@@ -934,7 +940,7 @@ function Studio() {
       )}
 
       {autopost && session?.is_admin && ready && project && (
-        <AutopilotRunner project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} promoId={autopost.id} queue={autopost.queue} index={autopost.index} />
+        <AutopilotRunner project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} promoId={autopost.id} queue={autopost.queue} index={autopost.index} when={autopost.when} startInDays={autopost.startInDays} platforms={autopost.platforms} />
       )}
       {showAutoVideo && !autopost && <GenerateVideoDialog project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} onClose={() => setShowAutoVideo(false)} />}
       {confirmBuild && (

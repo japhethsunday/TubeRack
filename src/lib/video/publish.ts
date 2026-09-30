@@ -127,3 +127,35 @@ export function releaseSlot(k: number, now = new Date(), hour = 17): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+export type ReleaseTime = "now" | "morning" | "afternoon" | "evening";
+export const RELEASE_HOURS: Record<Exclude<ReleaseTime, "now">, number> = { morning: 9, afternoon: 14, evening: 19 };
+
+/**
+ * When the k-th video of a batch goes out, in the viewer's local time.
+ * "now": the first posts at once, the rest daily at 5 PM. A time of day:
+ * one a day at that hour, starting today if it's still ahead, else tomorrow.
+ * null means "post now".
+ */
+export function releaseAt(k: number, when: ReleaseTime = "now", startInDays = 0, now = new Date()): Date | null {
+  const d = new Date(now);
+  if (when === "now") {
+    if (k <= 0 && startInDays <= 0) return null;
+    d.setHours(17, 0, 0, 0);
+    d.setDate(d.getDate() + startInDays + k);
+    return d;
+  }
+  d.setHours(RELEASE_HOURS[when], 0, 0, 0);
+  d.setDate(d.getDate() + startInDays);
+  // Too close or already past today: begin tomorrow (YouTube needs some lead time).
+  if (d.getTime() < now.getTime() + 20 * 60_000) d.setDate(d.getDate() + 1);
+  d.setDate(d.getDate() + k);
+  return d;
+}
+
+/** A Date as the local "YYYY-MM-DDTHH:mm" the publish form uses. */
+export function localSlot(d: Date | null): string {
+  if (!d) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

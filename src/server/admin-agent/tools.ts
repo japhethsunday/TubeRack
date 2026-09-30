@@ -1,3 +1,4 @@
+import { listScheduledPosts } from "@/src/server/tiktok/schedule";
 import { z } from "zod";
 import { adminDb, adminEmails, adminOverview, adminUserDetail, adminUsers } from "@/src/server/admin";
 import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
@@ -163,6 +164,12 @@ export const TOOLS = {
       const rows = await adminDb()`SELECT subject, audience, status, scheduled_at FROM campaigns WHERE status IN ('scheduled', 'sending') ORDER BY scheduled_at NULLS FIRST LIMIT 20`;
       return { campaigns: rows.map((r) => ({ subject: String(r.subject), audience: String(r.audience), status: String(r.status), when: r.scheduled_at ? new Date(String(r.scheduled_at)).toISOString().slice(0, 16) : null })) };
     },
+  },
+  scheduled_posts: {
+    permission: "promo.list",
+    about: "TikTok posts scheduled or recently done: caption, when (UTC), status, error. YouTube scheduled videos show in promo_videos.",
+    args: z.object({}),
+    run: async () => ({ posts: await listScheduledPosts() }),
   },
   growth_report: {
     permission: "growth.view",

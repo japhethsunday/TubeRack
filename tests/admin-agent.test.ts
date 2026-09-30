@@ -132,13 +132,20 @@ describe("assistant promo videos", () => {
 });
 
 describe("assistant hands-free posting", () => {
-  it("make_and_post_videos is limited to 1-5 videos and says it posts to YouTube", async () => {
+  it("make_and_post_videos defaults to YouTube now and is limited to 1-7 videos", async () => {
     const { prepare, ACTIONS } = await import("@/src/server/admin-agent/actions");
     const p = prepare("make_and_post_videos", {});
     assert.equal(p?.args.count, 2);
-    assert.match(p!.summary, /post them to your YouTube channel, hands-free: the first goes live now, the others are scheduled one per day at 5 PM/);
-    assert.equal(prepare("make_and_post_videos", { count: 6 }), null);
+    assert.match(p!.summary, /schedule them on YouTube, hands-free: the first goes live now, the others one per day at 5 PM/);
+    assert.equal(prepare("make_and_post_videos", { count: 8 }), null);
     assert.equal(ACTIONS.make_and_post_videos.permission, "promo.write");
+  });
+  it("schedules YouTube and TikTok at a time of day", async () => {
+    const { prepare } = await import("@/src/server/admin-agent/actions");
+    const p = prepare("make_and_post_videos", { count: 5, platforms: ["youtube", "tiktok"], when: "afternoon" });
+    assert.match(p!.summary, /on YouTube and TikTok, hands-free: one per day at 2 PM, starting today/);
+    assert.equal(prepare("make_and_post_videos", { platforms: ["instagram"] }), null);
+    assert.equal(prepare("make_and_post_videos", { when: "midnight" }), null);
   });
 });
 

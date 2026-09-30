@@ -8,6 +8,7 @@ import { notifyCreditGift } from "@/src/server/credit-emails";
 import { FEATURES, featureFlags, putSetting } from "@/src/server/admin-ops";
 import { normalizeCode } from "@/src/server/growth/codes";
 import { PROMO_FEATURES, createPromoProject, styleFor, writePromo } from "@/src/server/growth/promo";
+import { cancelScheduledPosts } from "@/src/server/tiktok/schedule";
 import { runPromoAutopilot } from "@/src/server/growth/promo-autopilot";
 import { sendTeamReply } from "@/src/server/support/emails";
 import { AUDIENCES, EMPTY_CONTENT, audienceCounts, runCampaign, type AudienceKey } from "@/src/server/growth/campaigns";
@@ -122,12 +123,28 @@ export const ACTIONS = {
   make_and_post_videos: {
     permission: "promo.write",
     args: z.object({
-      count: z.number().int().min(1).max(5).default(2),
+      count: z.number().int().min(1).max(7).default(2),
       feature: z.enum(PROMO_FEATURES.map((f) => f.id) as [string, ...string[]]).optional(),
       angle: z.string().trim().max(300).default(""),
+      platforms: z.array(z.enum(["youtube", "tiktok"])).min(1).max(2).default(["youtube"]),
+      when: z.enum(["now", "morning", "afternoon", "evening"]).default("now"),
+      startInDays: z.number().int().min(0).max(14).default(0),
     }),
-    describe: (a: { count: number; feature?: string; angle: string }) =>
-      `Make ${a.count} promo video${a.count === 1 ? "" : "s"}${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : ""} and post ${a.count === 1 ? "it" : "them"} to your YouTube channel, hands-free${a.count > 1 ? ": the first goes live now, the others are scheduled one per day at 5 PM your time" : ""}. A studio tab does the work: keep it open about 3–5 minutes per video, then you get the links.`,
+    describe: (a: { count: number; feature?: string; angle: string; platforms: string[]; when: string; startInDays: number }) => {
+      const where = a.platforms.map((p) => (p === "tiktok" ? "TikTok" : "YouTube")).join(" and ");
+      const hour = { morning: "9 AM", afternoon: "2 PM", evening: "7 PM" }[a.when as "morning"] ?? "";
+      const start = a.startInDays === 0 ? "today (or tomorrow if that time has passed)" : a.startInDays === 1 ? "tomorrow" : `in ${a.startInDays} days`;
+      const plan =
+        a.when === "now"
+          ? a.count > 1 ? `the first goes live ${a.startInDays ? start : "now"}, the others one per day at 5 PM` : a.startInDays ? `goes live ${start} at 5 PM` : "goes live now"
+          : `one per day at ${hour}, starting ${start}`;
+      return `Make ${a.count} promo video${a.count === 1 ? "" : "s"}${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : ""} and schedule ${a.count === 1 ? "it" : "them"} on ${where}, hands-free: ${plan}, your local time. A studio tab does the work: keep it open about 3–5 minutes per video.`;
+    },
+  },
+  cancel_scheduled_posts: {
+    permission: "promo.write",
+    args: z.object({}),
+    describe: () => "Cancel every TikTok post that is scheduled but not posted yet. (YouTube videos already scheduled stay scheduled on YouTube; change them in YouTube Studio.)",
   },
   delete_promo_videos: {
     permission: "promo.delete",
@@ -345,7 +362,14 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       }
       await log({ count, made: ids.length });
       if (!ids.length) return "Couldn't write the videos just now. Try again in a minute.";
-      return { text: `${ids.length} video${ids.length === 1 ? "" : "s"} written. Opening the studio to make and post ${ids.length === 1 ? "it" : "them"} now. Keep that tab open.`, launch: `/admin/promo/run?ids=${ids.join(",")}` };
+      const pf = (a.platforms as unknown as string[]).map((p) => (p === "tiktok" ? "tt" : "yt")).join(",");
+      const q = new URLSearchParams({ ids: ids.join(","), at: String(a.when), start: String(a.startInDays), pf });
+      return { text: `${ids.length} video${ids.length === 1 ? "" : "s"} written. Opening the studio to make and schedule ${ids.length === 1 ? "it" : "them"} now. Keep that tab open.`, launch: `/admin/promo/run?${q}` };
+    }
+    case "cancel_scheduled_posts": {
+      const n = await cancelScheduledPosts();
+      await log({ cancelled: n });
+      return n ? `Cancelled ${n} scheduled TikTok post${n === 1 ? "" : "s"}.` : "No TikTok posts were waiting.";
     }
     case "delete_promo_videos": {
       const rows =

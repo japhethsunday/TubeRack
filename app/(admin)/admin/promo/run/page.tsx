@@ -21,6 +21,11 @@ export default function PromoRun() {
       .then(async (d) => {
         const projectId = d.promos.find((p) => p.id === first)?.projectId ?? (await api.post<{ projectId: string }>(`/api/v1/admin/promo/${first}`, { action: "project" })).projectId;
         const q = new URLSearchParams({ project: projectId, autopost: first });
+        const from = new URLSearchParams(window.location.search);
+        for (const k of ["at", "start", "pf"]) {
+          const v = from.get(k);
+          if (v) q.set(k, v.slice(0, 20));
+        }
         if (rest.length) q.set("queue", rest.join(","));
         window.location.assign(`/studio/video?${q}`);
       })
@@ -28,7 +33,7 @@ export default function PromoRun() {
   }, []);
   return (
     <>
-      <PageTitle title="Making your videos" sub="Opening Video Studio. Keep the tab open: each video is made and posted to YouTube, then you get the links." />
+      <PageTitle title="Making your videos" sub="Opening Video Studio. Keep the tab open: each video is made, then posted or scheduled where you asked." />
       {error ? <p className="text-sm text-destructive">{error}</p> : <p className="flex items-center gap-2 text-sm text-muted-text"><Loader2 className="size-4 animate-spin" aria-hidden="true" /> Starting…</p>}
     </>
   );
