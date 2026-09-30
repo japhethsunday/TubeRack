@@ -85,7 +85,7 @@ const LOOKUP_LABEL: Record<string, string> = {
  * shares nothing with the creators' support chat. Conversations are saved to
  * the admin's account (see AssistantProvider).
  */
-export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; setTurns: React.Dispatch<React.SetStateAction<Turn[]>>; compact?: boolean }) {
+export function AssistantChat({ turns, setTurns, compact, onNavigate }: { turns: Turn[]; setTurns: React.Dispatch<React.SetStateAction<Turn[]>>; compact?: boolean; onNavigate?: () => void }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +95,7 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
   const pathname = usePathname();
   /** Go to an admin page; when it's the page already open, reload it with fresh data. */
   function go(href: string) {
+    onNavigate?.();
     const [path, query = ""] = href.split("?");
     if (path === pathname) {
       if (query && `?${query}` !== window.location.search) window.location.assign(href);
@@ -199,7 +200,7 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
                       <span className="block text-[11px] text-white/45">{new Date(c.updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
                     </span>
                   </button>
-                  <button type="button" aria-label="Delete conversation" onClick={() => void saved.removeChat(c.id)} className="mr-2 rounded-lg p-2 text-white/35 opacity-0 transition hover:bg-rose-500/10 hover:text-rose-300 focus:opacity-100 group-hover:opacity-100">
+                  <button type="button" aria-label="Delete conversation" onClick={() => void saved.removeChat(c.id)} className="mr-2 rounded-lg p-2 text-white/35 opacity-100 sm:opacity-0 transition hover:bg-rose-500/10 hover:text-rose-300 focus:opacity-100 group-hover:opacity-100">
                     <Trash2 className="size-4" aria-hidden="true" />
                   </button>
                 </li>

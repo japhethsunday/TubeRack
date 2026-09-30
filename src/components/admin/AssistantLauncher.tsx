@@ -228,7 +228,7 @@ export function AssistantLauncher() {
           </header>
           <div className="min-h-0 flex-1">
             <ChatBoundary>
-              <AssistantChat turns={turns} setTurns={setTurns} compact />
+              <AssistantChat turns={turns} setTurns={setTurns} compact onNavigate={() => { if (window.matchMedia("(max-width: 639px)").matches) setOpen(false); }} />
             </ChatBoundary>
           </div>
         </div>

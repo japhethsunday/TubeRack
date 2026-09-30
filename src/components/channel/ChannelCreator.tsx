@@ -301,7 +301,7 @@ export function ChannelCreator() {
                     <span className="block truncate text-sm font-medium">{p.lead_name ?? p.niche}</span>
                     <span className="block truncate text-xs text-muted-text">{p.niche} · {regionName(p.region) || "Worldwide"} · {new Date(p.created_at).toLocaleDateString()}</span>
                   </Link>
-                  <button type="button" onClick={() => void removePlan(p.id)} aria-label={`Delete plan ${p.niche}`} className="mr-1 rounded p-1 text-muted-text opacity-0 hover:text-destructive group-hover:opacity-100 focus:opacity-100">
+                  <button type="button" onClick={() => void removePlan(p.id)} aria-label={`Delete plan ${p.niche}`} className="mr-1 rounded p-1 text-muted-text opacity-100 sm:opacity-0 hover:text-destructive group-hover:opacity-100 focus:opacity-100">
                     <Trash2 className="size-3.5" aria-hidden="true" />
                   </button>
                 </li>

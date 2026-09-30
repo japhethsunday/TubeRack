@@ -116,7 +116,7 @@ export function EditableText({
             setEditing(true);
           }}
           aria-label={`Edit ${label}`}
-          className="shrink-0 rounded-md p-1.5 text-muted-text opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+          className="shrink-0 rounded-md p-1.5 text-muted-text opacity-100 transition-opacity sm:opacity-0 hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
         >
           <Pencil className="size-3.5" aria-hidden="true" />
         </button>

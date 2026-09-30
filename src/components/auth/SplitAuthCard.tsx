@@ -37,7 +37,7 @@ export function GlowField({
             {...rest}
           />
           {password && (
-            <button type="button" onClick={() => setShown((s) => !s)} aria-label={shown ? "Hide password" : "Show password"} className="text-muted-text hover:text-foreground">
+            <button type="button" onClick={() => setShown((s) => !s)} aria-label={shown ? "Hide password" : "Show password"} className="-m-2.5 rounded-lg p-2.5 text-muted-text hover:text-foreground">
               {shown ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           )}

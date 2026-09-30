@@ -189,7 +189,7 @@ export function ContentCalendar() {
               <div key={day} className={cx("group min-h-28 border-b border-r border-border p-1.5 [&:nth-child(7n)]:border-r-0", !inMonth && "bg-muted/30")}>
                 <div className="flex items-center justify-between">
                   <span className={cx("flex size-6 items-center justify-center rounded-full text-xs", day === today ? "bg-primary font-semibold text-primary-foreground" : inMonth ? "" : "text-muted-text")}>{Number(day.slice(8))}</span>
-                  <button type="button" aria-label={`Add item on ${day}`} onClick={() => setEditing(blank(day))} className="rounded p-0.5 text-muted-text opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100 focus:opacity-100">
+                  <button type="button" aria-label={`Add item on ${day}`} onClick={() => setEditing(blank(day))} className="rounded p-0.5 text-muted-text opacity-100 sm:opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100 focus:opacity-100">
                     <Plus className="size-3.5" aria-hidden="true" />
                   </button>
                 </div>
