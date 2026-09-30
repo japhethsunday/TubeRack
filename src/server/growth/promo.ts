@@ -1,4 +1,5 @@
 import { getDb } from "@/src/server/db";
+import { searchedHowTos } from "@/src/server/growth/search-demand";
 import { randomUUID } from "node:crypto";
 import { GeminiTextProvider, isTextConfigured } from "@/src/server/ai/gemini";
 import { PRODUCT_FACTS } from "@/src/server/support/facts";
@@ -103,13 +104,22 @@ export async function writePromo(input: { feature: string; style: string; platfo
   if (!isTextConfigured()) throw backendUnavailable("AI writing");
   const f = PROMO_FEATURES.find((x) => x.id === input.feature) ?? PROMO_FEATURES[0];
   const made = await recentPromoIdeas();
+  const teaching = TEACHING_STYLES.has(input.style);
+  // Real searches people type into YouTube right now (teaching Shorts only).
+  const searched = teaching && !input.angle ? await searchedHowTos(made).catch(() => []) : [];
   const prompt = `You are a performance video marketer making a vertical 9:16 short-form ad for Recktube, made with Recktube itself.
 
 ${PRODUCT_FACTS}
 
 Feature to promote: ${f.name} — ${f.pitch}
 Style: ${input.style}. Platform: ${input.platform}. Target length: ${input.lengthSec} seconds.
-${TEACHING_STYLES.has(input.style) ? `This is a TEACHING Short: the title and hook promise one concrete, searchable creator skill ("How to post on TikTok the right way", "How to get your first 1,000 subscribers", "How to write a hook that stops the scroll", "How to pick a profitable niche", "How to make Shorts without showing your face", "How to schedule a week of videos"…) — invent a fresh one people actually search for. Give genuinely useful, correct steps anyone can follow, and show ${f.name} naturally as the fastest way to do it. The value comes first; the Recktube mention is part of the solution, not a hard sell.` : ""}
+${teaching ? `This is a TEACHING Short. It must answer ONE real question people search for.
+${searched.length ? `REAL YouTube searches right now (pick the one that best fits ${f.name}; use its wording in the title so it matches the search):\n${searched.map((q) => `- ${q}`).join("\n")}` : `Choose a question creators really search (e.g. "how to post on tiktok", "how to get your first 1000 subscribers on youtube", "how to start a faceless youtube channel") — not one already made.`}
+Teaching rules (most important):
+- Real, correct, current steps anyone can follow today, in order (3–5 steps), each specific and actionable. Name the actual button/setting/place only if you are sure it exists; otherwise describe it plainly. Never invent platform features, numbers, rules or guarantees.
+- Every step must be useful even without Recktube; show ${f.name} naturally as the fastest way to do one or more steps.
+- Title: the searched question as a clear promise (e.g. "How to post on TikTok the right way"). Hook: the pain or payoff in the first 2 seconds.
+- End: one line CTA to try Recktube free at recktube.xyz.` : ""}
 ${input.angle ? `Founder's angle: ${input.angle.slice(0, 600)}` : "No angle given: INVENT a fresh, specific idea yourself — e.g. a concrete creator in a real niche (cooking, finance, gaming, faceless history…) with a real problem this feature solves, a surprising insight about growing on YouTube, or a relatable moment creators know. Be original, not generic."}
 ${made.length ? `\nALREADY MADE — do NOT reuse these ideas, hooks, scenarios or titles, and make this one clearly different from all of them:\n${made.map((m) => `- ${m}`).join("\n")}\n` : ""}
 Rules:
