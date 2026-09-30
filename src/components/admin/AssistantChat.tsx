@@ -68,6 +68,7 @@ const LOOKUP_LABEL: Record<string, string> = {
   upcoming_posts: "scheduled posts",
   bonus_codes: "bonus codes",
   find_users: "accounts",
+  credit_changes: "credit changes",
   user_details: "account details",
   recent_failures: "failures",
   support_queue: "support queue",

@@ -701,4 +701,27 @@ a[class*="rounded-2xl"][class*="border"]:hover {
 }
 
 /* Phone admin menu: solid, so the page never shows through it. */
-.admin-fx .admin-rail.admin-drawer { background: #0d0a16; border-radius: 0 22px 22px 0; margin: 0; }
+.admin-fx .admin-rail.admin-drawer {
+  background: #0d0a16;
+  border-radius: 0 22px 22px 0;
+  border-left: 0;
+  margin: 0;
+  /* The rail clips on desktop; the phone drawer must scroll. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  animation: admin-drawer-in 0.22s ease-out;
+}
+.admin-fx .admin-rail.admin-drawer::before { display: none; }
+.admin-fx .admin-rail.admin-drawer > * { padding-left: 0; }
+.admin-fx .admin-rail.admin-drawer > div:first-child {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #0d0a16;
+}
+@keyframes admin-drawer-in { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .admin-fx .admin-rail.admin-drawer { animation: none; }
+}

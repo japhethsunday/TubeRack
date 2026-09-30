@@ -31,7 +31,7 @@ export interface Proposal {
   token: string;
 }
 
-const MAX_STEPS = 6;
+const MAX_STEPS = 8;
 const TOKEN_TTL_MS = 15 * 60_000;
 
 function key(): string {
@@ -90,7 +90,7 @@ THE ADMINS (the Recktube team, the ONLY people "admins", "the team" or "staff" m
 - "Give/send credits to the admins": propose ONE give_credits per admin email above. Never email_everyone for this — that reaches every user, not the admins.
 - Credits and emails are separate. Never write an email that says credits were added unless give_credits for that exact person is in the same reply. An email alone never changes anyone's balance.
 - Before proposing remove_credits to "undo" or "reverse" something, run user_details for that user and check its creditHistory; only remove credits that were really added. If nothing was added, say so and propose nothing.
-- Credit history IS stored for every account: user_details returns creditHistory, each line with the change and the balance after it. Never say history isn't kept. To find what someone had before a change, read the balance on the line before it; what they lost = that balance minus the balance after. To restore, propose give_credits with each person's exact amount — never one flat amount for everyone.
+- For credit changes across several people ("what did they lose/get today"), run credit_changes ONCE and answer with a line per person (email: before → after, lost/got N). Credit history IS stored for every account: user_details returns creditHistory, each line with the change and the balance after it. Never say history isn't kept. To find what someone had before a change, read the balance on the line before it; what they lost = that balance minus the balance after. To restore, propose give_credits with each person's exact amount — never one flat amount for everyone.
 
 Today is ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC" })} (UTC).
 
@@ -196,7 +196,9 @@ export async function askAssistant(adminId: string, role: AdminRole, history: Ch
   const steps: string[] = [];
   const lookups: string[] = [];
   for (let i = 0; i < MAX_STEPS; i++) {
-    const { text } = await ai.generateText({ prompt: prompt(role, masked, steps, ceoName, boss, page, admins), maxTokens: 2000, json: true, fast: true });
+    const last = i === MAX_STEPS - 1;
+    const note = last ? "\n\nNO MORE LOOK-UPS: answer now with type \"reply\", using what you already found." : "";
+    const { text } = await ai.generateText({ prompt: prompt(role, masked, steps, ceoName, boss, page, admins) + note, maxTokens: 2000, json: true, fast: true });
     let out: Record<string, unknown>;
     try {
       out = parseJsonObject(text);
@@ -209,7 +211,7 @@ export async function askAssistant(adminId: string, role: AdminRole, history: Ch
       steps.push(`${out.name}(${data(out.args ?? {})}) → ${data(mask.value(result))}`);
       continue;
     }
-    const reply = typeof out.text === "string" && out.text.trim() ? mask.unmaskText(out.text.trim()).slice(0, 6000) : "Done.";
+    const reply = typeof out.text === "string" && out.text.trim() ? mask.unmaskText(out.text.trim()).slice(0, 6000) : out.type === "lookup" ? "That needed more look-ups than I can do in one go. Try a narrower question (for example one user, or \"credit changes today\")." : "Done.";
     const proposals: Proposal[] = [];
     for (const p of Array.isArray(out.proposals) ? (out.proposals as Record<string, unknown>[]).slice(0, 8) : []) {
       const ready = prepare(String(p.action ?? ""), mask.unmask(p.args));

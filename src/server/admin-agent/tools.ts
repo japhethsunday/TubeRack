@@ -39,6 +39,29 @@ export const TOOLS = {
       return { total: r.total, users: r.users.slice(0, 10).map((u) => ({ email: u.email, name: u.name, status: u.status, verified: u.verified, joined: u.createdAt.slice(0, 10), lastSeen: u.lastSeen?.slice(0, 10) ?? null, credits: u.unlimited ? "unlimited" : u.credits, projects: u.projects, generations30d: u.usage30, youtube: u.youtube })) };
     },
   },
+  credit_changes: {
+    permission: "credits.list",
+    about: "Every credit change across ALL accounts in the last N hours (default 24, max 168), newest first: email, when, change, balance before → after, kind, reason. Use this (not one user_details per person) for 'what did people lose/get today', reversals and credit audits. lost = before − after.",
+    args: z.object({ hours: z.number().int().min(1).max(168).default(24) }),
+    run: async (a: { hours: number }) => {
+      const rows = await adminDb()`
+        SELECT u.email, t.created_at, t.kind, t.ref, t.balance_after,
+               (SELECT p.balance_after FROM credit_transactions p WHERE p.account_id = t.account_id AND p.created_at < t.created_at ORDER BY p.created_at DESC LIMIT 1) AS before
+        FROM credit_transactions t
+        JOIN credit_accounts c ON c.id = t.account_id
+        JOIN memberships m ON m.workspace_id = c.workspace_id AND m.role = 'owner'
+        JOIN users u ON u.id = m.user_id
+        WHERE t.created_at > now() - make_interval(hours => ${a.hours}) AND t.kind NOT LIKE 'usage:%'
+        ORDER BY t.created_at DESC LIMIT 60`;
+      return {
+        changes: rows.map((r) => {
+          const after = n(r.balance_after);
+          const before = r.before === null ? null : n(r.before);
+          return { email: String(r.email), at: new Date(String(r.created_at)).toISOString().slice(0, 16), change: before === null ? null : after - before, before, after, kind: String(r.kind), reason: r.ref ? String(r.ref).slice(0, 80) : "" };
+        }),
+      };
+    },
+  },
   user_details: {
     permission: "users.view",
     about: "Everything about one account by email: status, credits and plan, projects, recent generations (and failures), credit history, referrals, affiliate status, support chats.",

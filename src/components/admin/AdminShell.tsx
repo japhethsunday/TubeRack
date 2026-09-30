@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Activity, Bot, Search, ShieldAlert, Calculator, Clapperboard, Coins, FileDown, FolderKanban, Gauge, Gift, Handshake, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, ShieldUser, Tags, ToggleRight, Ticket, TriangleAlert, Users, Wallet } from "lucide-react";
+import { Activity, Bot, Search, ShieldAlert, Calculator, Clapperboard, Coins, FileDown, FolderKanban, Gauge, Gift, Handshake, Headset, Inbox, Rocket, Send, LogOut, Mail, Megaphone, Menu, ScrollText, Server, ShieldUser, Tags, ToggleRight, Ticket, TriangleAlert, Users, Wallet, X } from "lucide-react";
 import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { cx } from "@/src/components/ui/cx";
@@ -56,7 +56,7 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
   const active = (href: string) => (href === "/admin" ? path === "/admin" : path.startsWith(href));
   const sidebar = (grouped: boolean) => (
     <>
-      <div className="flex h-14 items-center gap-2.5 border-b border-border px-4">
+      <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4">
         <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white">
           <BrandMark className="size-[18px]" />
         </span>
@@ -64,6 +64,11 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
           <div className="text-sm font-bold">Recktube</div>
           <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-text">Admin console</div>
         </div>
+        {grouped && (
+          <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="ml-auto rounded-lg p-2 text-muted-text hover:bg-white/5 hover:text-foreground">
+            <X className="size-5" aria-hidden="true" />
+          </button>
+        )}
       </div>
       {grouped ? (
         <nav className="flex flex-col gap-4 p-3" aria-label="Admin">
