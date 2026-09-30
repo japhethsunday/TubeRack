@@ -101,7 +101,7 @@ export const ACTIONS = {
       angle: z.string().trim().max(300).default(""),
     }),
     describe: (a: { count: number; feature?: string; angle: string }) =>
-      `Make ${a.count} promo video${a.count === 1 ? "" : "s"}${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : ""} and post ${a.count === 1 ? "it" : "them"} to your YouTube channel, hands-free. A studio tab does the work: keep it open about 3–5 minutes per video, then you get the links.`,
+      `Make ${a.count} promo video${a.count === 1 ? "" : "s"}${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : ""} and post ${a.count === 1 ? "it" : "them"} to your YouTube channel, hands-free${a.count > 1 ? ": the first goes live now, the others are scheduled one per day at 5 PM your time" : ""}. A studio tab does the work: keep it open about 3–5 minutes per video, then you get the links.`,
   },
   delete_promo_videos: {
     permission: "promo.delete",

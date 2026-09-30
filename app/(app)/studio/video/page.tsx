@@ -150,7 +150,7 @@ function Studio() {
     const q = new URLSearchParams(window.location.search);
     const id = q.get("autopost");
     const ok = (v: string) => /^[0-9a-f-]{36}$/.test(v);
-    return id && ok(id) ? { id, queue: (q.get("queue") ?? "").split(",").filter(ok).slice(0, 10) } : null;
+    return id && ok(id) ? { id, queue: (q.get("queue") ?? "").split(",").filter(ok).slice(0, 10), index: Math.max(0, Math.min(10, Number(q.get("n")) || 0)) } : null;
   });
   const comp = project ? video.compFor(project.id) : null;
   const scenes = useMemo(() => (project ? scriptsApi.scenesFor(project.id) : []), [project, scriptsApi]);
@@ -932,7 +932,7 @@ function Studio() {
       )}
 
       {autopost && ready && project && (
-        <AutopilotRunner project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} promoId={autopost.id} queue={autopost.queue} />
+        <AutopilotRunner project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} promoId={autopost.id} queue={autopost.queue} index={autopost.index} />
       )}
       {showAutoVideo && !autopost && <GenerateVideoDialog project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} onClose={() => setShowAutoVideo(false)} />}
       {confirmBuild && (

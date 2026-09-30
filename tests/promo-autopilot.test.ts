@@ -35,3 +35,13 @@ describe("promo style mix", () => {
     }
   });
 });
+
+describe("release schedule", () => {
+  it("posts the first now and the rest one per day at 5 PM", async () => {
+    const { releaseSlot } = await import("@/src/lib/video/publish");
+    const now = new Date(2026, 8, 30, 21, 15);
+    assert.equal(releaseSlot(0, now), "");
+    assert.equal(releaseSlot(1, now), "2026-10-01T17:00");
+    assert.equal(releaseSlot(2, now), "2026-10-02T17:00");
+  });
+});

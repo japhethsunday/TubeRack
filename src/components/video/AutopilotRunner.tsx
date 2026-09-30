@@ -9,6 +9,7 @@ import { useScripts } from "@/src/components/script/ScriptProvider";
 import { GenerateVideoDialog } from "@/src/components/video/AutoVideo";
 import { PublishDialog } from "@/src/components/video/PublishToYouTube";
 import { sizeFor } from "@/src/components/video/ExportStudio";
+import { releaseSlot } from "@/src/lib/video/publish";
 import { durationOf, healthOf, validateComposition } from "@/src/lib/video/build";
 import type { RenderAsset } from "@/src/lib/video/render";
 import type { ScriptSection } from "@/src/lib/script/types";
@@ -27,17 +28,21 @@ export function AutopilotRunner({
   wpm,
   promoId,
   queue,
+  index = 0,
 }: {
   project: { id: string; name: string; topic: string; platform: string; contentType: string };
   sections: ScriptSection[];
   wpm: number;
   promoId: string;
   queue: string[];
+  /** Position in the batch: 0 posts now, the rest are scheduled one per day. */
+  index?: number;
 }) {
   const [stage, setStage] = useState<"generate" | "publish" | "next" | "failed">("generate");
   const [promo, setPromo] = useState<Promo | null>(null);
   const [error, setError] = useState("");
-  const total = queue.length + 1;
+  const total = index + queue.length + 1;
+  const slot = releaseSlot(index);
 
   // The prepared title, caption and hashtags for YouTube.
   useEffect(() => {
@@ -59,7 +64,7 @@ export function AutopilotRunner({
       const d = await api.get<{ promos: Promo[] }>("/api/v1/admin/promo");
       let projectId = d.promos.find((p) => p.id === nextId)?.projectId ?? null;
       if (!projectId) projectId = (await api.post<{ projectId: string }>(`/api/v1/admin/promo/${nextId}`, { action: "project" })).projectId;
-      const q = new URLSearchParams({ project: projectId, autopost: nextId });
+      const q = new URLSearchParams({ project: projectId, autopost: nextId, n: String(index + 1) });
       if (rest.length) q.set("queue", rest.join(","));
       window.location.assign(`/studio/video?${q}`);
     } catch {
@@ -82,8 +87,8 @@ export function AutopilotRunner({
       <div role="status" className="fixed inset-x-0 top-0 z-[80] flex items-center justify-center gap-2 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-4 py-2 text-sm font-medium text-white shadow-lg">
         {stage === "failed" ? <Bot className="size-4" aria-hidden="true" /> : <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
         <span>
-          Autopilot · video {total - queue.length} of {total} ·{" "}
-          {stage === "generate" ? "making the video" : stage === "publish" ? "posting to YouTube" : stage === "next" ? "moving on" : `skipped: ${error}`}
+          Autopilot · video {index + 1} of {total} ·{" "}
+          {stage === "generate" ? "making the video" : stage === "publish" ? (slot ? `scheduling for ${new Date(slot).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}` : "posting to YouTube") : stage === "next" ? "moving on" : `skipped: ${error}`}
           {" "}· keep this tab open
         </span>
       </div>
@@ -98,6 +103,7 @@ export function AutopilotRunner({
           title={yt?.title || promo.pkg.title}
           description={yt ? `${yt.caption}\n\n${yt.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}\n\nMade with Recktube: https://www.recktube.xyz` : promo.pkg.title}
           tags={(yt?.hashtags ?? []).map((h) => h.replace(/^#/, ""))}
+          scheduleAt={slot}
           onDone={async (videoId) => {
             await api.post(`/api/v1/admin/promo/${promoId}`, { action: "posted", videoId }).catch(() => undefined);
             void goNext();
@@ -110,7 +116,7 @@ export function AutopilotRunner({
 }
 
 /** Same render + upload as the Publish button, filled in and started automatically. */
-function AutoPublish(props: { projectId: string; projectName: string; topic: string; title: string; description: string; tags: string[]; onDone: (videoId: string) => void; onFail: (m: string) => void }) {
+function AutoPublish(props: { projectId: string; projectName: string; topic: string; title: string; description: string; tags: string[]; scheduleAt: string; onDone: (videoId: string) => void; onFail: (m: string) => void }) {
   const video = useVideo();
   const media = useMedia();
   const scripts = useScripts();
@@ -159,7 +165,7 @@ function AutoPublish(props: { projectId: string; projectName: string; topic: str
       }}
       prerendered={null}
       onClose={() => undefined}
-      auto={{ title: props.title, description: props.description, tags: props.tags, onDone: props.onDone, onFail: props.onFail }}
+      auto={{ title: props.title, description: props.description, tags: props.tags, scheduleAt: props.scheduleAt, onDone: props.onDone, onFail: props.onFail }}
     />
   );
 }

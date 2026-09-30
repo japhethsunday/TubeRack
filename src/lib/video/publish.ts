@@ -113,3 +113,17 @@ export function scheduleError(localValue: string, now = Date.now()): string | nu
   if (t < now + 15 * 60_000) return "Schedule at least 15 minutes from now.";
   return null;
 }
+
+/**
+ * Release slot for the k-th video of a batch (k = 0 posts now): one per day
+ * at 17:00 local time, when Shorts viewing peaks. Returns a datetime-local
+ * value ("YYYY-MM-DDTHH:mm"), or "" for "post now".
+ */
+export function releaseSlot(k: number, now = new Date(), hour = 17): string {
+  if (k <= 0) return "";
+  const d = new Date(now);
+  d.setHours(hour, 0, 0, 0);
+  d.setDate(d.getDate() + k);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

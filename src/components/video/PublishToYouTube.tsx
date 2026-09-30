@@ -170,6 +170,8 @@ export interface AutoPublish {
   title: string;
   description: string;
   tags: string[];
+  /** datetime-local value to schedule the release; "" posts now. */
+  scheduleAt?: string;
   onDone: (videoId: string) => void;
   onFail: (message: string) => void;
 }
@@ -539,7 +541,7 @@ export function PublishDialog({ source, prerendered, onClose, onRendered, auto }
     if (auto.description) setDescription(auto.description.slice(0, YT_DESCRIPTION_MAX));
     if (auto.tags.length) setTags(normalizeTags(auto.tags).join(", "));
     setPrivacy("public");
-    setSchedule("");
+    setSchedule(auto.scheduleAt ?? "");
     setAutoStage("filled");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once the connection is known.
   }, [auto, autoStage, conn]);
