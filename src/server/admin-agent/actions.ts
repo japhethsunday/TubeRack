@@ -103,6 +103,12 @@ export const ACTIONS = {
     describe: (a: { count: number; feature?: string; angle: string }) =>
       `Make ${a.count} promo video${a.count === 1 ? "" : "s"}${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : ""} and post ${a.count === 1 ? "it" : "them"} to your YouTube channel, hands-free. A studio tab does the work: keep it open about 3–5 minutes per video, then you get the links.`,
   },
+  delete_promo_videos: {
+    permission: "promo.delete",
+    args: z.object({ which: z.enum(["failed", "unposted", "all"]).default("failed") }),
+    describe: (a: { which: string }) =>
+      `Delete ${a.which === "failed" ? "the failed" : a.which === "unposted" ? "all not-yet-posted" : "ALL"} promo videos from the Promo list. Videos already on YouTube stay on YouTube; their studio projects stay too.`,
+  },
   approve_affiliate: {
     permission: "affiliates.manage",
     args: z.object({ email }),
@@ -280,6 +286,16 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       await log({ count, made: ids.length });
       if (!ids.length) return "Couldn't write the videos just now. Try again in a minute.";
       return { text: `${ids.length} video${ids.length === 1 ? "" : "s"} written. Opening the studio to make and post ${ids.length === 1 ? "it" : "them"} now. Keep that tab open.`, launch: `/admin/promo/run?ids=${ids.join(",")}` };
+    }
+    case "delete_promo_videos": {
+      const rows =
+        a.which === "failed"
+          ? await adminDb()`DELETE FROM promo_videos WHERE status = 'failed' RETURNING id`
+          : a.which === "unposted"
+            ? await adminDb()`DELETE FROM promo_videos WHERE youtube_video_id IS NULL RETURNING id`
+            : await adminDb()`DELETE FROM promo_videos RETURNING id`;
+      await log({ which: a.which, deleted: rows.length });
+      return rows.length ? `Deleted ${rows.length} promo video${rows.length === 1 ? "" : "s"}.` : "There were none to delete.";
     }
     case "approve_affiliate": {
       const u = await userByEmail(a.email);

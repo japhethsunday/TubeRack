@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { adminDb, adminOverview, adminUserDetail, adminUsers } from "@/src/server/admin";
+import { adminDb, adminEmails, adminOverview, adminUserDetail, adminUsers } from "@/src/server/admin";
 import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
 import { FEATURES, featureFlags } from "@/src/server/admin-ops";
 import { getInboxEmail, listInbox } from "@/src/server/inbox";
@@ -126,6 +126,35 @@ export const TOOLS = {
       return { videos: rows.map((r) => ({ title: String(r.title ?? ""), status: String(r.status), youtube: r.youtube_video_id ? `https://youtu.be/${String(r.youtube_video_id)}` : null, error: String(r.last_error ?? "") || null, made: new Date(String(r.created_at)).toISOString().slice(0, 16) })) };
     },
   },
+  youtube_channel: {
+    permission: "overview",
+    about: "Our own Recktube YouTube channel: subscribers, total views, video count, the last N days (views, watch time, subscribers gained/lost, likes, top videos, traffic sources, impressions and click rate when available) and the latest uploads with views and privacy.",
+    args: z.object({ days: z.number().int().min(7).max(90).default(28) }),
+    run: async (a: { days: number }) => {
+      const ws = await ownerWorkspace();
+      if (!ws) return { error: "No owner workspace found." };
+      const { channelAnalytics, myVideos } = await import("@/src/server/google/channel");
+      try {
+        const [an, vids] = await Promise.all([channelAnalytics(ws, a.days), myVideos(ws, 12).catch(() => [])]);
+        return {
+          channel: an.channel.title,
+          subscribers: an.channel.subscribers,
+          totalViews: an.channel.views,
+          videos: an.channel.videos,
+          period: `${an.range.start} to ${an.range.end}`,
+          totals: an.totals,
+          impressions: an.impressions,
+          topVideos: an.topVideos.slice(0, 5).map((v) => ({ title: v.title, views: v.views, avgViewPercent: v.averageViewPercentage, subscribersGained: v.subscribersGained })),
+          traffic: an.traffic.slice(0, 5),
+          latestUploads: vids.map((v) => ({ title: v.title, views: v.views, privacy: v.privacy, published: v.publishedAt.slice(0, 10), link: `https://youtu.be/${v.id}` })),
+          note: "Analytics lag about 2 days, so brand-new videos may show few or no views yet.",
+        };
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return { error: /not connected/i.test(msg) || error?.constructor?.name === "NotConnectedError" ? "The YouTube channel isn't connected. Connect it on the YouTube page." : `YouTube didn't answer: ${msg.slice(0, 160)}` };
+      }
+    },
+  },
   growth_report: {
     permission: "growth.view",
     about: "Where sign-ups came from in the last N days (1–90): sources/campaigns, referrals, affiliates.",
@@ -176,6 +205,16 @@ export const TOOLS = {
 } as const;
 
 export type ToolName = keyof typeof TOOLS;
+
+/** The founder's own workspace, where the Recktube channel is connected. */
+async function ownerWorkspace(): Promise<string | null> {
+  const owner = adminEmails()[0];
+  if (!owner) return null;
+  const [w] = await adminDb()`
+    SELECT m.workspace_id FROM memberships m JOIN users u ON u.id = m.user_id
+    WHERE lower(u.email) = ${owner} ORDER BY (m.role = 'owner') DESC, m.created_at ASC LIMIT 1`;
+  return w ? String(w.workspace_id) : null;
+}
 
 export function toolList(role: AdminRole): string {
   return Object.entries(TOOLS)

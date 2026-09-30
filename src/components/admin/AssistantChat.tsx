@@ -75,6 +75,8 @@ const LOOKUP_LABEL: Record<string, string> = {
   affiliates_overview: "affiliates",
   safety_flags: "safety flags",
   tool_switches: "tool switches",
+  youtube_channel: "YouTube channel",
+  promo_videos: "promo videos",
 };
 
 /**

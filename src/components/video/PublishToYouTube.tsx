@@ -557,8 +557,15 @@ export function PublishDialog({ source, prerendered, onClose, onRendered, auto }
       reported.current = true;
       auto.onDone(result.videoId);
     } else if (phase === "failed") {
+      const failed = stepsRef.current.find((x) => x.state === "failed");
+      // The video is already on YouTube: an extra (thumbnail, playlist,
+      // captions) that YouTube refuses is skipped instead of failing the post.
+      if (failed && failed.id !== "render" && failed.id !== "upload") {
+        skipFailed();
+        return;
+      }
       reported.current = true;
-      auto.onFail(stepsRef.current.find((x) => x.state === "failed")?.detail || "Publishing failed.");
+      auto.onFail(failed?.detail || "Publishing failed.");
     }
   }, [auto, phase, result]);
   // A validation problem stops the hands-free run too.

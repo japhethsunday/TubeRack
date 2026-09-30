@@ -141,3 +141,18 @@ describe("assistant hands-free posting", () => {
     assert.equal(ACTIONS.make_and_post_videos.permission, "promo.write");
   });
 });
+
+describe("assistant promo clean-up and channel", () => {
+  it("delete_promo_videos defaults to failed ones and is gated", async () => {
+    const { prepare, ACTIONS } = await import("@/src/server/admin-agent/actions");
+    assert.equal(prepare("delete_promo_videos", {})?.args.which, "failed");
+    assert.match(prepare("delete_promo_videos", { which: "unposted" })!.summary, /Videos already on YouTube stay on YouTube/);
+    assert.equal(prepare("delete_promo_videos", { which: "youtube" }), null);
+    assert.equal(ACTIONS.delete_promo_videos.permission, "promo.delete");
+  });
+  it("youtube_channel look-up exists with a sane default window", async () => {
+    const { TOOLS } = await import("@/src/server/admin-agent/tools");
+    assert.equal(TOOLS.youtube_channel.args.parse({}).days, 28);
+    assert.equal(TOOLS.youtube_channel.args.safeParse({ days: 400 }).success, false);
+  });
+});
