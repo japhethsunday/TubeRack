@@ -9,6 +9,7 @@ import {
   ImageIcon, LayoutPanelTop, Lightbulb, Menu, Package, Radar, Rocket, Search, X,
 } from "lucide-react";
 import { ThemeToggle } from "@/src/components/shell/ThemeToggle";
+import { useSession } from "@/src/components/auth/useSession";
 
 type NavLink = { href: string; label: string; body: string; icon: typeof Search };
 
@@ -43,6 +44,7 @@ const ANCHORS = [
   { href: "/#how", label: "How it works" },
   { href: "/#features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/help", label: "Help Center" },
 ];
 
 function Dropdown({ label, links }: { label: string; links: NavLink[] }) {
@@ -108,6 +110,8 @@ function Dropdown({ label, links }: { label: string; links: NavLink[] }) {
 export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // App tools are only listed for signed-in people; visitors see the public pages.
+  const signedIn = useSession().status === "signed-in";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -146,7 +150,7 @@ export function SiteHeader() {
           </Link>
 
           <nav aria-label="Main" className="hidden items-center gap-1 text-sm lg:flex">
-            {MENUS.map((m) => <Dropdown key={m.label} label={m.label} links={m.links} />)}
+            {signedIn && MENUS.map((m) => <Dropdown key={m.label} label={m.label} links={m.links} />)}
             {ANCHORS.map((a) => (
               <a key={a.href} href={a.href} className="rounded-lg px-3 py-2 text-foreground/70 hover:text-foreground">
                 {a.label}
@@ -156,12 +160,20 @@ export function SiteHeader() {
 
           <div className="flex items-center gap-2 text-sm">
             <ThemeToggle />
-            <Link href="/login" className="hidden rounded-lg px-3 py-2 font-medium text-foreground/80 hover:bg-foreground/10 hover:text-foreground sm:inline-flex">
-              Sign in
-            </Link>
-            <Link href="/signup" className="rounded-lg bg-foreground px-3.5 py-2 font-medium text-background hover:bg-foreground/90">
-              Get started
-            </Link>
+            {signedIn ? (
+              <Link href="/dashboard" className="rounded-lg bg-foreground px-3.5 py-2 font-medium text-background hover:bg-foreground/90">
+                Open app
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className="hidden rounded-lg px-3 py-2 font-medium text-foreground/80 hover:bg-foreground/10 hover:text-foreground sm:inline-flex">
+                  Sign in
+                </Link>
+                <Link href="/signup" className="rounded-lg bg-foreground px-3.5 py-2 font-medium text-background hover:bg-foreground/90">
+                  Get started
+                </Link>
+              </>
+            )}
             <button
               type="button"
               onClick={() => setMobileOpen((v) => !v)}
@@ -181,7 +193,7 @@ export function SiteHeader() {
             aria-label="Main"
             className="max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-border bg-background px-4 pb-8 pt-4 lg:hidden"
           >
-            {MENUS.map((m) => (
+            {signedIn && MENUS.map((m) => (
               <div key={m.label} className="mb-5">
                 <p className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-muted-text">{m.label}</p>
                 <ul>
@@ -196,7 +208,7 @@ export function SiteHeader() {
                 </ul>
               </div>
             ))}
-            <ul className="mb-5 border-t border-border pt-4">
+            <ul className={signedIn ? "mb-5 border-t border-border pt-4" : "mb-5"}>
               {ANCHORS.map((a) => (
                 <li key={a.href}>
                   <a href={a.href} onClick={() => setMobileOpen(false)} className="block rounded-lg px-2 py-2.5 text-sm hover:bg-muted">
@@ -205,9 +217,11 @@ export function SiteHeader() {
                 </li>
               ))}
             </ul>
-            <Link href="/login" onClick={() => setMobileOpen(false)} className="flex h-11 items-center justify-center rounded-lg border border-border text-sm font-medium hover:bg-muted">
-              Sign in
-            </Link>
+            {!signedIn && (
+              <Link href="/login" onClick={() => setMobileOpen(false)} className="flex h-11 items-center justify-center rounded-lg border border-border text-sm font-medium hover:bg-muted">
+                Sign in
+              </Link>
+            )}
           </nav>
         )}
       </header>

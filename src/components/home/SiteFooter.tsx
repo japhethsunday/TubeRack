@@ -4,6 +4,7 @@ import { BrandMark } from "@/src/components/ui/BrandMark";
 import Link from "next/link";
 import { ArrowRight, ArrowUp, Clapperboard, Sparkles } from "lucide-react";
 import { Reveal } from "@/src/components/home/motion";
+import { useSession } from "@/src/components/auth/useSession";
 
 const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
@@ -43,6 +44,35 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   },
 ];
 
+/** What visitors who aren't signed in see: public pages only. */
+const PUBLIC_COLUMNS: typeof COLUMNS = [
+  {
+    title: "Product",
+    links: [
+      { href: "/#how", label: "How it works" },
+      { href: "/#features", label: "Features" },
+      { href: "/pricing", label: "Pricing" },
+    ],
+  },
+  {
+    title: "Support",
+    links: [
+      { href: "/help", label: "Help Center" },
+      { href: "/contact", label: "Contact" },
+      { href: "/privacy", label: "Privacy Policy" },
+      { href: "/terms", label: "Terms of Service" },
+    ],
+  },
+  {
+    title: "Account",
+    links: [
+      { href: "/signup", label: "Create account" },
+      { href: "/login", label: "Sign in" },
+      { href: "/forgot-password", label: "Reset password" },
+    ],
+  },
+];
+
 function FooterLink({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href} className="group inline-flex items-center gap-1.5 text-sm text-foreground/60 hover:text-foreground">
@@ -57,6 +87,7 @@ function FooterLink({ href, label }: { href: string; label: string }) {
 
 /** Marketing footer: brand, real destinations, stack line, back-to-top. */
 export function SiteFooter() {
+  const columns = useSession().status === "signed-in" ? COLUMNS : PUBLIC_COLUMNS;
   return (
     <footer className="relative z-10 mt-8">
       <div className="home-glow-border h-px w-full opacity-70" aria-hidden="true" />
@@ -82,7 +113,7 @@ export function SiteFooter() {
               </Link>
             </div>
           </Reveal>
-          {COLUMNS.map((col, i) => (
+          {columns.map((col, i) => (
             <Reveal key={col.title} delay={120 + i * 90}>
               <nav aria-label={col.title}>
                 <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/50">{col.title}</h3>
