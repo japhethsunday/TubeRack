@@ -87,3 +87,27 @@ export async function cancelScheduledPosts(): Promise<number> {
   const rows = await db`UPDATE scheduled_posts SET status = 'cancelled', updated_at = now() WHERE status = 'pending' RETURNING id`;
   return rows.length;
 }
+
+/** Cancel one queued TikTok post by its id. */
+export async function cancelScheduledPost(id: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  const rows = await db`UPDATE scheduled_posts SET status = 'cancelled', updated_at = now() WHERE id = ${id} AND status = 'pending' RETURNING id`;
+  return rows.length > 0;
+}
+
+export interface UpcomingPost { platform: "YouTube" | "TikTok"; title: string; when: string; status: string; id: string; link?: string }
+
+/** Everything going out soon or recently sent: YouTube promos with a release time, and TikTok posts. */
+export async function upcomingPosts(): Promise<UpcomingPost[]> {
+  const db = getDb();
+  if (!db) return [];
+  const yt = await db`SELECT id, package->>'title' AS title, youtube_video_id, scheduled_for, posted_at FROM promo_videos
+    WHERE youtube_video_id IS NOT NULL AND coalesce(scheduled_for, posted_at) > now() - interval '3 days' ORDER BY coalesce(scheduled_for, posted_at) LIMIT 30`;
+  const out: UpcomingPost[] = yt.map((r) => {
+    const when = new Date(String(r.scheduled_for ?? r.posted_at)).toISOString();
+    return { platform: "YouTube", id: String(r.id), title: String(r.title ?? "Promo video"), when, status: r.scheduled_for && new Date(when).getTime() > Date.now() ? "scheduled (private until then)" : "live", link: `https://youtu.be/${String(r.youtube_video_id)}` };
+  });
+  for (const p of await listScheduledPosts()) out.push({ platform: "TikTok", id: p.id, title: p.caption, when: p.postAt, status: p.error ? `${p.status}: ${p.error}` : p.status });
+  return out.sort((a, b) => a.when.localeCompare(b.when));
+}

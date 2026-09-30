@@ -194,3 +194,23 @@ describe("bonus codes and choices", () => {
     assert.equal(ACTIONS.delete_bonus_code.permission, "credits.change");
   });
 });
+
+describe("scheduling look-ups and single cancel", () => {
+  it("upcoming_posts replaces scheduled_posts and cancel_scheduled_post is gated", async () => {
+    const { TOOLS } = await import("@/src/server/admin-agent/tools");
+    const { prepare, ACTIONS } = await import("@/src/server/admin-agent/actions");
+    assert.ok("upcoming_posts" in TOOLS && "bonus_codes" in TOOLS);
+    assert.match(prepare("cancel_scheduled_post", { id: "11111111-2222-3333-4444-555555555555", title: "Money tips" })!.summary, /Cancel the scheduled TikTok post “Money tips”/);
+    assert.equal(ACTIONS.cancel_scheduled_post.permission, "promo.write");
+  });
+});
+
+describe("support assistant choices", () => {
+  it("keeps up to 5 short choices and drops them on hand-over", async () => {
+    const { parseTurn } = await import("@/src/server/support/assistant");
+    const t = parseTurn(JSON.stringify({ reply: "What's happening?", action: "answer", category: "other", subject: "x", choices: ["My export has no sound", "The voice sounds robotic", 3, "", "a", "b", "c"] }));
+    assert.deepEqual(t.choices, ["My export has no sound", "The voice sounds robotic", "a", "b", "c"]);
+    const h = parseTurn(JSON.stringify({ reply: "Passing you to the team.", action: "handoff", category: "other", subject: "x", choices: ["Yes"] }));
+    assert.deepEqual(h.choices, []);
+  });
+});

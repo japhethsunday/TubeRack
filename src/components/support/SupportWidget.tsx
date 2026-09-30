@@ -8,7 +8,7 @@ import { useSession } from "@/src/components/auth/useSession";
 import { cx } from "@/src/components/ui/cx";
 
 type Role = "user" | "assistant" | "admin" | "system";
-interface Msg { id: string; role: Role; body: string; createdAt: string }
+interface Msg { id: string; role: Role; body: string; createdAt: string; choices?: string[] }
 interface Conversation { id: string; status: "open" | "handoff" | "resolved"; subject: string; messages: Msg[] }
 interface Summary { id: string; status: string; subject: string; updatedAt: string; userUnread: boolean }
 
@@ -252,6 +252,15 @@ export function SupportWidget() {
                   </div>
                 )}
                 {conv?.messages.map((m) => <Bubble key={m.id} m={m} />)}
+                {!busy && conv?.messages.at(-1)?.role === "assistant" && !!conv.messages.at(-1)?.choices?.length && (
+                  <div role="group" aria-label="Choose an answer" className="support-in flex flex-wrap gap-2 pl-1">
+                    {conv.messages.at(-1)!.choices!.map((c) => (
+                      <button key={c} type="button" onClick={() => void send(c)} className="rounded-full border border-primary/40 bg-primary/10 px-3.5 py-2 text-left text-xs font-semibold text-primary transition hover:bg-primary/15 active:scale-[0.97]">
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {busy && (
                   <div className="flex items-center gap-1 px-1" aria-label="Recktube Support is typing">
                     <span className="support-dot" /><span className="support-dot" style={{ animationDelay: "0.15s" }} /><span className="support-dot" style={{ animationDelay: "0.3s" }} />

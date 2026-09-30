@@ -8,7 +8,7 @@ import { parseBody, parseId } from "@/src/server/validate";
 
 const body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("project") }),
-  z.object({ action: z.literal("posted"), videoId: z.string().regex(/^[A-Za-z0-9_-]{6,20}$/) }),
+  z.object({ action: z.literal("posted"), videoId: z.string().regex(/^[A-Za-z0-9_-]{6,20}$/), scheduledFor: z.string().datetime().optional() }),
   z.object({ action: z.literal("failed"), message: z.string().trim().max(400) }),
 ]);
 
@@ -21,7 +21,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     const db = adminDb();
     // Hands-free autopilot reports what happened to the video.
     if (input.action === "posted") {
-      const rows = await db`UPDATE promo_videos SET status = 'posted', youtube_video_id = ${input.videoId}, posted_at = now(), last_error = '' WHERE id = ${id} RETURNING id`;
+      const rows = await db`UPDATE promo_videos SET status = 'posted', youtube_video_id = ${input.videoId}, posted_at = now(), scheduled_for = ${input.scheduledFor ?? null}, last_error = '' WHERE id = ${id} RETURNING id`;
       if (!rows.length) throw notFound("Promo");
       await audit({ userId: admin.id, action: "admin.promo.posted", resourceType: "promo_video", resourceId: id, metadata: { videoId: input.videoId } });
       return NextResponse.json({ data: { url: `https://youtu.be/${input.videoId}` } });

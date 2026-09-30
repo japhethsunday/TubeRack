@@ -1,3 +1,4 @@
+import { TIER_NAME, tierOf } from "@/src/lib/plans";
 import { getDb } from "@/src/server/db";
 import { creditState } from "@/src/server/credits";
 
@@ -10,7 +11,7 @@ import { creditState } from "@/src/server/credits";
  */
 export interface AccountSnapshot {
   account: { name: string; email: string; emailVerified: boolean; status: string; joined: string; activeSessions: number };
-  credits: { balance: number | "unlimited"; monthlyAllowance: number; lastRefill: string | null; nextRefill: string | null } | null;
+  credits: { plan: string; balance: number | "unlimited"; monthlyAllowance: number; lastRefill: string | null; nextRefill: string | null } | null;
   creditHistory: { when: string; change: number; balanceAfter: number; reason: string }[];
   recentGenerations: { when: string; kind: string; status: string }[];
   failedGenerationsLast7Days: number;
@@ -52,7 +53,7 @@ export async function accountSnapshot(userId: string, workspaceId: string | null
         const c = await creditState(ws);
         if (!c) return null;
         const next = c.refilledAt ? new Date(new Date(c.refilledAt).getTime() + 30 * 86_400_000).toISOString() : null;
-        return { balance: c.unlimited ? ("unlimited" as const) : c.balance, monthlyAllowance: c.monthlyGrant, lastRefill: iso(c.refilledAt) || null, nextRefill: iso(next) || null };
+        return { plan: TIER_NAME[tierOf(c)], balance: c.unlimited ? ("unlimited" as const) : c.balance, monthlyAllowance: c.monthlyGrant, lastRefill: iso(c.refilledAt) || null, nextRefill: iso(next) || null };
       }, null)
     : null;
 

@@ -12,6 +12,7 @@ export interface SupportMessage {
   role: ChatLine["role"];
   body: string;
   createdAt: string;
+  choices?: string[];
 }
 
 export interface SupportConversation {
@@ -39,6 +40,7 @@ const toMessage = (r: Record<string, unknown>): SupportMessage => ({
   role: String(r.role) as ChatLine["role"],
   body: String(r.body),
   createdAt: new Date(String(r.created_at)).toISOString(),
+  ...(Array.isArray((r.meta as { choices?: unknown } | null)?.choices) ? { choices: ((r.meta as { choices: unknown[] }).choices).filter((c): c is string => typeof c === "string").slice(0, 5) } : {}),
 });
 
 export async function listConversations(userId: string) {
@@ -61,7 +63,7 @@ export async function getConversation(userId: string, id: string, markRead = tru
   const d = db();
   const [c] = await d`SELECT * FROM support_conversations WHERE id = ${id} AND user_id = ${userId}`;
   if (!c) throw notFound("Conversation");
-  const msgs = await d`SELECT id, role, body, created_at FROM support_messages WHERE conversation_id = ${id} ORDER BY created_at ASC LIMIT 200`;
+  const msgs = await d`SELECT id, role, body, meta, created_at FROM support_messages WHERE conversation_id = ${id} ORDER BY created_at ASC LIMIT 200`;
   if (markRead && c.user_unread) await d`UPDATE support_conversations SET user_unread = false WHERE id = ${id}`;
   return {
     id: String(c.id),
@@ -129,7 +131,7 @@ export async function chat(user: SessionUser, workspaceId: string | null, conver
   const snapshot = await accountSnapshot(user.id, workspaceId);
   const turn = await assistantTurn(snapshot, history);
 
-  await d`INSERT INTO support_messages (conversation_id, role, body, meta) VALUES (${id}, 'assistant', ${turn.reply}, ${JSON.stringify({ action: turn.action, category: turn.category })})`;
+  await d`INSERT INTO support_messages (conversation_id, role, body, meta) VALUES (${id}, 'assistant', ${turn.reply}, ${JSON.stringify({ action: turn.action, category: turn.category, ...(turn.choices?.length ? { choices: turn.choices } : {}) })})`;
   await d`
     UPDATE support_conversations
     SET subject = CASE WHEN category = '' THEN ${turn.subject} ELSE subject END,

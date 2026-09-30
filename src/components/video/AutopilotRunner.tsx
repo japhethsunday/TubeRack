@@ -130,7 +130,7 @@ export function AutopilotRunner({
           youtube={yt}
           tiktok={tt ? { caption: tiktokCaption, postAt: releaseDate ? releaseDate.toISOString() : "", promoId } : null}
           onDone={async (videoId) => {
-            if (videoId) await api.post(`/api/v1/admin/promo/${promoId}`, { action: "posted", videoId }).catch(() => undefined);
+            if (videoId) await api.post(`/api/v1/admin/promo/${promoId}`, { action: "posted", videoId, ...(releaseDate && yt ? { scheduledFor: releaseDate.toISOString() } : {}) }).catch(() => undefined);
             void goNext();
           }}
           onFail={(m) => void fail(m)}

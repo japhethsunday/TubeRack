@@ -65,6 +65,8 @@ const STARTERS = [
 
 const LOOKUP_LABEL: Record<string, string> = {
   business_overview: "business numbers",
+  upcoming_posts: "scheduled posts",
+  bonus_codes: "bonus codes",
   find_users: "accounts",
   user_details: "account details",
   recent_failures: "failures",

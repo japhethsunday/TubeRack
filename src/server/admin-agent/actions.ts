@@ -8,7 +8,7 @@ import { notifyCreditGift } from "@/src/server/credit-emails";
 import { FEATURES, featureFlags, putSetting } from "@/src/server/admin-ops";
 import { createAdminCode, deleteAdminCode, normalizeCode } from "@/src/server/growth/codes";
 import { PROMO_FEATURES, createPromoProject, styleFor, writePromo } from "@/src/server/growth/promo";
-import { cancelScheduledPosts } from "@/src/server/tiktok/schedule";
+import { cancelScheduledPost, cancelScheduledPosts } from "@/src/server/tiktok/schedule";
 import { runPromoAutopilot } from "@/src/server/growth/promo-autopilot";
 import { sendTeamReply } from "@/src/server/support/emails";
 import { AUDIENCES, EMPTY_CONTENT, audienceCounts, runCampaign, type AudienceKey } from "@/src/server/growth/campaigns";
@@ -140,6 +140,11 @@ export const ACTIONS = {
           : `one per day at ${hour}, starting ${start}`;
       return `Make ${a.count} promo video${a.count === 1 ? "" : "s"}${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : ""} and schedule ${a.count === 1 ? "it" : "them"} on ${where}, hands-free: ${plan}, your local time. A studio tab does the work: keep it open about 3–5 minutes per video.`;
     },
+  },
+  cancel_scheduled_post: {
+    permission: "promo.write",
+    args: z.object({ id: z.string().trim().min(8).max(80), title: z.string().trim().max(120).default("") }),
+    describe: (a: { id: string; title: string }) => `Cancel the scheduled TikTok post${a.title ? ` “${a.title}”` : ""}. It won't be posted.`,
   },
   cancel_scheduled_posts: {
     permission: "promo.write",
@@ -381,6 +386,11 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       const pf = (a.platforms as unknown as string[]).map((p) => (p === "tiktok" ? "tt" : "yt")).join(",");
       const q = new URLSearchParams({ ids: ids.join(","), at: String(a.when), start: String(a.startInDays), pf });
       return { text: `${ids.length} video${ids.length === 1 ? "" : "s"} written. Opening the studio to make and schedule ${ids.length === 1 ? "it" : "them"} now. Keep that tab open.`, launch: `/admin/promo/run?${q}` };
+    }
+    case "cancel_scheduled_post": {
+      const ok = await cancelScheduledPost(String(a.id));
+      await log({ id: a.id, cancelled: ok });
+      return ok ? "Cancelled that TikTok post." : "That post isn't waiting any more (it was already posted, failed or cancelled).";
     }
     case "cancel_scheduled_posts": {
       const n = await cancelScheduledPosts();

@@ -1,5 +1,6 @@
+import { TIER_NAME, tierOf } from "@/src/lib/plans";
 import { listAdminCodes } from "@/src/server/growth/codes";
-import { listScheduledPosts } from "@/src/server/tiktok/schedule";
+import { upcomingPosts } from "@/src/server/tiktok/schedule";
 import { z } from "zod";
 import { adminDb, adminEmails, adminOverview, adminUserDetail, adminUsers } from "@/src/server/admin";
 import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
@@ -55,7 +56,7 @@ export const TOOLS = {
       return {
         found: true,
         account: { email: d.user.email, name: d.user.name, status: d.user.status, verified: d.user.verified, joined: d.user.createdAt.slice(0, 10), isAdmin: d.user.admin },
-        workspaces: d.workspaces.map((w) => ({ role: w.role, credits: w.unlimited ? "unlimited" : w.balance, monthlyAllowance: w.monthlyGrant, projects: w.projects, youtube: w.youtube })),
+        workspaces: d.workspaces.map((w) => ({ role: w.role, plan: TIER_NAME[tierOf({ unlimited: w.unlimited, monthlyGrant: w.monthlyGrant })], credits: w.unlimited ? "unlimited" : w.balance, monthlyAllowance: w.monthlyGrant, projects: w.projects, youtube: w.youtube })),
         recentGenerations: d.usage.slice(0, 12).map((x) => `${x.createdAt.slice(0, 16)} ${x.kind} ${x.status}${x.provider ? ` (${x.provider})` : ""}`),
         creditHistory: d.ledger.slice(0, 8).map((x) => `${x.createdAt.slice(0, 10)} ${x.amount > 0 ? "+" : ""}${x.amount} ${x.kind}${x.ref ? ` — ${x.ref.slice(0, 60)}` : ""}`),
         projects: d.projects.slice(0, 8).map((p) => p.name),
@@ -174,11 +175,11 @@ export const TOOLS = {
       codes: (await listAdminCodes(60)).map((c) => ({ code: c.code, type: c.kind, forEmail: c.forEmail, credits: c.credits, used: c.uses, maxUses: c.maxUses, status: c.status, expires: c.expiresAt?.slice(0, 10) ?? "never", redeemedBy: c.redemptions.slice(0, 10) })),
     }),
   },
-  scheduled_posts: {
+  upcoming_posts: {
     permission: "promo.list",
-    about: "TikTok posts scheduled or recently done: caption, when (UTC), status, error. YouTube scheduled videos show in promo_videos.",
+    about: "Everything going out soon or sent in the last 3 days: YouTube promo videos with their release time (scheduled ones stay private until then) and TikTok posts (queued, posted, failed, cancelled), in time order, with ids.",
     args: z.object({}),
-    run: async () => ({ posts: await listScheduledPosts() }),
+    run: async () => ({ posts: await upcomingPosts(), note: "Times are UTC; convert to the boss's local time when you answer." }),
   },
   growth_report: {
     permission: "growth.view",
