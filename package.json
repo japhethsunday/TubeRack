@@ -14,7 +14,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts tests/*.test.tsx",
-    "db:migrate": "node db/migrate.mjs"
+    "db:migrate": "node db/migrate.mjs",
+    "deploy": "node scripts/deploy.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
@@ -34,6 +36,7 @@
     "@types/react-dom": "^19.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "playwright": "1.56.1",
     "tailwindcss": "^4",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"

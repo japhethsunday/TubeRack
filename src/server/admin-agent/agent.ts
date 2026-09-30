@@ -12,6 +12,7 @@ import type { AdminRole } from "@/src/lib/admin-roles";
 import { roleAllows } from "@/src/lib/admin-roles";
 import { ACTIONS, prepare, type ActionName } from "@/src/server/admin-agent/actions";
 import { runTool, toolList } from "@/src/server/admin-agent/tools";
+import { highImpact } from "@/src/server/admin-agent/guards";
 
 /**
  * The admin assistant: answers questions with read-only look-ups, and
@@ -29,6 +30,8 @@ export interface Proposal {
   action: ActionName;
   summary: string;
   token: string;
+  /** Needs the admin to type CONFIRM (big or hard-to-undo change). */
+  high?: boolean;
 }
 
 const MAX_STEPS = 8;
@@ -42,12 +45,12 @@ function key(): string {
 const sign = (data: string) => createHmac("sha256", key()).update(`admin-agent:${data}`).digest("base64url");
 
 /** A proposal bound to one admin, one action and its exact arguments, valid 15 minutes. */
-export function signProposal(adminId: string, action: ActionName, args: Record<string, unknown>): string {
-  const body = Buffer.from(JSON.stringify({ a: adminId, n: action, g: args, e: Date.now() + TOKEN_TTL_MS, j: randomBytes(9).toString("base64url") })).toString("base64url");
+export function signProposal(adminId: string, action: ActionName, args: Record<string, unknown>, high = false): string {
+  const body = Buffer.from(JSON.stringify({ a: adminId, n: action, g: args, e: Date.now() + TOKEN_TTL_MS, j: randomBytes(9).toString("base64url"), ...(high ? { h: 1 } : {}) })).toString("base64url");
   return `${body}.${sign(body)}`;
 }
 
-export function verifyProposal(token: string, adminId: string): { action: ActionName; args: Record<string, unknown>; nonce: string } | null {
+export function verifyProposal(token: string, adminId: string): { action: ActionName; args: Record<string, unknown>; nonce: string; high: boolean } | null {
   if (typeof token !== "string" || token.length > 6000) return null;
   const [body, mac] = token.split(".");
   if (!body || !mac) return null;
@@ -55,9 +58,9 @@ export function verifyProposal(token: string, adminId: string): { action: Action
   const got = Buffer.from(mac);
   if (want.length !== got.length || !timingSafeEqual(want, got)) return null;
   try {
-    const p = JSON.parse(Buffer.from(body, "base64url").toString()) as { a: string; n: string; g: Record<string, unknown>; e: number; j: string };
+    const p = JSON.parse(Buffer.from(body, "base64url").toString()) as { a: string; n: string; g: Record<string, unknown>; e: number; j: string; h?: number };
     if (p.a !== adminId || !(p.e > Date.now()) || !(p.n in ACTIONS)) return null;
-    return { action: p.n as ActionName, args: p.g, nonce: p.j };
+    return { action: p.n as ActionName, args: p.g, nonce: p.j, high: p.h === 1 };
   } catch {
     return null;
   }
@@ -212,11 +215,15 @@ export async function askAssistant(adminId: string, role: AdminRole, history: Ch
       continue;
     }
     const reply = typeof out.text === "string" && out.text.trim() ? mask.unmaskText(out.text.trim()).slice(0, 6000) : out.type === "lookup" ? "That needed more look-ups than I can do in one go. Try a narrower question (for example one user, or \"credit changes today\")." : "Done.";
-    const proposals: Proposal[] = [];
+    const ready: NonNullable<ReturnType<typeof prepare>>[] = [];
     for (const p of Array.isArray(out.proposals) ? (out.proposals as Record<string, unknown>[]).slice(0, 8) : []) {
-      const ready = prepare(String(p.action ?? ""), mask.unmask(p.args));
-      if (!ready || !roleAllows(role, ACTIONS[ready.name].permission)) continue;
-      proposals.push({ action: ready.name, summary: await withWho(ready.name, ready.args, ready.summary), token: signProposal(adminId, ready.name, ready.args) });
+      const r = prepare(String(p.action ?? ""), mask.unmask(p.args));
+      if (r && roleAllows(role, ACTIONS[r.name].permission)) ready.push(r);
+    }
+    const high = highImpact(ready);
+    const proposals: Proposal[] = [];
+    for (const [k, r] of ready.entries()) {
+      proposals.push({ action: r.name, summary: await withWho(r.name, r.args, r.summary), token: signProposal(adminId, r.name, r.args, high[k]), ...(high[k] ? { high: true } : {}) });
     }
     let open: string | null = null;
     try {

@@ -12,7 +12,7 @@ import { useAssistantChats } from "@/src/components/admin/AssistantLauncher";
 import { api, ApiError } from "@/src/lib/api";
 import { cx } from "@/src/components/ui/cx";
 
-export interface Proposal { action: string; summary: string; token: string; state?: "idle" | "busy" | "done" | "error" | "dismissed"; result?: string }
+export interface Proposal { action: string; summary: string; token: string; high?: boolean; typed?: string; state?: "idle" | "busy" | "done" | "error" | "dismissed"; result?: string }
 export interface Turn { role: "admin" | "assistant"; text: string; proposals?: Proposal[]; lookups?: string[]; open?: string; choices?: string[]; wrapFor?: number }
 
 function greeting(): string {
@@ -142,7 +142,8 @@ export function AssistantChat({ turns, setTurns, compact, onNavigate }: { turns:
     // One after another, so each is re-checked and logged like a single Confirm.
     for (let pi = 0; pi < list.length; pi++) {
       const p = list[pi];
-      if (p.state === "idle" || p.state === "error") await confirm(ti, pi, p);
+      // Big changes are never bulk-confirmed: each needs its own typed CONFIRM.
+      if (!p.high && (p.state === "idle" || p.state === "error")) await confirm(ti, pi, p);
     }
   }
 
@@ -177,7 +178,7 @@ export function AssistantChat({ turns, setTurns, compact, onNavigate }: { turns:
   async function confirm(ti: number, pi: number, p: Proposal) {
     setProposal(ti, pi, { state: "busy" });
     try {
-      const r = await api.put<{ result: string; launch?: string }>("/api/v1/admin/assistant", { token: p.token });
+      const r = await api.put<{ result: string; launch?: string }>("/api/v1/admin/assistant", { token: p.token, ...(p.high ? { typed: p.typed ?? "" } : {}) });
       setProposal(ti, pi, { state: "done", result: r.result });
       wrapUp(ti);
       // Pages behind the assistant show the change straight away.
@@ -336,27 +337,37 @@ export function AssistantChat({ turns, setTurns, compact, onNavigate }: { turns:
                     Open {t.open.replace(/^\/admin\/?/, "").split("?")[0].replace(/-/g, " ") || "overview"} <ChevronRight className="size-3.5" aria-hidden="true" />
                   </button>
                 )}
-                {(t.proposals?.filter((p) => p.state === "idle" || p.state === "error").length ?? 0) >= 2 && (
+                {(t.proposals?.filter((p) => !p.high && (p.state === "idle" || p.state === "error")).length ?? 0) >= 2 && (
                   <button type="button" onClick={() => void confirmAll(ti)} disabled={t.proposals?.some((p) => p.state === "busy")} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-violet-950/40 transition hover:brightness-110 disabled:opacity-50">
-                    <Check className="size-3.5" aria-hidden="true" /> Confirm all {t.proposals?.filter((p) => p.state === "idle" || p.state === "error").length}
+                    <Check className="size-3.5" aria-hidden="true" /> Confirm all {t.proposals?.filter((p) => !p.high && (p.state === "idle" || p.state === "error")).length}
                   </button>
                 )}
                 {t.proposals?.map((p, pi) => {
                   const Icon = ACTION_ICON[p.action] ?? Sparkles;
                   return (
-                    <div key={pi} className={cx("rounded-2xl border p-3 transition", p.state === "done" ? "border-emerald-400/25 bg-emerald-500/[0.06]" : p.state === "dismissed" ? "border-white/[0.06] bg-transparent opacity-60" : p.state === "error" ? "border-rose-400/30 bg-rose-500/[0.06]" : "border-violet-400/25 bg-violet-500/[0.06]")}>
+                    <div key={pi} className={cx("rounded-2xl border p-3 transition", p.state === "done" ? "border-emerald-400/25 bg-emerald-500/[0.06]" : p.state === "dismissed" ? "border-white/[0.06] bg-transparent opacity-60" : p.state === "error" ? "border-rose-400/30 bg-rose-500/[0.06]" : p.high ? "border-amber-400/40 bg-amber-500/[0.07]" : "border-violet-400/25 bg-violet-500/[0.06]")}>
                       <div className="flex items-start gap-2.5">
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.07] text-violet-200"><Icon className="size-4" aria-hidden="true" /></span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">{p.state === "done" ? "Done" : p.state === "dismissed" ? "Skipped" : p.state === "error" ? "Didn't work" : "Needs your OK"}</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">{p.state === "done" ? "Done" : p.state === "dismissed" ? "Skipped" : p.state === "error" ? "Didn't work" : p.high ? "Big change: check carefully" : "Needs your OK"}</p>
                           <p className="whitespace-pre-line text-sm leading-snug text-white/90">{p.summary}</p>
                         </div>
                       </div>
                       {p.state === "done" && <p className="mt-2 flex items-start gap-1.5 text-xs text-emerald-200"><Check className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" /> {p.result}</p>}
                       {p.state === "error" && <p className="mt-2 text-xs text-rose-200">{p.result}</p>}
+                      {p.high && (p.state === "idle" || p.state === "error") && (
+                        <input
+                          value={p.typed ?? ""}
+                          onChange={(e) => setProposal(ti, pi, { typed: e.target.value })}
+                          placeholder="Type CONFIRM to go ahead"
+                          aria-label="Type CONFIRM to go ahead"
+                          autoCapitalize="characters"
+                          className="mt-3 h-10 w-full rounded-xl border border-amber-400/40 bg-black/30 px-3 text-base text-white placeholder:text-white/40 focus:border-amber-300 focus:outline-none sm:text-sm"
+                        />
+                      )}
                       {(p.state === "idle" || p.state === "busy" || p.state === "error") && (
                         <div className="mt-3 flex gap-2">
-                          <button type="button" disabled={p.state === "busy"} onClick={() => void confirm(ti, pi, p)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-60">
+                          <button type="button" disabled={p.state === "busy" || (p.high && (p.typed ?? "").trim().toUpperCase() !== "CONFIRM")} onClick={() => void confirm(ti, pi, p)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-60">
                             {p.state === "busy" ? <span className="size-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" /> : <Check className="size-3.5" aria-hidden="true" />} {p.state === "busy" ? "Working…" : p.state === "error" ? "Try again" : "Confirm"}
                           </button>
                           <button type="button" disabled={p.state === "busy"} onClick={() => { setProposal(ti, pi, { state: "dismissed" }); wrapUp(ti); }} className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-white/70 transition hover:bg-white/[0.06] disabled:opacity-40">

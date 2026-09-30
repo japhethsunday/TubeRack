@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   }
 }
 
-const confirm = z.object({ token: z.string().min(10).max(6000) });
+const confirm = z.object({ token: z.string().min(10).max(6000), typed: z.string().max(20).optional() });
 
 /** PUT /api/v1/admin/assistant — confirm one proposed action (signed, single use, role re-checked). */
 export async function PUT(request: Request) {
@@ -49,9 +49,10 @@ export async function PUT(request: Request) {
     const user = await getSessionUser();
     const role = await adminRole(user);
     if (!role || !user || user.id !== admin.id) throw forbidden("Admins only.");
-    const { token } = await parseBody(request, confirm);
+    const { token, typed } = await parseBody(request, confirm);
     const p = verifyProposal(token, admin.id);
     if (!p) throw validationError("This action has expired or isn't valid. Ask the assistant again.");
+    if (p.high && typed?.trim().toUpperCase() !== "CONFIRM") throw validationError("This is a big change. Type CONFIRM to go ahead.");
     // Single use: a confirmed card can't be replayed.
     await sharedLimit(`admin-agent-token:${p.nonce}`, 1, 20 * 60).catch(() => {
       throw validationError("This action was already done.");

@@ -3,7 +3,8 @@ import { adminDb, isAdmin } from "@/src/server/admin";
 import { roleAllows, type AdminRole } from "@/src/lib/admin-roles";
 import { revokeAllSessions, type SessionUser } from "@/src/server/auth";
 import { audit } from "@/src/server/audit";
-import { adjustCredits, setCreditPlan } from "@/src/server/credits";
+import { adjustCredits, creditState, setCreditPlan } from "@/src/server/credits";
+import { checkAction } from "@/src/server/admin-agent/guards";
 import { notifyCreditGift } from "@/src/server/credit-emails";
 import { FEATURES, featureFlags, putSetting } from "@/src/server/admin-ops";
 import { createAdminCode, deleteAdminCode, normalizeCode } from "@/src/server/growth/codes";
@@ -246,21 +247,24 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
   // Each branch below reads only the fields its own schema just validated.
   const a = parsed.data as unknown as Record<string, never>;
   const log = (meta: Record<string, unknown>) => audit({ userId: admin.id, action: `admin.assistant.${name}`, metadata: meta });
+  await checkAction(name, a as Record<string, unknown>);
 
   switch (name) {
     case "give_credits": {
       const u = await userByEmail(a.email);
       const ws = await ownedWorkspace(String(u.id));
+      const before = (await creditState(ws))?.balance ?? null;
       const state = await adjustCredits(ws, a.amount, a.reason);
       await notifyCreditGift(ws, { added: a.amount, balance: state?.unlimited ? undefined : state?.balance, note: a.reason });
-      await log({ email: a.email, amount: a.amount });
+      await log({ email: a.email, amount: a.amount, before, after: state?.balance ?? null });
       return `Added ${a.amount} credits to ${a.email}.`;
     }
     case "remove_credits": {
       const u = await userByEmail(a.email);
       const ws = await ownedWorkspace(String(u.id));
+      const before = (await creditState(ws))?.balance ?? null;
       const state = await adjustCredits(ws, -Number(a.amount), a.reason);
-      await log({ email: a.email, amount: -Number(a.amount) });
+      await log({ email: a.email, amount: -Number(a.amount), before, after: state?.balance ?? null });
       return state?.unlimited ? `Removed ${a.amount} credits from ${a.email} (note: they're on unlimited credits).` : `Removed credits from ${a.email}. New balance: ${state?.balance ?? 0}.`;
     }
     case "set_monthly_plan": {
