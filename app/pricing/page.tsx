@@ -4,6 +4,7 @@ import { Check, X } from "lucide-react";
 import { getDb } from "@/src/server/db";
 import { SiteHeader } from "@/src/components/home/SiteHeader";
 import { SiteFooter } from "@/src/components/home/SiteFooter";
+import { Linkify } from "@/src/components/home/Linkify";
 
 export const metadata: Metadata = {
   title: "Pricing · Recktube",
@@ -157,7 +158,7 @@ export default async function Pricing() {
             <Faq q="How do I pay?" a="Choose a plan after you sign up. Payments are processed securely by Paystack. You can also email support@recktube.xyz and we'll set up your plan." />
             <Faq q="Can I cancel?" a="Yes, any time. Your plan stays active until the end of the month you paid for, then your account returns to the Free plan." />
             <Faq q="Do unused monthly credits roll over?" a="Every 30 days your balance is topped back up to your plan's monthly amount. Credits above that amount, such as a credit pack, are kept." />
-            <Faq q="Refunds" a="If something went wrong with a payment, email support@recktube.xyz within 7 days and we'll make it right." />
+            <Faq q="Refunds" a="If something went wrong with a payment, email support@recktube.xyz within 7 days and we'll make it right. Full details: recktube.xyz/refund-policy" />
           </div>
         </section>
       </div>
@@ -186,7 +187,7 @@ function Faq({ q, a }: { q: string; a: string }) {
   return (
     <div className="rounded-2xl border border-foreground/10 bg-foreground/[0.02] p-4">
       <p className="font-semibold">{q}</p>
-      <p className="mt-1 leading-relaxed text-foreground/70">{a}</p>
+      <p className="mt-1 leading-relaxed text-foreground/70"><Linkify text={a} /></p>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { SiteHeader } from "@/src/components/home/SiteHeader";
 import { SiteFooter } from "@/src/components/home/SiteFooter";
 import { HELP_ARTICLES } from "@/src/content/help";
+import { Linkify } from "@/src/components/home/Linkify";
 
 export function generateStaticParams() {
   return HELP_ARTICLES.map((a) => ({ slug: a.slug }));
@@ -38,17 +39,17 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
               return (
                 <div key={i} className="flex gap-3">
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-xs font-semibold text-violet-700 dark:text-violet-300">{step[1]}</span>
-                  <p className="pt-0.5">{step[2]}</p>
+                  <p className="pt-0.5"><Linkify text={step[2]} /></p>
                 </div>
               );
             if (p.startsWith("• "))
               return (
                 <p key={i} className="flex gap-2 pl-1">
                   <span className="text-violet-600 dark:text-violet-400" aria-hidden="true">•</span>
-                  <span>{p.slice(2)}</span>
+                  <span><Linkify text={p.slice(2)} /></span>
                 </p>
               );
-            return <p key={i}>{p}</p>;
+            return <p key={i}><Linkify text={p} /></p>;
           })}
         </div>
         {related.length > 0 && (

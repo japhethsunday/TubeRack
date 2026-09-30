@@ -6,7 +6,8 @@ import { ChevronRight, Search } from "lucide-react";
 import { HELP_ARTICLES, HELP_CATEGORIES, searchHelp } from "@/src/content/help";
 
 /** Help Center: instant search over the articles, grouped by topic. */
-export function HelpSearch() {
+/** `popular`: when not searching, show just these articles instead of every topic. */
+export function HelpSearch({ popular }: { popular?: string[] } = {}) {
   const [q, setQ] = useState("");
   const found = useMemo(() => searchHelp(q), [q]);
   const searching = q.trim().length > 1;
@@ -28,6 +29,11 @@ export function HelpSearch() {
         <section aria-live="polite">
           <p className="mb-3 text-xs text-foreground/50">{found.length ? `${found.length} article${found.length === 1 ? "" : "s"}` : "No articles match. Try other words, or contact us below."}</p>
           <ArticleList items={found} />
+        </section>
+      ) : popular ? (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-foreground/50">Popular answers</h2>
+          <ArticleList items={popular.map((slug) => HELP_ARTICLES.find((a) => a.slug === slug)).filter((a): a is (typeof HELP_ARTICLES)[number] => Boolean(a))} />
         </section>
       ) : (
         HELP_CATEGORIES.map((c) => (

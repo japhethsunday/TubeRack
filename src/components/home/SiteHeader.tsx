@@ -44,7 +44,7 @@ const ANCHORS = [
   { href: "/#how", label: "How it works" },
   { href: "/#features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/help", label: "Help Center" },
+  { href: "/support", label: "Support" },
 ];
 
 function Dropdown({ label, links }: { label: string; links: NavLink[] }) {

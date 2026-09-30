@@ -36,8 +36,10 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/settings", label: "Settings" },
       { href: "/dashboard", label: "Dashboard" },
       { href: "/pricing", label: "Pricing" },
+      { href: "/support", label: "Support" },
       { href: "/help", label: "Help Center" },
       { href: "/contact", label: "Contact" },
+      { href: "/refund-policy", label: "Refunds & cancellations" },
       { href: "/privacy", label: "Privacy Policy" },
       { href: "/terms", label: "Terms of Service" },
     ],
@@ -57,8 +59,10 @@ const PUBLIC_COLUMNS: typeof COLUMNS = [
   {
     title: "Support",
     links: [
+      { href: "/support", label: "Support" },
       { href: "/help", label: "Help Center" },
       { href: "/contact", label: "Contact" },
+      { href: "/refund-policy", label: "Refunds & cancellations" },
       { href: "/privacy", label: "Privacy Policy" },
       { href: "/terms", label: "Terms of Service" },
     ],
