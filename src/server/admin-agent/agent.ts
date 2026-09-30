@@ -1,4 +1,4 @@
-import { adminDb } from "@/src/server/admin";
+import { adminDb, adminEmails } from "@/src/server/admin";
 import { Masker } from "@/src/server/ai/mask";
 import { bossTodos } from "@/src/server/admin-agent/boss";
 import { founder } from "@/src/server/founder";
@@ -66,7 +66,18 @@ export function verifyProposal(token: string, adminId: string): { action: Action
 /** Text from the database can't pose as instructions or close the data blocks. */
 const data = (v: unknown) => JSON.stringify(v).slice(0, 9000).replace(/<<<|>>>/g, "»");
 
-function prompt(role: AdminRole, history: ChatTurn[], steps: string[], ceoName = "", boss = false, page: string | null = null): string {
+/** Everyone with admin access: owners from ADMIN_EMAILS plus the Team page. */
+async function teamEmails(): Promise<string[]> {
+  const out = new Set(adminEmails());
+  try {
+    for (const r of await adminDb()`SELECT email FROM admin_members`) out.add(String(r.email).toLowerCase());
+  } catch {
+    // Team table not migrated: owners only.
+  }
+  return [...out];
+}
+
+function prompt(role: AdminRole, history: ChatTurn[], steps: string[], ceoName = "", boss = false, page: string | null = null, admins = ""): string {
   const actions = Object.entries(ACTIONS)
     .filter(([, s]) => roleAllows(role, s.permission))
     .map(([name]) => name)
@@ -74,6 +85,11 @@ function prompt(role: AdminRole, history: ChatTurn[], steps: string[], ceoName =
   return `You are the Recktube admin assistant, working for a Recktube admin (role: ${role}). You help run the business: answer questions from real data, investigate accounts, and suggest actions.
 
 ${PRODUCT_FACTS}
+
+THE ADMINS (the Recktube team, the ONLY people "admins", "the team" or "staff" means): ${admins || "(unknown)"}.
+- "Give/send credits to the admins": propose ONE give_credits per admin email above. Never email_everyone for this — that reaches every user, not the admins.
+- Credits and emails are separate. Never write an email that says credits were added unless give_credits for that exact person is in the same reply. An email alone never changes anyone's balance.
+- Before proposing remove_credits to "undo" or "reverse" something, run user_details for that user and check its creditHistory; only remove credits that were really added. If nothing was added, say so and propose nothing.
 
 Today is ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC" })} (UTC).
 
@@ -175,10 +191,11 @@ export async function askAssistant(adminId: string, role: AdminRole, history: Ch
   const mask = new Masker([ceoName]);
   await learnNamesFor(mask, history);
   const masked = history.map((t) => ({ ...t, text: mask.text(t.text) }));
+  const admins = mask.text((await teamEmails()).join(", "));
   const steps: string[] = [];
   const lookups: string[] = [];
   for (let i = 0; i < MAX_STEPS; i++) {
-    const { text } = await ai.generateText({ prompt: prompt(role, masked, steps, ceoName, boss, page), maxTokens: 2000, json: true, fast: true });
+    const { text } = await ai.generateText({ prompt: prompt(role, masked, steps, ceoName, boss, page, admins), maxTokens: 2000, json: true, fast: true });
     let out: Record<string, unknown>;
     try {
       out = parseJsonObject(text);
