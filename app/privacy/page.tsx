@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Privacy Policy — Recktube", descri
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" updated="September 28, 2026">
+    <LegalPage title="Privacy Policy" updated="September 30, 2026">
       <p>Recktube is a workspace for YouTube creators: research, scripts, voice-overs, visuals, video editing, packaging and publishing. This policy explains what we collect, why, and the choices you have.</p>
 
       <h2>Information we collect</h2>
@@ -35,6 +35,7 @@ export default function PrivacyPage() {
       <ul>
         <li><strong>Hosting and data:</strong> Vercel (hosting), Supabase (database and file storage), Resend (email).</li>
         <li><strong>Text, research, images and voice:</strong> Google (Gemini API and Cloud Text-to-Speech), with Mistral AI, NVIDIA and BytePlus as backups when the main service is busy. The prompts, scripts and text you generate with are sent to them to produce the result.</li>
+        <li><strong>Support assistant and email support:</strong> when you use in-app support or email support@recktube.xyz, your message and the account details needed to help you (such as your credit balance or why a video failed) are processed by Google&apos;s Gemini API to write the answer. Before anything is sent, your name and email address are replaced with placeholders, so the provider does not see who you are; please don&apos;t include passwords, card numbers or other sensitive details in your messages. Our team&apos;s internal tools work the same way.</li>
         <li><strong>AI video clips:</strong> open-source video models run on Hugging Face. The prompt and any image you choose to animate are sent there.</li>
         <li><strong>Backup voice:</strong> a self-hosted speech server operated by Recktube.</li>
         <li><strong>Stock footage and music:</strong> Pixabay and Jamendo (search terms only).</li>
