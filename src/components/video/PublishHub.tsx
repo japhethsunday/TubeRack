@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Camera, Check, Loader2, MonitorPlay, Music2, Send, Users } from "lucide-react";
 import { api } from "@/src/lib/api";
 import { growth } from "@/src/lib/growth-client";
+import { usePaid } from "@/src/lib/use-paid";
 import { Modal } from "@/src/components/ui/overlays";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
@@ -29,6 +30,7 @@ interface PlatformRow {
  */
 export function PublishHub({ source, prerendered, openSignal }: { source: PublishSource; prerendered?: Prerendered | null; openSignal?: number }) {
   const [open, setOpen] = useState(false);
+  const paid = usePaid();
   const [lastSignal, setLastSignal] = useState(openSignal ?? 0);
   if ((openSignal ?? 0) !== lastSignal) {
     setLastSignal(openSignal ?? 0);
@@ -60,7 +62,9 @@ export function PublishHub({ source, prerendered, openSignal }: { source: Publis
     { id: "instagram", label: "Instagram Reels", icon: Camera, state: "soon" },
     { id: "facebook", label: "Facebook", icon: Users, state: "soon" },
   ];
-  const connected = rows.filter((r): r is PlatformRow & { id: PlatformId } => r.state === "connected" && (r.id === "youtube" || r.id === "tiktok")).map((r) => r.id);
+  // TikTok is part of the paid plans; the Free plan publishes to YouTube.
+  const tiktokLocked = paid === false;
+  const connected = rows.filter((r): r is PlatformRow & { id: PlatformId } => r.state === "connected" && (r.id === "youtube" || (r.id === "tiktok" && !tiktokLocked))).map((r) => r.id);
 
 
   function start(list: PlatformId[]) {
@@ -96,7 +100,8 @@ export function PublishHub({ source, prerendered, openSignal }: { source: Publis
           <ul className="space-y-2">
             {rows.map((r) => {
               const Icon = r.icon;
-              const usable = r.state === "connected" && (r.id === "youtube" || r.id === "tiktok");
+              const locked = r.id === "tiktok" && tiktokLocked;
+              const usable = r.state === "connected" && !locked && (r.id === "youtube" || r.id === "tiktok");
               return (
                 <li key={r.id} className={cx("flex items-center gap-3 rounded-xl border border-border p-3", !usable && "opacity-75")}>
                   <input
@@ -111,7 +116,7 @@ export function PublishHub({ source, prerendered, openSignal }: { source: Publis
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium">{r.label}</span>
                     <span className="block truncate text-xs text-muted-text">
-                      {r.state === null ? "Checking…" : r.state === "soon" ? "Coming soon — download the export and upload it in the app" : r.state === "connected" ? r.account || "Connected" : "Not connected"}
+                      {locked ? "Paid plans only — your Free plan publishes to YouTube" : r.state === null ? "Checking…" : r.state === "soon" ? "Coming soon — download the export and upload it in the app" : r.state === "connected" ? r.account || "Connected" : "Not connected"}
                     </span>
                   </span>
                   {r.state === null && <Loader2 className="size-4 animate-spin text-muted-text" aria-hidden="true" />}
@@ -120,7 +125,12 @@ export function PublishHub({ source, prerendered, openSignal }: { source: Publis
                       Only here
                     </Button>
                   )}
-                  {r.state === "not-connected" && (
+                  {locked && (
+                    <a href="/pricing" className="inline-flex h-8 shrink-0 items-center rounded-lg border border-border px-3 text-xs font-medium hover:bg-muted">
+                      See plans
+                    </a>
+                  )}
+                  {!locked && r.state === "not-connected" && (
                     <a
                       href={r.id === "youtube" ? "/youtube" : "/settings?tab=connections"}
                       className="inline-flex h-8 shrink-0 items-center rounded-lg border border-border px-3 text-xs font-medium hover:bg-muted"

@@ -50,6 +50,8 @@ export async function creditState(workspaceId: string): Promise<CreditState | nu
  * Paid access (AI video clips and AI motion): an unlimited account, or a
  * monthly allowance above the free one. Admins set this per user.
  */
+export const TIKTOK_PAID_MESSAGE = "Posting to TikTok is part of the paid plans. The Free plan connects YouTube only. See recktube.xyz/pricing to upgrade.";
+
 export function isPaidPlan(state: Pick<CreditState, "unlimited" | "monthlyGrant"> | null): boolean {
   return Boolean(state && (state.unlimited || state.monthlyGrant > DEFAULT_MONTHLY_CREDITS));
 }

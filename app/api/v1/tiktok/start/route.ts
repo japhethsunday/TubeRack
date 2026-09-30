@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { requireWorkspace } from "@/src/server/workspace";
+import { isAdmin } from "@/src/server/admin";
+import { creditState, isPaidPlan, TIKTOK_PAID_MESSAGE } from "@/src/server/credits";
 import { isTikTokConfigured, tiktokAuthUrl } from "@/src/server/tiktok/client";
 import { tiktokPaused } from "@/src/server/tiktok/post";
 import { randomToken } from "@/src/server/crypto";
@@ -12,11 +14,14 @@ export async function GET(request: Request) {
   const origin = linkOrigin(request);
   const returnTo = sanitizeReturnTo(new URL(request.url).searchParams.get("returnTo") ?? "/settings?tab=connections");
   const back = (msg: string) => NextResponse.redirect(`${origin}${returnTo}${returnTo.includes("?") ? "&" : "?"}tiktok_error=${encodeURIComponent(msg)}`);
+  let caller;
   try {
-    await requireWorkspace("editor");
+    caller = await requireWorkspace("editor");
   } catch {
     return NextResponse.redirect(`${origin}/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
+  // TikTok is part of the paid plans (the Free plan connects YouTube only).
+  if (!isAdmin(caller.user) && !isPaidPlan(await creditState(caller.workspaceId))) return back(TIKTOK_PAID_MESSAGE);
   if (!isTikTokConfigured()) return back("TikTok isn't set up yet.");
   const paused = await tiktokPaused();
   if (paused) return back(paused);

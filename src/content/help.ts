@@ -37,7 +37,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "2. Write the script, or let Recktube write it with a strong hook and clear sections. Edit anything you like.",
       "3. Press Generate video. Recktube records the voice-over, finds stock footage and makes pictures for each scene, adds background music, animated captions and a thumbnail.",
       "4. Watch the result. Fine-tune it in the Video Studio if you want (timeline, text, transitions, audio mix).",
-      "5. Publish to YouTube, send it to TikTok, or save the file to your device.",
+      "5. Publish to YouTube, save the file to your device, or on a paid plan post it to TikTok.",
       "Keep the tab open while the video is being generated: switching apps on a phone can pause it.",
     ],
   },
@@ -118,8 +118,9 @@ export const HELP_ARTICLES: HelpArticle[] = [
     slug: "post-to-tiktok",
     title: "Post to TikTok",
     category: "Publishing",
-    summary: "Connect TikTok, then post straight away or send the video to your TikTok drafts.",
+    summary: "On paid plans: connect TikTok, then post straight away or send the video to your TikTok drafts.",
     body: [
+      "Posting to TikTok is included in every paid plan (Creator, Pro and Studio). The Free plan connects YouTube only — see recktube.xyz/pricing.",
       "1. Connect TikTok in Settings → Connections (or on My Channel).",
       "2. Open a finished video, press Publish and choose TikTok.",
       "3. Post now or send it to your drafts, choose who can see it, and allow comments, duets or stitches.",
@@ -158,10 +159,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
     slug: "upgrades-and-paid-features",
     title: "Upgrades and paid features",
     category: "Credits & plans",
-    summary: "AI video clips and AI motion are paid features. How to upgrade.",
+    summary: "What the paid plans add, and how to upgrade.",
     body: [
+      "Paid plans (Creator $5, Pro $12 and Studio $25 a month) give you more credits every month and add posting to TikTok, AI video clips and AI motion. See every plan at recktube.xyz/pricing.",
       "AI video clips and AI motion (turning pictures into real moving shots) are available on paid plans. On a free account you'll see them with a Paid badge.",
-      "There is no in-app card payment yet. To upgrade, email support@recktube.xyz and the team will set it up for you.",
+      "To upgrade, choose a plan on the Pricing page, or email support@recktube.xyz and the team will set it up for you.",
     ],
   },
   {

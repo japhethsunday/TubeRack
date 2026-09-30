@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { getDb } from "@/src/server/db";
 import { SiteHeader } from "@/src/components/home/SiteHeader";
 import { SiteFooter } from "@/src/components/home/SiteFooter";
@@ -16,14 +16,22 @@ export const revalidate = 300;
 
 interface Plan { id: string; name: string; kind: "subscription" | "pack"; priceMinor: number; currency: string; credits: number; description: string }
 
+/** Shown if the database can't be reached, so the page never loses its prices. Keep in step with Admin → Plans. */
+const FALLBACK: Plan[] = [
+  { id: "creator", name: "Creator", kind: "subscription", priceMinor: 500, currency: "USD", credits: 1000, description: "For creators posting every week." },
+  { id: "pro", name: "Pro", kind: "subscription", priceMinor: 1200, currency: "USD", credits: 3000, description: "For growing channels posting most days." },
+  { id: "studio", name: "Studio", kind: "subscription", priceMinor: 2500, currency: "USD", credits: 7000, description: "For daily posting across YouTube and TikTok." },
+  { id: "pack", name: "Credit pack", kind: "pack", priceMinor: 300, currency: "USD", credits: 500, description: "A one-off top-up of 500 credits, added to your balance on any plan." },
+];
+
 async function plans(): Promise<Plan[]> {
   try {
     const db = getDb();
-    if (!db) return [];
+    if (!db) return FALLBACK;
     const rows = await db`SELECT id, name, kind, price_minor, currency, credits, description FROM plans WHERE active = true ORDER BY sort, price_minor`;
     return rows.map((r) => ({ id: String(r.id), name: String(r.name), kind: r.kind === "pack" ? "pack" : "subscription", priceMinor: Number(r.price_minor), currency: String(r.currency), credits: Number(r.credits), description: String(r.description ?? "") }));
   } catch {
-    return [];
+    return FALLBACK;
   }
 }
 
@@ -33,8 +41,34 @@ const money = (minor: number, cur: string) => {
   return `${SYMBOL[cur] ?? `${cur} `}${Number.isInteger(v) ? v.toLocaleString("en-US") : v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-const EVERY_PLAN = ["Script Studio, Content Creator and Channel Creator", "Full video generation: voice-over, visuals, music, captions, thumbnail", "Video Studio editor and MP4 export", "Publish and schedule to YouTube, post to TikTok", "Trend Radar, niche research and analytics"];
-const PAID_EXTRAS = ["AI video clips and AI motion", "More credits every month"];
+/** Tools in every plan, including Free. */
+const CORE = [
+  "Script Studio: AI scripts with strong hooks",
+  "Content Creator, Channel Creator and Most Paying Niches",
+  "Full video generation: voice-over, stock and AI visuals, music, animated captions and thumbnail",
+  "Video Studio editor with MP4 export",
+  "Connect YouTube: publish, schedule and see analytics",
+  "Trend Radar and niche research",
+];
+
+/** What a plan includes, with real numbers from its monthly credits. */
+function planFeatures(credits: number, paid: boolean): { text: string; included: boolean; strong?: boolean }[] {
+  const videos = Math.max(1, Math.floor(credits / 100));
+  const out: { text: string; included: boolean; strong?: boolean }[] = [
+    { text: `${credits.toLocaleString("en-US")} credits every month`, included: true, strong: true },
+    { text: `About ${videos} full AI-generated video${videos === 1 ? "" : "s"} a month, or up to ${Math.floor(credits / 10).toLocaleString("en-US")} AI images`, included: true },
+    ...CORE.map((text) => ({ text, included: true })),
+  ];
+  if (paid) {
+    out.push({ text: "Connect TikTok: post now or send to drafts", included: true });
+    out.push({ text: `AI video clips and AI motion (up to ${Math.floor(credits / 25).toLocaleString("en-US")} clips a month)`, included: true });
+    out.push({ text: "Buy extra credit packs any time", included: true });
+  } else {
+    out.push({ text: "TikTok posting", included: false });
+    out.push({ text: "AI video clips and AI motion", included: false });
+  }
+  return out;
+}
 
 const COSTS: [string, number][] = [
   ["Full generated video", 100],
@@ -59,7 +93,7 @@ export default async function Pricing() {
           <p className="text-xs font-semibold uppercase tracking-widest text-violet-600 dark:text-violet-400">Pricing</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Simple plans. Start free.</h1>
           <p className="mt-3 text-sm leading-relaxed text-foreground/70">
-            Every account gets 100 free credits every month. Upgrade when you post more. Prices are per month, billed monthly; cancel any time.
+            Start free with YouTube. Upgrade for more videos, TikTok posting and AI video. Prices are per month, billed monthly; cancel any time.
           </p>
         </div>
 
@@ -67,9 +101,8 @@ export default async function Pricing() {
           <li className="flex flex-col rounded-3xl border border-foreground/10 bg-foreground/[0.02] p-6">
             <h2 className="text-lg font-semibold">Free</h2>
             <p className="mt-3"><span className="text-4xl font-bold tracking-tight">{money(0, subs[0]?.currency ?? "USD")}</span><span className="text-sm text-foreground/60"> / month</span></p>
-            <p className="mt-1 text-sm font-medium text-violet-700 dark:text-violet-300">100 credits every month</p>
-            <p className="mt-3 text-sm leading-relaxed text-foreground/70">Try everything: about one full generated video, or 10 images, each month.</p>
-            <Features items={EVERY_PLAN} />
+            <p className="mt-3 text-sm leading-relaxed text-foreground/70">Try Recktube with YouTube. No card needed.</p>
+            <Features items={planFeatures(100, false)} />
             <Link href="/signup" className="mt-6 inline-flex h-11 items-center justify-center rounded-xl border border-foreground/15 text-sm font-semibold transition hover:bg-foreground/5">Start free</Link>
           </li>
           {subs.map((p) => {
@@ -79,9 +112,8 @@ export default async function Pricing() {
                 {hot && <span className="absolute -top-3 left-6 rounded-full bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-3 py-1 text-[11px] font-semibold text-white">Most popular</span>}
                 <h2 className="text-lg font-semibold">{p.name}</h2>
                 <p className="mt-3"><span className="text-4xl font-bold tracking-tight">{money(p.priceMinor, p.currency)}</span><span className="text-sm text-foreground/60"> / month</span></p>
-                <p className="mt-1 text-sm font-medium text-violet-700 dark:text-violet-300">{p.credits.toLocaleString("en-US")} credits every month</p>
                 {p.description && <p className="mt-3 text-sm leading-relaxed text-foreground/70">{p.description}</p>}
-                <Features items={["Everything in Free", ...PAID_EXTRAS]} />
+                <Features items={planFeatures(p.credits, true)} />
                 <Link href="/signup" className={`mt-6 inline-flex h-11 items-center justify-center rounded-xl text-sm font-semibold transition ${hot ? "bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 text-white hover:brightness-110" : "border border-foreground/15 hover:bg-foreground/5"}`}>Choose {p.name}</Link>
               </li>
             );
@@ -134,12 +166,16 @@ export default async function Pricing() {
   );
 }
 
-function Features({ items }: { items: string[] }) {
+function Features({ items }: { items: { text: string; included: boolean; strong?: boolean }[] }) {
   return (
-    <ul className="mt-5 flex-1 space-y-2 text-sm">
+    <ul className="mt-5 flex-1 space-y-2.5 text-sm">
       {items.map((f) => (
-        <li key={f} className="flex gap-2 text-foreground/80">
-          <Check className="mt-0.5 size-4 shrink-0 text-emerald-500" aria-hidden="true" /> {f}
+        <li key={f.text} className={`flex gap-2.5 ${f.included ? "text-foreground/85" : "text-foreground/40"}`}>
+          {f.included ? <Check className="mt-0.5 size-4 shrink-0 text-emerald-500" aria-hidden="true" /> : <X className="mt-0.5 size-4 shrink-0 text-foreground/35" aria-hidden="true" />}
+          <span className={f.strong ? "font-semibold text-violet-700 dark:text-violet-300" : f.included ? "" : "line-through decoration-foreground/20"}>
+            {f.text}
+            {!f.included && <span className="sr-only"> (not included)</span>}
+          </span>
         </li>
       ))}
     </ul>

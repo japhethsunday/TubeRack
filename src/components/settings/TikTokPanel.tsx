@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Music2 } from "lucide-react";
+import { Crown, Music2 } from "lucide-react";
+import { usePaid } from "@/src/lib/use-paid";
 import { api } from "@/src/lib/api";
 import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
@@ -15,6 +16,7 @@ interface Info {
 /** Settings → Connections: connect, see and disconnect the TikTok account. */
 export function ConnectionsPanel({ returnTo = "/settings?tab=connections" }: { returnTo?: string } = {}) {
   const [info, setInfo] = useState<Info | null>(null);
+  const paid = usePaid();
   const [busy, setBusy] = useState(false);
   const [notice] = useState(() => {
     if (typeof window === "undefined") return null;
@@ -59,6 +61,12 @@ export function ConnectionsPanel({ returnTo = "/settings?tab=connections" }: { r
               </div>
               <TikTokStatsView returnTo={returnTo} />
               </>
+            ) : paid === false ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"><Crown className="size-3" aria-hidden="true" /> Paid plans</span>
+                <span className="min-w-0 flex-1 text-muted-text">Posting to TikTok is included from the Creator plan. Your Free plan connects YouTube.</span>
+                <a href="/pricing" className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90">See plans</a>
+              </div>
             ) : (
               <a href={`/api/v1/tiktok/start?returnTo=${encodeURIComponent(returnTo)}`} className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
                 <Music2 className="size-4" aria-hidden="true" /> Connect TikTok

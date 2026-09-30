@@ -1,3 +1,6 @@
+import { BackendError } from "@/src/server/errors";
+import { isAdmin } from "@/src/server/admin";
+import { creditState, isPaidPlan, TIKTOK_PAID_MESSAGE } from "@/src/server/credits";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireWorkspace } from "@/src/server/workspace";
@@ -27,6 +30,7 @@ const body = z.object({
 export async function POST(request: Request) {
   try {
     const caller = await requireWorkspace("editor");
+    if (!isAdmin(caller.user) && !isPaidPlan(await creditState(caller.workspaceId))) throw new BackendError("FORBIDDEN", TIKTOK_PAID_MESSAGE);
     const limit = limiterFor("upload").take(`tiktok:${caller.user.id}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const input = await parseBody(request, body);
