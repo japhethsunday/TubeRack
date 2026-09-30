@@ -13,7 +13,7 @@ import { api, ApiError } from "@/src/lib/api";
 import { cx } from "@/src/components/ui/cx";
 
 export interface Proposal { action: string; summary: string; token: string; state?: "idle" | "busy" | "done" | "error" | "dismissed"; result?: string }
-export interface Turn { role: "admin" | "assistant"; text: string; proposals?: Proposal[]; lookups?: string[]; open?: string; choices?: string[] }
+export interface Turn { role: "admin" | "assistant"; text: string; proposals?: Proposal[]; lookups?: string[]; open?: string; choices?: string[]; wrapFor?: number }
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -149,17 +149,43 @@ export function AssistantChat({ turns, setTurns, compact, onNavigate }: { turns:
     setTurns((all) => all.map((t, i) => (i === ti ? { ...t, proposals: t.proposals?.map((p, j) => (j === pi ? { ...p, ...patch } : p)) } : t)));
   }
 
+  /** Once every card in a reply is handled, the assistant closes the task with a short summary. */
+  function wrapUp(ti: number) {
+    setTurns((all) => {
+      const t = all[ti];
+      const cards = t?.proposals ?? [];
+      if (!cards.length || ti !== all.length - 1 || cards.some((p) => p.state === "idle" || p.state === "busy")) return all;
+      if (all.some((x) => x.wrapFor === ti)) return all;
+      const done = cards.filter((p) => p.state === "done");
+      const failed = cards.filter((p) => p.state === "error");
+      const skipped = cards.filter((p) => p.state === "dismissed").length;
+      if (!done.length && !failed.length) return all;
+      let text =
+        done.length === 1 && !failed.length
+          ? `All done. ${done[0].result ?? ""}`.trim()
+          : done.length
+            ? `All done${failed.length ? " except one" : ""}, boss. Here is what changed:\n${done.map((p) => `• ${p.result ?? "Done."}`).join("\n")}`
+            : "That did not go through.";
+      if (failed.length) text += `\n\n${failed.length === 1 ? "This one did not work" : `${failed.length} did not work`}: ${failed.map((p) => p.result).filter(Boolean).join("; ")}. Tap Try again, or tell me what to change.`;
+      if (skipped) text += `\n(${skipped} skipped, nothing changed there.)`;
+      text += "\n\nAnything else I can take care of?";
+      return [...all, { role: "assistant" as const, text, wrapFor: ti, choices: ["What else needs me today?", "That's all, thanks"] }];
+    });
+  }
+
   async function confirm(ti: number, pi: number, p: Proposal) {
     setProposal(ti, pi, { state: "busy" });
     try {
       const r = await api.put<{ result: string; launch?: string }>("/api/v1/admin/assistant", { token: p.token });
       setProposal(ti, pi, { state: "done", result: r.result });
+      wrapUp(ti);
       // Pages behind the assistant show the change straight away.
       refreshAdminData();
       // Hands-free video posting continues in this tab (only our own admin page).
       if (r.launch && /^\/admin\/promo\/run\?ids=[0-9a-f%2C,-]+(&at=(now|morning|afternoon|evening))?(&start=\d{1,2})?(&pf=(yt|tt)(%2C|,)?(yt|tt)?)?$/.test(r.launch)) window.setTimeout(() => window.location.assign(r.launch!), 1200);
     } catch (e) {
       setProposal(ti, pi, { state: "error", result: e instanceof ApiError ? e.message : "Couldn't do that." });
+      wrapUp(ti);
     }
   }
 
@@ -332,7 +358,7 @@ export function AssistantChat({ turns, setTurns, compact, onNavigate }: { turns:
                           <button type="button" disabled={p.state === "busy"} onClick={() => void confirm(ti, pi, p)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-60">
                             {p.state === "busy" ? <span className="size-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" /> : <Check className="size-3.5" aria-hidden="true" />} {p.state === "busy" ? "Working…" : p.state === "error" ? "Try again" : "Confirm"}
                           </button>
-                          <button type="button" disabled={p.state === "busy"} onClick={() => setProposal(ti, pi, { state: "dismissed" })} className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-white/70 transition hover:bg-white/[0.06] disabled:opacity-40">
+                          <button type="button" disabled={p.state === "busy"} onClick={() => { setProposal(ti, pi, { state: "dismissed" }); wrapUp(ti); }} className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-white/70 transition hover:bg-white/[0.06] disabled:opacity-40">
                             <X className="size-3.5" aria-hidden="true" /> Skip
                           </button>
                         </div>
