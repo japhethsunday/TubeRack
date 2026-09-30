@@ -4,7 +4,7 @@ import { Component, createContext, useCallback, useContext, useEffect, useMemo, 
 import { api } from "@/src/lib/api";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Bot, Maximize2, X } from "lucide-react";
+import { Maximize2, Sparkles, X } from "lucide-react";
 import { AssistantChat, type Turn } from "@/src/components/admin/AssistantChat";
 
 /**
@@ -196,7 +196,7 @@ export function AssistantLauncher() {
           className="support-launch fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-5 z-[70] flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white shadow-xl shadow-violet-900/40 transition-transform hover:scale-105"
         >
           <span className="support-ring absolute inset-0 rounded-full" aria-hidden="true" />
-          <Bot className="relative size-6" aria-hidden="true" />
+          <Sparkles className="relative size-6" aria-hidden="true" />
           {urgent && <span className="absolute right-0.5 top-0.5 size-3.5 rounded-full border-2 border-background bg-destructive" aria-label="Something needs you" />}
         </button>
       )}
@@ -204,27 +204,27 @@ export function AssistantLauncher() {
         <div
           role="dialog"
           aria-label="Admin assistant"
-          className="support-panel fixed inset-x-2 bottom-2 z-[70] flex h-[min(640px,calc(100dvh-1rem))] flex-col overflow-hidden rounded-2xl border border-border bg-elevated shadow-2xl shadow-black/40 sm:inset-x-auto sm:bottom-5 sm:right-5 sm:w-[390px]"
+          className="support-panel fixed inset-x-2 bottom-2 z-[70] flex h-[min(680px,calc(100dvh-1rem))] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0d0a16] shadow-2xl shadow-black/60 ring-1 ring-violet-500/10 sm:inset-x-auto sm:bottom-5 sm:right-5 sm:w-[420px]"
         >
-          <header className="relative overflow-hidden bg-gradient-to-br from-fuchsia-600 via-violet-700 to-sky-600 px-4 py-3 text-white">
-            <div className="auth-grid absolute inset-0 opacity-50" aria-hidden="true" />
-            <div className="relative flex items-center gap-3">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-white/15">
-                <Bot className="size-5" aria-hidden="true" />
+          <header className="relative bg-[#120d1f] px-4 py-3 text-white">
+            <div className="flex items-center gap-3">
+              <span className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 shadow-lg shadow-violet-900/50">
+                <Sparkles className="size-[18px]" aria-hidden="true" />
+                <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#120d1f] bg-emerald-400" aria-hidden="true" />
               </span>
               <div className="min-w-0 flex-1 leading-tight">
-                <p className="text-sm font-semibold">Admin assistant</p>
-                <p className="flex items-center gap-1.5 truncate text-[11px] text-white/80">
-                  <span className="size-1.5 rounded-full bg-emerald-300" /> Online · changes only happen when you Confirm
-                </p>
+                <p className="text-sm font-semibold tracking-tight">Recktube Assistant</p>
+                <p className="truncate text-[11px] text-white/55">Online · nothing changes until you confirm</p>
               </div>
-              <Link href="/admin/assistant" onClick={() => setOpen(false)} aria-label="Open full screen" className="rounded-md p-1 hover:bg-white/15">
+              <Link href="/admin/assistant" onClick={() => setOpen(false)} aria-label="Open full screen" title="Full screen" className="rounded-lg p-2 text-white/60 transition hover:bg-white/10 hover:text-white">
                 <Maximize2 className="size-4" aria-hidden="true" />
               </Link>
-              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="rounded-md p-1 hover:bg-white/15">
-                <X className="size-5" aria-hidden="true" />
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="rounded-lg p-2 text-white/60 transition hover:bg-white/10 hover:text-white">
+                <X className="size-4" aria-hidden="true" />
               </button>
             </div>
+            {/* brand hairline */}
+            <span className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-fuchsia-500/0 via-violet-400/70 to-sky-400/0" aria-hidden="true" />
           </header>
           <div className="min-h-0 flex-1">
             <ChatBoundary>

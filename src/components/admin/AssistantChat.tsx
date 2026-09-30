@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { refreshAdminData } from "@/src/components/admin/kit";
-import { ArrowLeft, Bot, Check, History, MessageSquarePlus, Plus, Search, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import {
+  ArrowUp, BarChart3, Check, ChevronRight, Clapperboard, Coins, Gauge, Handshake, History, LifeBuoy, Mail, Megaphone, MessagesSquare,
+  MinusCircle, Plus, Power, Send, ShieldAlert, Sparkles, Ticket, Trash2, TriangleAlert, UserCheck, UserPlus, UserX, Wallet, X,
+  type LucideIcon,
+} from "lucide-react";
 import { useAssistantChats } from "@/src/components/admin/AssistantLauncher";
 import { api, ApiError } from "@/src/lib/api";
-import { Button } from "@/src/components/ui/Button";
 import { cx } from "@/src/components/ui/cx";
 
 export interface Proposal { action: string; summary: string; token: string; state?: "idle" | "busy" | "done" | "error" | "dismissed"; result?: string }
@@ -15,6 +18,39 @@ export interface Turn { role: "admin" | "assistant"; text: string; proposals?: P
 function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+
+const ACTION_ICON: Record<string, LucideIcon> = {
+  give_credits: Coins, remove_credits: MinusCircle, set_monthly_plan: Gauge, set_unlimited: Gauge, suspend_user: UserX, reactivate_user: UserCheck,
+  send_email: Mail, email_everyone: Megaphone, reply_support: LifeBuoy, approve_affiliate: Handshake, create_bonus_code: Ticket,
+  pause_tool: Power, resume_tool: Power, write_promo_videos: Clapperboard, make_and_post_videos: Clapperboard,
+};
+const TODO_ICON: Record<string, LucideIcon> = {
+  "flags-high": ShieldAlert, flags: ShieldAlert, support: LifeBuoy, inbox: Mail, failures: TriangleAlert, promos: Clapperboard,
+  affiliates: Handshake, owed: Wallet, paused: Power, sending: Send, signups: UserPlus,
+};
+const TONE = {
+  urgent: { bar: "bg-rose-500", icon: "bg-rose-500/15 text-rose-300", label: "Now" },
+  normal: { bar: "bg-amber-400", icon: "bg-amber-400/15 text-amber-200", label: "Today" },
+  good: { bar: "bg-emerald-400", icon: "bg-emerald-400/15 text-emerald-200", label: "FYI" },
+} as const;
+
+/** One-tap starting points, shown as tiles. */
+const QUICK: { label: string; ask: string; icon: LucideIcon }[] = [
+  { label: "Today's priorities", ask: "Hi, what needs me today?", icon: Sparkles },
+  { label: "Business this week", ask: "How is the business doing this week?", icon: BarChart3 },
+  { label: "Make & post videos", ask: "Make and post 2 promo videos", icon: Clapperboard },
+  { label: "Reply to support", ask: "Reply to all creators waiting for support", icon: LifeBuoy },
+  { label: "Fraud check", ask: "Any suspicious accounts or fraud?", icon: ShieldAlert },
+  { label: "What failed today", ask: "What failed in the last 24 hours?", icon: TriangleAlert },
+];
+
+function Orb({ size = "md" }: { size?: "sm" | "md" }) {
+  return (
+    <span className={cx("relative flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-violet-600 to-sky-500 text-white shadow-lg shadow-violet-900/40", size === "sm" ? "size-7" : "size-9")}>
+      <Sparkles className={size === "sm" ? "size-3.5" : "size-4"} aria-hidden="true" />
+    </span>
+  );
 }
 
 const STARTERS = [
@@ -120,154 +156,208 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
     }
   }
 
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  const boss = saved?.boss ?? null;
+  const needs = boss?.todos.filter((t) => t.tone !== "good").length ?? 0;
+
   return (
-      <div className={cx("flex flex-col", compact ? "h-full min-h-0" : "h-[calc(100dvh-12rem)] min-h-[480px] overflow-hidden rounded-2xl border border-border bg-elevated shadow-2xl shadow-black/30")}>
-        {saved && !showHistory && (
-          <div className="flex items-center gap-1 border-b border-border px-3 py-1.5 text-xs">
-            <button type="button" onClick={() => setShowHistory(true)} className="flex min-h-8 items-center gap-1.5 rounded-full px-2.5 text-muted-text hover:bg-muted hover:text-foreground">
-              <History className="size-3.5" aria-hidden="true" /> All conversations{saved.chats.length ? ` · ${saved.chats.length}` : ""}
+    <div className={cx("assistant-ui flex flex-col text-[#ece9f5]", compact ? "h-full min-h-0 bg-[#0d0a16]" : "h-[calc(100dvh-12rem)] min-h-[520px] overflow-hidden rounded-3xl border border-white/10 bg-[#0d0a16] shadow-2xl shadow-black/40")}>
+      {/* Toolbar: Chat / History and New */}
+      {saved && (
+        <div className="flex items-center gap-2 border-b border-white/[0.07] px-3 py-2">
+          <div className="flex rounded-full bg-white/[0.05] p-0.5 text-xs font-medium" role="tablist" aria-label="Assistant view">
+            <button type="button" role="tab" aria-selected={!showHistory} onClick={() => setShowHistory(false)} className={cx("flex items-center gap-1.5 rounded-full px-3 py-1.5 transition", !showHistory ? "bg-white/10 text-white shadow-sm" : "text-white/55 hover:text-white")}>
+              <MessagesSquare className="size-3.5" aria-hidden="true" /> Chat
             </button>
-            <button type="button" onClick={() => { saved.newChat(); setError(null); }} disabled={busy} className="ml-auto flex min-h-8 items-center gap-1.5 rounded-full px-2.5 font-medium text-primary hover:bg-primary/10 disabled:opacity-40">
-              <Plus className="size-3.5" aria-hidden="true" /> New
+            <button type="button" role="tab" aria-selected={showHistory} onClick={() => setShowHistory(true)} className={cx("flex items-center gap-1.5 rounded-full px-3 py-1.5 transition", showHistory ? "bg-white/10 text-white shadow-sm" : "text-white/55 hover:text-white")}>
+              <History className="size-3.5" aria-hidden="true" /> History{saved.chats.length ? <span className="rounded-full bg-white/10 px-1.5 text-[10px]">{saved.chats.length}</span> : null}
             </button>
           </div>
-        )}
-        {saved && showHistory ? (
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <button type="button" onClick={() => setShowHistory(false)} className="mb-2 flex items-center gap-1.5 rounded-md px-1 py-1 text-xs text-muted-text hover:text-foreground">
-              <ArrowLeft className="size-3.5" aria-hidden="true" /> Back to chat
-            </button>
-            <button type="button" onClick={() => { saved.newChat(); setShowHistory(false); setError(null); }} className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/50 py-2.5 text-sm font-medium text-primary hover:bg-primary/5">
-              <MessageSquarePlus className="size-4" aria-hidden="true" /> New conversation
-            </button>
-            {saved.chats.length === 0 && <p className="py-6 text-center text-sm text-muted-text">No saved conversations yet.</p>}
-            <ul className="space-y-1.5">
+          <button type="button" onClick={() => { saved.newChat(); setShowHistory(false); setError(null); }} disabled={busy} className="ml-auto flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:border-violet-400/50 hover:bg-violet-500/10 hover:text-white disabled:opacity-40">
+            <Plus className="size-3.5" aria-hidden="true" /> New chat
+          </button>
+        </div>
+      )}
+
+      {saved && showHistory ? (
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          {saved.chats.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-center text-sm text-white/50">
+              <History className="size-8 opacity-40" aria-hidden="true" /> No saved conversations yet.
+            </div>
+          ) : (
+            <ul className="space-y-1">
               {saved.chats.map((c) => (
-                <li key={c.id} className={cx("group flex items-center rounded-xl hover:bg-muted", c.id === saved.chatId && "bg-muted")}>
-                  <button type="button" disabled={busy} onClick={() => { void saved.openChat(c.id).catch(() => setError("Couldn't open that conversation.")); setShowHistory(false); }} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left">
-                    <span className={cx("size-2 shrink-0 rounded-full", c.id === saved.chatId ? "bg-emerald-400" : "bg-sky-400")} />
+                <li key={c.id} className={cx("group flex items-center rounded-2xl border transition", c.id === saved.chatId ? "border-violet-400/30 bg-violet-500/10" : "border-transparent hover:bg-white/[0.04]")}>
+                  <button type="button" disabled={busy} onClick={() => { void saved.openChat(c.id).catch(() => setError("Couldn't open that conversation.")); setShowHistory(false); }} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-left">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70"><MessagesSquare className="size-4" aria-hidden="true" /></span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{c.title || "Conversation"}</span>
-                      <span className="block text-[11px] text-muted-text">{new Date(c.updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
+                      <span className="block truncate text-sm font-medium text-white/90">{c.title || "Conversation"}</span>
+                      <span className="block text-[11px] text-white/45">{new Date(c.updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
                     </span>
                   </button>
-                  <button type="button" aria-label="Delete conversation" onClick={() => void saved.removeChat(c.id)} className="mr-1 rounded-md p-2 text-muted-text hover:bg-destructive/10 hover:text-destructive">
-                    <Trash2 className="size-3.5" aria-hidden="true" />
+                  <button type="button" aria-label="Delete conversation" onClick={() => void saved.removeChat(c.id)} className="mr-2 rounded-lg p-2 text-white/35 opacity-0 transition hover:bg-rose-500/10 hover:text-rose-300 focus:opacity-100 group-hover:opacity-100">
+                    <Trash2 className="size-4" aria-hidden="true" />
                   </button>
                 </li>
               ))}
             </ul>
-          </div>
-        ) : (<>
-        <div className={cx("min-h-0 flex-1 space-y-3 overflow-y-auto", compact ? "p-4" : "p-4 sm:p-5")} aria-live="polite">
-          {turns.length === 0 && saved?.boss && (
-            <div className="support-in space-y-3">
-              <div className="max-w-[92%] rounded-2xl rounded-bl-md bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
-                <p className="font-medium">{greeting()}, {saved.boss.name}.</p>
-                <p className="mt-1 text-muted-text">{saved.boss.todos.some((t) => t.tone !== "good") ? "Here's what needs you right now:" : "Everything is under control. Here's today at a glance:"}</p>
-              </div>
-              {saved.boss.todos.length > 0 && (
-                <ul className="space-y-1.5">
-                  {saved.boss.todos.map((t) => (
-                    <li key={t.id}>
-                      <button type="button" onClick={() => go(t.href)} className="flex w-full items-start gap-2.5 rounded-xl border border-border px-3 py-2 text-left hover:border-primary">
-                        <span className={cx("mt-1.5 size-2 shrink-0 rounded-full", t.tone === "urgent" ? "bg-destructive" : t.tone === "good" ? "bg-emerald-400" : "bg-amber-400")} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-medium">{t.title}</span>
-                          <span className="block text-[11px] text-muted-text">{t.detail}</span>
-                        </span>
-                        <span className="mt-0.5 text-xs font-medium text-primary">Open →</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="flex flex-wrap gap-1.5">
-                {["Hi, what needs me today?", ...STARTERS.slice(0, 3)].map((s) => (
-                  <button key={s} type="button" onClick={() => void ask(s)} className="rounded-full border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary">
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
           )}
-          {turns.length === 0 && !saved?.boss && (
-            <div className="support-in space-y-3">
-              <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
-                <p className="font-medium">Hello, welcome to the Recktube admin assistant.</p>
-                <p className="mt-1 text-muted-text">Ask anything about the business, look into an account, or tell me what to do. Nothing changes until you tap Confirm.</p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {STARTERS.map((s) => (
-                  <button key={s} type="button" onClick={() => void ask(s)} className="rounded-full border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary">
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {turns.map((t, ti) => (
-            <div key={ti} className={cx("support-in flex", t.role === "admin" ? "justify-end" : "justify-start")}>
-              <div className={cx("max-w-[85%] space-y-2 rounded-2xl px-3.5 py-2 text-sm leading-relaxed", !compact && "sm:max-w-[75%]", t.role === "admin" ? "rounded-br-md bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white" : "rounded-bl-md bg-muted")}>
-                {!!t.lookups?.length && (
-                  <p className="flex flex-wrap items-center gap-1 text-[11px] text-muted-text">
-                    <Search className="size-3" aria-hidden="true" /> Checked: {[...new Set(t.lookups)].map((l) => LOOKUP_LABEL[l] ?? l).join(", ")}
-                  </p>
+        </div>
+      ) : (<>
+      <div className={cx("min-h-0 flex-1 space-y-4 overflow-y-auto", compact ? "px-3 py-4" : "px-4 py-5 sm:px-6")} aria-live="polite">
+        {turns.length === 0 && (
+          <div className="support-in space-y-4">
+            {/* Briefing card */}
+            <div className="rounded-3xl bg-gradient-to-br from-fuchsia-500/40 via-violet-500/25 to-sky-500/40 p-px">
+              <div className="rounded-[23px] bg-[#130e20] p-4">
+                <div className="flex items-center gap-3">
+                  <Orb />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-white/45">{today}</p>
+                    <p className="truncate text-base font-semibold text-white">{boss ? `${greeting()}, ${boss.name}` : "How can I help today?"}</p>
+                  </div>
+                  {boss && (
+                    <span className={cx("shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold", needs ? "bg-rose-500/15 text-rose-200" : "bg-emerald-500/15 text-emerald-200")}>
+                      {needs ? `${needs} need${needs === 1 ? "s" : ""} you` : "All clear"}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-white/65">
+                  {boss
+                    ? needs
+                      ? "Here's what's waiting for you, most important first. Tap one to go straight there."
+                      : "Nothing urgent. Here's today at a glance."
+                    : "Ask about the business, look into an account or tell me what to do. Nothing changes until you confirm."}
+                </p>
+                {boss && boss.todos.length > 0 && (
+                  <ul className="mt-3 space-y-1.5">
+                    {boss.todos.map((t) => {
+                      const Icon = TODO_ICON[t.id] ?? Sparkles;
+                      const tone = TONE[t.tone];
+                      return (
+                        <li key={t.id}>
+                          <button type="button" onClick={() => go(t.href)} className="group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.03] py-2.5 pl-4 pr-3 text-left transition hover:border-white/15 hover:bg-white/[0.06]">
+                            <span className={cx("absolute inset-y-2 left-0 w-1 rounded-r-full", tone.bar)} aria-hidden="true" />
+                            <span className={cx("flex size-8 shrink-0 items-center justify-center rounded-xl", tone.icon)}><Icon className="size-4" aria-hidden="true" /></span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-medium text-white/90">{t.title}</span>
+                              <span className="block truncate text-[11px] text-white/45">{t.detail}</span>
+                            </span>
+                            <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-white/35 sm:inline">{tone.label}</span>
+                            <ChevronRight className="size-4 shrink-0 text-white/30 transition group-hover:translate-x-0.5 group-hover:text-white/70" aria-hidden="true" />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
-                <p className="whitespace-pre-wrap break-words">{t.text}</p>
+              </div>
+            </div>
+            {/* Quick actions */}
+            <div>
+              <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">Quick actions</p>
+              <div className={cx("grid gap-2", compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3")}>
+                {QUICK.map((q) => (
+                  <button key={q.label} type="button" onClick={() => void ask(q.ask)} className="group flex items-center gap-2.5 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-3 py-2.5 text-left text-xs font-medium text-white/80 transition hover:-translate-y-0.5 hover:border-violet-400/40 hover:bg-violet-500/10 hover:text-white">
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500/25 to-sky-500/25 text-violet-200 transition group-hover:from-fuchsia-500/40 group-hover:to-sky-500/40"><q.icon className="size-3.5" aria-hidden="true" /></span>
+                    <span className="min-w-0 leading-snug">{q.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {turns.map((t, ti) =>
+          t.role === "admin" ? (
+            <div key={ti} className="support-in flex justify-end">
+              <div className={cx("max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-violet-600 px-3.5 py-2.5 text-sm leading-relaxed text-white shadow-lg shadow-violet-950/40", !compact && "sm:max-w-[70%]")}>{t.text}</div>
+            </div>
+          ) : (
+            <div key={ti} className="support-in flex items-start gap-2.5">
+              <Orb size="sm" />
+              <div className={cx("min-w-0 max-w-[88%] space-y-2.5", !compact && "sm:max-w-[80%]")}>
+                {!!t.lookups?.length && (
+                  <div className="flex flex-wrap gap-1">
+                    {[...new Set(t.lookups)].map((l) => (
+                      <span key={l} className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 py-0.5 text-[10px] font-medium text-white/50">
+                        <Check className="size-3 text-emerald-300" aria-hidden="true" /> {LOOKUP_LABEL[l] ?? l.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="whitespace-pre-wrap break-words rounded-2xl rounded-tl-md border border-white/[0.07] bg-white/[0.04] px-3.5 py-2.5 text-sm leading-relaxed text-white/90">{t.text}</div>
                 {t.open && (
-                  <button type="button" onClick={() => go(t.open!)} className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10">
-                    Open {t.open.replace(/^\/admin\/?/, "").split("?")[0] || "overview"} →
+                  <button type="button" onClick={() => go(t.open!)} className="inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-100 transition hover:bg-violet-500/20">
+                    Open {t.open.replace(/^\/admin\/?/, "").split("?")[0].replace(/-/g, " ") || "overview"} <ChevronRight className="size-3.5" aria-hidden="true" />
                   </button>
                 )}
                 {(t.proposals?.filter((p) => p.state === "idle" || p.state === "error").length ?? 0) >= 2 && (
-                  <Button size="sm" onClick={() => void confirmAll(ti)} disabled={t.proposals?.some((p) => p.state === "busy")}>
+                  <button type="button" onClick={() => void confirmAll(ti)} disabled={t.proposals?.some((p) => p.state === "busy")} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-violet-950/40 transition hover:brightness-110 disabled:opacity-50">
                     <Check className="size-3.5" aria-hidden="true" /> Confirm all {t.proposals?.filter((p) => p.state === "idle" || p.state === "error").length}
-                  </Button>
+                  </button>
                 )}
-                {t.proposals?.map((p, pi) => (
-                  <div key={pi} className="rounded-xl border border-border bg-background/70 p-3">
-                    <p className="flex items-start gap-2 text-sm">
-                      <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-                      <span>{p.summary}</span>
-                    </p>
-                    {p.state === "done" && <p className="mt-2 flex items-center gap-1 text-xs text-success"><Check className="size-3.5" aria-hidden="true" /> {p.result}</p>}
-                    {p.state === "error" && <p className="mt-2 text-xs text-destructive">{p.result}</p>}
-                    {p.state === "dismissed" && <p className="mt-2 text-xs text-muted-text">Skipped.</p>}
-                    {(p.state === "idle" || p.state === "busy" || p.state === "error") && (
-                      <div className="mt-2 flex gap-2">
-                        <Button size="sm" loading={p.state === "busy"} onClick={() => void confirm(ti, pi, p)}>
-                          <Check className="size-3.5" aria-hidden="true" /> Confirm
-                        </Button>
-                        <Button size="sm" variant="ghost" disabled={p.state === "busy"} onClick={() => setProposal(ti, pi, { state: "dismissed" })}>
-                          <X className="size-3.5" aria-hidden="true" /> Skip
-                        </Button>
+                {t.proposals?.map((p, pi) => {
+                  const Icon = ACTION_ICON[p.action] ?? Sparkles;
+                  return (
+                    <div key={pi} className={cx("rounded-2xl border p-3 transition", p.state === "done" ? "border-emerald-400/25 bg-emerald-500/[0.06]" : p.state === "dismissed" ? "border-white/[0.06] bg-transparent opacity-60" : p.state === "error" ? "border-rose-400/30 bg-rose-500/[0.06]" : "border-violet-400/25 bg-violet-500/[0.06]")}>
+                      <div className="flex items-start gap-2.5">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.07] text-violet-200"><Icon className="size-4" aria-hidden="true" /></span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">{p.state === "done" ? "Done" : p.state === "dismissed" ? "Skipped" : p.state === "error" ? "Didn't work" : "Needs your OK"}</p>
+                          <p className="text-sm leading-snug text-white/90">{p.summary}</p>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {p.state === "done" && <p className="mt-2 flex items-start gap-1.5 text-xs text-emerald-200"><Check className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" /> {p.result}</p>}
+                      {p.state === "error" && <p className="mt-2 text-xs text-rose-200">{p.result}</p>}
+                      {(p.state === "idle" || p.state === "busy" || p.state === "error") && (
+                        <div className="mt-3 flex gap-2">
+                          <button type="button" disabled={p.state === "busy"} onClick={() => void confirm(ti, pi, p)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-60">
+                            {p.state === "busy" ? <span className="size-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" /> : <Check className="size-3.5" aria-hidden="true" />} {p.state === "busy" ? "Working…" : p.state === "error" ? "Try again" : "Confirm"}
+                          </button>
+                          <button type="button" disabled={p.state === "busy"} onClick={() => setProposal(ti, pi, { state: "dismissed" })} className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-white/70 transition hover:bg-white/[0.06] disabled:opacity-40">
+                            <X className="size-3.5" aria-hidden="true" /> Skip
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          ))}
-          {busy && (
-            <div className="flex items-center gap-1 px-1" aria-label="The assistant is working">
-              <span className="support-dot" /><span className="support-dot" style={{ animationDelay: "0.15s" }} /><span className="support-dot" style={{ animationDelay: "0.3s" }} />
+          ),
+        )}
+        {busy && (
+          <div className="flex items-center gap-2.5" aria-label="The assistant is working">
+            <Orb size="sm" />
+            <div className="flex items-center gap-2 rounded-2xl rounded-tl-md border border-white/[0.07] bg-white/[0.04] px-3.5 py-2.5 text-xs text-white/60">
+              <span className="flex gap-1"><span className="support-dot" /><span className="support-dot" style={{ animationDelay: "0.15s" }} /><span className="support-dot" style={{ animationDelay: "0.3s" }} /></span>
+              Working on it
             </div>
-          )}
-          {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-          <div ref={end} />
-        </div>
-        <form
-          className="flex items-end gap-2 border-t border-border p-3"
-          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
-          onSubmit={(e) => {
-            e.preventDefault();
-            void ask(input);
-          }}
-        >
+          </div>
+        )}
+        {error && <p role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-3.5 py-2.5 text-sm text-rose-200">{error}</p>}
+        <div ref={end} />
+      </div>
+
+      {/* Composer */}
+      <form
+        className="border-t border-white/[0.07] p-3"
+        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void ask(input);
+        }}
+      >
+        <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-1.5 pl-3.5 transition focus-within:border-violet-400/60 focus-within:bg-white/[0.06] focus-within:shadow-[0_0_0_4px_rgba(139,92,246,0.15)]">
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -277,19 +367,21 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
             rows={1}
             maxLength={2000}
             aria-label="Ask the assistant"
-            placeholder="Ask or tell me what to do…"
-            className="max-h-32 min-h-[42px] flex-1 resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-base sm:text-sm"
+            placeholder={boss ? `Ask anything, ${boss.name}…` : "Ask or tell me what to do…"}
+            className="max-h-36 min-h-10 flex-1 resize-none bg-transparent py-2.5 text-base leading-5 text-white outline-none placeholder:text-white/35 sm:text-sm"
           />
           <button
             type="submit"
             disabled={busy || !input.trim()}
             aria-label="Send"
-            className="flex size-[42px] shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white disabled:opacity-40"
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white shadow-lg shadow-violet-950/50 transition hover:brightness-110 disabled:opacity-30 disabled:shadow-none"
           >
-            <Send className="size-4" aria-hidden="true" />
+            <ArrowUp className="size-4" aria-hidden="true" />
           </button>
-        </form>
-        </>)}
-      </div>
+        </div>
+        <p className="mt-1.5 px-1 text-center text-[10px] text-white/30">Enter to send · Shift+Enter for a new line · Nothing changes until you confirm</p>
+      </form>
+      </>)}
+    </div>
   );
 }
