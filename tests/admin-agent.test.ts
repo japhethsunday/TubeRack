@@ -156,3 +156,18 @@ describe("assistant promo clean-up and channel", () => {
     assert.equal(TOOLS.youtube_channel.args.safeParse({ days: 400 }).success, false);
   });
 });
+
+describe("assistant email series", () => {
+  it("schedules 1-7 emails, one a day from tomorrow at 07:00 UTC by default", async () => {
+    const { prepare, seriesDate } = await import("@/src/server/admin-agent/actions");
+    const emails = [1, 2, 3, 4, 5].map((n) => ({ subject: `Tip number ${n}`, message: `A genuinely useful creator tip, number ${n}.` }));
+    const p = prepare("schedule_email_series", { emails });
+    assert.equal(p?.args.startInDays, 1);
+    assert.equal(p?.args.everyDays, 1);
+    assert.equal(p?.args.from, "founder");
+    assert.match(p!.summary, /Schedule 5 emails from founder@recktube\.xyz/);
+    assert.equal(prepare("schedule_email_series", { emails: [...emails, ...emails] }), null);
+    const d = seriesDate(2, new Date(Date.UTC(2026, 8, 30, 21, 0)));
+    assert.equal(d.toISOString(), "2026-10-02T07:00:00.000Z");
+  });
+});

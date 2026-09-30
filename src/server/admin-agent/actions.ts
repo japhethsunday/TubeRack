@@ -73,6 +73,32 @@ export const ACTIONS = {
     describe: (a: { subject: string; message: string; from: string; audience: string }) =>
       `Email ${AUDIENCES.find((x) => x.key === a.audience)?.label.toLowerCase() ?? a.audience} from ${a.from}@recktube.xyz: “${a.subject}” — ${a.message.slice(0, 200)}${a.message.length > 200 ? "…" : ""} (branded design, unsubscribe link; people who unsubscribed are skipped)`,
   },
+  schedule_email_series: {
+    permission: "campaigns.send",
+    args: z.object({
+      emails: z.array(z.object({ subject: z.string().trim().min(3).max(140), message: z.string().trim().min(10).max(2500) })).min(1).max(7),
+      from: z.enum(["support", "founder", "owner"]).default("founder"),
+      audience: z.enum(AUDIENCES.map((x) => x.key) as [AudienceKey, ...AudienceKey[]]).default("all_users"),
+      startInDays: z.number().int().min(0).max(14).default(1),
+      everyDays: z.number().int().min(1).max(7).default(1),
+    }),
+    describe: (a: { emails: { subject: string }[]; from: string; audience: string; startInDays: number; everyDays: number }) => {
+      const dates = a.emails.map((_, i) => seriesDate(a.startInDays + i * a.everyDays));
+      const fmt = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+      return `Schedule ${a.emails.length} email${a.emails.length === 1 ? "" : "s"} from ${a.from}@recktube.xyz to ${AUDIENCES.find((x) => x.key === a.audience)?.label.toLowerCase() ?? a.audience}, ${a.everyDays === 1 ? "one a day" : `every ${a.everyDays} days`}, ${fmt(dates[0])} → ${fmt(dates[dates.length - 1])} (sent ~7:00 UTC):\n${a.emails.map((e, i) => `${i + 1}. ${fmt(dates[i])} — “${e.subject}”`).join("\n")}`;
+    },
+  },
+  set_promo_autopilot: {
+    permission: "promo.write",
+    args: z.object({ enabled: z.boolean(), perDay: z.number().int().min(1).max(5).default(1) }),
+    describe: (a: { enabled: boolean; perDay: number }) =>
+      a.enabled ? `Turn on Promo autopilot: ${a.perDay} new video${a.perDay === 1 ? "" : "s"} written every morning, emailed to you to make and post.` : "Turn off Promo autopilot.",
+  },
+  cancel_scheduled_emails: {
+    permission: "campaigns.send",
+    args: z.object({}),
+    describe: () => "Cancel every email campaign that is scheduled but not sent yet.",
+  },
   reply_support: {
     permission: "support.act",
     args: z.object({
@@ -133,6 +159,13 @@ export const ACTIONS = {
 } as const;
 
 export type ActionName = keyof typeof ACTIONS;
+
+/** Scheduled campaigns go out with the daily job at 07:00 UTC: day N at that time. */
+export function seriesDate(days: number, now = new Date()): Date {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 7, 0, 0));
+  d.setUTCDate(d.getUTCDate() + days);
+  return days === 0 ? now : d;
+}
 export const isActionName = (s: string): s is ActionName => Object.prototype.hasOwnProperty.call(ACTIONS, s);
 
 /** Validate a proposal and write its human summary from the arguments (never from model text). */
@@ -235,6 +268,33 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       const r = await runCampaign(String(c.id), 40_000);
       await log({ campaign: String(c.id), audience, from: a.from, reach });
       return `Sending to ${reach} people: ${r.sent} sent now${r.failed ? `, ${r.failed} failed` : ""}${r.remaining ? `, ${r.remaining} more going out shortly` : ""}. Track it under Campaigns.`;
+    }
+    case "schedule_email_series": {
+      const emails = a.emails as unknown as { subject: string; message: string }[];
+      const series = `Series ${new Date().toISOString().slice(0, 10)}`;
+      let first: string | null = null;
+      for (const [i, e] of emails.entries()) {
+        const when = seriesDate(Number(a.startInDays) + i * Number(a.everyDays));
+        const content = { ...EMPTY_CONTENT, preheader: e.message.slice(0, 110), heading: e.subject, body: e.message, from: a.from };
+        const [c] = await adminDb()`
+          INSERT INTO campaigns (name, subject, audience, content, created_by, status, scheduled_at)
+          VALUES (${`${series} · ${i + 1}/${emails.length}: ${e.subject.slice(0, 50)}`}, ${e.subject}, ${a.audience}, ${JSON.stringify(content)}, ${admin.id}, 'scheduled', ${when}) RETURNING id`;
+        if (i === 0) first = String(c.id);
+      }
+      // Starting today: send the first one straight away.
+      if (Number(a.startInDays) === 0 && first) await runCampaign(first, 40_000);
+      await log({ count: emails.length, audience: a.audience, from: a.from, startInDays: a.startInDays, everyDays: a.everyDays });
+      return `Scheduled ${emails.length} email${emails.length === 1 ? "" : "s"}${Number(a.startInDays) === 0 ? " (the first is going out now)" : ""}. See them under Campaigns; say "cancel scheduled emails" to stop them.`;
+    }
+    case "set_promo_autopilot": {
+      await putSetting("promo_autopilot", { enabled: Boolean(a.enabled), perDay: Number(a.perDay) }, admin.id);
+      await log({ enabled: a.enabled, perDay: a.perDay });
+      return a.enabled ? `Autopilot is on: ${a.perDay} a day, starting tomorrow morning.` : "Autopilot is off.";
+    }
+    case "cancel_scheduled_emails": {
+      const rows = await adminDb()`UPDATE campaigns SET status = 'draft', scheduled_at = null, updated_at = now() WHERE status = 'scheduled' RETURNING id`;
+      await log({ cancelled: rows.length });
+      return rows.length ? `Cancelled ${rows.length} scheduled email${rows.length === 1 ? "" : "s"} (kept as drafts under Campaigns).` : "Nothing was scheduled.";
     }
     case "reply_support": {
       const db = adminDb();

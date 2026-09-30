@@ -76,6 +76,7 @@ const LOOKUP_LABEL: Record<string, string> = {
   safety_flags: "safety flags",
   tool_switches: "tool switches",
   youtube_channel: "YouTube channel",
+  scheduled_emails: "scheduled emails",
   promo_videos: "promo videos",
 };
 
@@ -308,7 +309,7 @@ export function AssistantChat({ turns, setTurns, compact }: { turns: Turn[]; set
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.07] text-violet-200"><Icon className="size-4" aria-hidden="true" /></span>
                         <div className="min-w-0 flex-1">
                           <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">{p.state === "done" ? "Done" : p.state === "dismissed" ? "Skipped" : p.state === "error" ? "Didn't work" : "Needs your OK"}</p>
-                          <p className="text-sm leading-snug text-white/90">{p.summary}</p>
+                          <p className="whitespace-pre-line text-sm leading-snug text-white/90">{p.summary}</p>
                         </div>
                       </div>
                       {p.state === "done" && <p className="mt-2 flex items-start gap-1.5 text-xs text-emerald-200"><Check className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" /> {p.result}</p>}

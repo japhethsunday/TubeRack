@@ -155,6 +155,15 @@ export const TOOLS = {
       }
     },
   },
+  scheduled_emails: {
+    permission: "campaigns.list",
+    about: "Email campaigns scheduled or sending: subject, audience, when, status.",
+    args: z.object({}),
+    run: async () => {
+      const rows = await adminDb()`SELECT subject, audience, status, scheduled_at FROM campaigns WHERE status IN ('scheduled', 'sending') ORDER BY scheduled_at NULLS FIRST LIMIT 20`;
+      return { campaigns: rows.map((r) => ({ subject: String(r.subject), audience: String(r.audience), status: String(r.status), when: r.scheduled_at ? new Date(String(r.scheduled_at)).toISOString().slice(0, 16) : null })) };
+    },
+  },
   growth_report: {
     permission: "growth.view",
     about: "Where sign-ups came from in the last N days (1–90): sources/campaigns, referrals, affiliates.",
