@@ -45,6 +45,8 @@ export function MobileHome() {
         <h1 className="text-2xl font-bold tracking-tight">{first || "Creator"} 👋</h1>
       </header>
 
+      <IdeaStarter />
+
       {mostRecent ? (
         <Link
           href={`/projects/${mostRecent.id}`}
@@ -68,16 +70,11 @@ export function MobileHome() {
           </div>
         </Link>
       ) : (
-        <div className="rounded-3xl bg-gradient-to-br from-fuchsia-600 via-violet-700 to-indigo-800 p-5 text-white shadow-xl shadow-violet-900/30">
-          <h2 className="text-lg font-semibold">Make your first video</h2>
-          <p className="mt-1 text-sm text-white/80">Start a project: idea, script, voice and visuals in one place.</p>
-          <div className="mt-4 [&_button]:w-full [&_button]:justify-center [&_button]:rounded-full [&_button]:bg-white [&_button]:text-violet-700">
-            <NewProjectButton label="Start a project" />
-          </div>
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
+          <p className="text-sm text-muted-text">Prefer to start from scratch?</p>
+          <NewProjectButton label="Blank project" />
         </div>
       )}
-
-      <IdeaStarter />
 
       <section aria-labelledby="m-create">
         <h2 id="m-create" className="mb-3 text-base font-semibold">Create</h2>

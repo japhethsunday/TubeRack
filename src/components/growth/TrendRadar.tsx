@@ -140,8 +140,8 @@ export function TrendRadar() {
         <div className="flex items-end">
           <Button type="submit" loading={busy}><Plus className="size-4" aria-hidden="true" /> Watch</Button>
         </div>
-        <label className="flex items-center gap-2 text-sm sm:col-span-3">
-          <input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} /> Email me a morning digest for this topic
+        <label className="py-1.5 flex items-center gap-2 text-sm sm:col-span-3">
+          <input type="checkbox" className="size-4 accent-violet-600" checked={email} onChange={(e) => setEmail(e.target.checked)} /> Email me a morning digest for this topic
         </label>
       </form>
       <p className="text-xs text-muted-text">Each scan pulls the most-viewed uploads of the last 7 days and ranks them by views per hour since upload. Watched topics are re-scanned every morning (up to 5 topics, ~102 YouTube units each).</p>

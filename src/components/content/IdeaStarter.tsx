@@ -2,16 +2,19 @@
 
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, MonitorPlay, Smartphone, Sparkles, Wand2 } from "lucide-react";
 import { useProjects } from "@/src/components/projects/ProjectsProvider";
 import { useIntel } from "@/src/components/intelligence/IntelProvider";
 import { emptyStrategyBrief } from "@/src/lib/intelligence/profiles";
 import { cx } from "@/src/components/ui/cx";
 
+const MAX = 1500;
+
 const EXAMPLES = [
-  "A 30-second Short: 3 morning habits that make you more productive. Calm voice, end with a question.",
-  "Explain how compound interest works for teenagers, with a simple example and a strong hook.",
-  "Top 5 hidden places to visit in Lagos, upbeat and fast-paced.",
+  { label: "Morning habits", text: "A 30-second Short: 3 morning habits that make you more productive. Calm voice, end with a question." },
+  { label: "Money tips", text: "3 simple ways students can save money every month. Friendly tone, practical examples, end with a question." },
+  { label: "Travel guide", text: "Top 5 hidden places to visit in Lagos. Upbeat and fast-paced, a quick fact for each place." },
+  { label: "Explain a topic", text: "Explain how compound interest works for teenagers, with one simple example and a strong hook." },
 ];
 
 /** Title from the first sentence of the idea, kept short. */
@@ -27,7 +30,7 @@ function titleFrom(text: string): string {
  * make a project from it, the script writer completes it, then the video is
  * generated. Same path as a Content Creator idea.
  */
-export function IdeaStarter({ className, dark = false }: { className?: string; dark?: boolean }) {
+export function IdeaStarter({ className }: { className?: string }) {
   const router = useRouter();
   const projects = useProjects();
   const intel = useIntel();
@@ -63,38 +66,75 @@ export function IdeaStarter({ className, dark = false }: { className?: string; d
   }
 
   return (
-    <section aria-labelledby={`${uid}-h`} className={cx("rounded-2xl border p-4 sm:p-5", dark ? "border-white/15 bg-white/10 text-white" : "border-primary/30 bg-surface", className)}>
-      <h2 id={`${uid}-h`} className="flex items-center gap-2 text-base font-semibold">
-        <Sparkles className={cx("size-4", dark ? "text-white" : "text-primary")} aria-hidden="true" /> Make a video from your idea
-      </h2>
-      <p className={cx("mt-1 text-sm", dark ? "text-white/80" : "text-muted-text")}>Type a few lines about the video you want. The AI writes the full script, then makes the video with voice, visuals, music and captions.</p>
-      <label className="sr-only" htmlFor={`${uid}-t`}>Your video idea</label>
-      <textarea
-        id={`${uid}-t`}
-        value={text}
-        onChange={(e) => setText(e.target.value.slice(0, 1500))}
-        rows={3}
-        placeholder={`e.g. ${EXAMPLES[0]}`}
-        className={cx("mt-3 w-full resize-y rounded-xl border px-3.5 py-2.5 text-base outline-none transition focus:border-primary sm:text-sm", dark ? "border-white/20 bg-black/20 text-white placeholder:text-white/50" : "border-border bg-background placeholder:text-muted-text")}
-      />
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {EXAMPLES.slice(1).map((e) => (
-          <button key={e} type="button" onClick={() => setText(e)} className={cx("rounded-full border px-2.5 py-1 text-left text-xs transition", dark ? "border-white/20 text-white/80 hover:bg-white/10" : "border-border text-muted-text hover:bg-muted hover:text-foreground")}>
-            {e.length > 48 ? `${e.slice(0, 46)}…` : e}
-          </button>
-        ))}
-      </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <div role="radiogroup" aria-label="Video length" className={cx("inline-flex rounded-full border p-0.5 text-xs font-medium", dark ? "border-white/20" : "border-border")}>
-          {(["Short", "Long"] as const).map((f) => (
-            <button key={f} type="button" role="radio" aria-checked={format === f} onClick={() => setFormat(f)} className={cx("rounded-full px-3 py-1.5 transition", format === f ? (dark ? "bg-white text-violet-700" : "bg-primary text-primary-foreground") : dark ? "text-white/80" : "text-muted-text")}>
-              {f === "Short" ? "Short (vertical)" : "Long video"}
-            </button>
-          ))}
+    <section aria-labelledby={`${uid}-h`} className={cx("rounded-[1.4rem] bg-gradient-to-br from-fuchsia-500/60 via-violet-500/50 to-sky-500/60 p-px shadow-lg shadow-violet-900/10", className)}>
+      <div className="rounded-[calc(1.4rem-1px)] bg-surface p-4 sm:p-6">
+        <div className="flex items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-600 text-white shadow-md shadow-violet-900/20">
+            <Wand2 className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <h2 id={`${uid}-h`} className="text-base font-semibold tracking-tight sm:text-lg">Make a video from your idea</h2>
+            <p className="mt-0.5 text-[13px] leading-snug text-muted-text sm:text-sm">Describe it in a few lines. We write the script and make the video.</p>
+          </div>
         </div>
-        <button type="button" onClick={start} disabled={!ok} className={cx("inline-flex h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold transition disabled:opacity-50", dark ? "bg-white text-violet-700" : "bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 text-white hover:brightness-110")}>
-          Write &amp; make my video <ArrowRight className="size-4" aria-hidden="true" />
-        </button>
+
+        <div className="mt-4 rounded-2xl border border-border bg-background/70 transition focus-within:border-violet-400/70 focus-within:shadow-[0_0_0_4px_rgba(139,92,246,0.12)]">
+          <label className="sr-only" htmlFor={`${uid}-t`}>Your video idea</label>
+          <textarea
+            id={`${uid}-t`}
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value.slice(0, MAX));
+              e.target.style.height = "auto";
+              e.target.style.height = `${Math.min(e.target.scrollHeight, 220)}px`;
+            }}
+            rows={3}
+            enterKeyHint="go"
+            placeholder="What's your video about? e.g. 3 morning habits that make you more productive. Calm voice, end with a question."
+            style={{ outline: "none", boxShadow: "none" }}
+            className="block min-h-[96px] w-full resize-none border-0 bg-transparent px-4 pt-3.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-text/80 sm:text-[15px]"
+          />
+          <div className="flex items-center justify-between gap-2 border-t border-border/70 px-2 py-2">
+            <div role="radiogroup" aria-label="Video format" className="inline-flex rounded-xl bg-muted/70 p-0.5 text-xs font-medium">
+              {([["Short", "Short", Smartphone], ["Long", "Long video", MonitorPlay]] as const).map(([f, label, Icon]) => (
+                <button key={f} type="button" role="radio" aria-checked={format === f} onClick={() => setFormat(f)} className={cx("inline-flex items-center gap-1.5 rounded-[10px] px-3 py-1.5 transition", format === f ? "bg-surface text-foreground shadow-sm" : "text-muted-text hover:text-foreground")}>
+                  <Icon className="size-3.5" aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className={cx("pr-2 text-[11px] tabular-nums", text.length > MAX - 100 ? "text-amber-600" : "text-muted-text/70")} aria-live="polite">
+              {text.length ? `${text.length}/${MAX}` : ""}
+            </span>
+          </div>
+        </div>
+
+        {!text && (
+          <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden">
+            <span className="shrink-0 self-center text-xs font-medium text-muted-text">Try:</span>
+            {EXAMPLES.map((e) => (
+              <button key={e.label} type="button" onClick={() => setText(e.text)} className="shrink-0 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground/80 transition hover:border-violet-400/50 hover:bg-violet-500/5 hover:text-foreground">
+                {e.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex flex-wrap items-center justify-center gap-x-1.5 text-[11px] text-muted-text sm:justify-start">
+            {["Script", "Voice", "Visuals", "Music", "Captions"].map((step, i) => (
+              <span key={step} className="inline-flex items-center gap-1.5">
+                {i > 0 && <span aria-hidden="true" className="text-muted-text/50">·</span>}
+                {step}
+              </span>
+            ))}
+          </p>
+          <button type="button" onClick={start} disabled={!ok} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-sky-600 px-6 text-[15px] font-semibold text-white shadow-lg shadow-violet-900/20 transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none sm:h-11 sm:w-auto sm:rounded-xl sm:text-sm">
+            <Sparkles className="size-4" aria-hidden="true" />
+            Write &amp; make my video
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </section>
   );
