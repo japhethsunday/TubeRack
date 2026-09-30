@@ -12,6 +12,7 @@ const body = z.object({
   voice: z.string().trim().max(40).optional(),
   engine: z.string().trim().max(60).optional(),
   strict: z.boolean().optional(),
+  style: z.enum(["natural", "energetic", "calm", "storyteller", "documentary"]).optional(),
 });
 
 /** POST /api/v1/ai/speech — synthesize narration with Gemini TTS (editor+). Returns a stored-file URL for the WAV. */

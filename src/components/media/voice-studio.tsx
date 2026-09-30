@@ -7,6 +7,7 @@ import { listSystemVoices, speakText } from "@/src/lib/media/audio";
 import { useMedia, runLocalJob, MediaStorageNote } from "@/src/components/media/MediaProvider";
 import { SpeechPreview, FilePreview } from "@/src/components/media/players";
 import { synthesizeProviderSpeech } from "@/src/lib/ai-client";
+import { NARRATOR_VOICES, readVoicePrefs, saveVoicePrefs, VOICE_STYLE_OPTIONS, type VoiceStyleId } from "@/src/lib/voice-prefs";
 import { Select, Input, Textarea } from "@/src/components/ui/fields";
 import { Button } from "@/src/components/ui/Button";
 import { Alert } from "@/src/components/ui/Alert";
@@ -48,7 +49,8 @@ export function VoiceStudio({
   const [rate, setRate] = useState(1);
   const [pitch, setPitch] = useState(1);
   const [systemVoice, setSystemVoice] = useState("");
-  const [providerVoice, setProviderVoice] = useState("");
+  const [providerVoice, setProviderVoice] = useState(() => (typeof window === "undefined" ? "" : readVoicePrefs().voice ?? ""));
+  const [voiceStyle, setVoiceStyle] = useState<VoiceStyleId>(() => (typeof window === "undefined" ? "natural" : readVoicePrefs().style));
   const [makeDefault, setMakeDefault] = useState(true);
   const [sourceId, setSourceId] = useState(initialSourceId && (initialSourceId === "custom" || sources.some((s) => s.id === initialSourceId)) ? initialSourceId : (sources[0]?.id ?? "custom"));
   const [customText, setCustomText] = useState("");
@@ -104,7 +106,7 @@ export function VoiceStudio({
     setProfileId(saved.id);
   }
 
-  const providerVoiceName = GEMINI_VOICES.includes(providerVoice) ? providerVoice : "Kore";
+  const providerVoiceName = GEMINI_VOICES.includes(providerVoice) ? providerVoice : DEFAULT_NARRATOR;
 
   /**
    * Generated narration: real audio stored server-side and saved as a take.
@@ -286,11 +288,39 @@ export function VoiceStudio({
               <span className="w-8 text-xs tabular-nums">{pitch.toFixed(2)}</span>
             </label>
           </div>
-          <Select label="Voice" value={GEMINI_VOICES.includes(providerVoice) ? providerVoice : "Kore"} onChange={(e) => setProviderVoice(e.target.value)} hint="Used for generated narration.">
-            {GEMINI_VOICES.map((v) => (
-              <option key={v}>{v}</option>
-            ))}
-          </Select>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Select
+              label="Narrator voice"
+              value={providerVoiceName}
+              onChange={(e) => {
+                setProviderVoice(e.target.value);
+                saveVoicePrefs({ voice: e.target.value });
+              }}
+              hint="Used for all generated narration, including full videos."
+            >
+              {NARRATOR_VOICES.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.id} · {v.sound}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="Speaking style"
+              value={voiceStyle}
+              onChange={(e) => {
+                const style = e.target.value as VoiceStyleId;
+                setVoiceStyle(style);
+                saveVoicePrefs({ style });
+              }}
+              hint={VOICE_STYLE_OPTIONS.find((o) => o.id === voiceStyle)?.hint}
+            >
+              {VOICE_STYLE_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={saveProfile}>
               <Plus className="size-4" aria-hidden="true" />
@@ -396,7 +426,9 @@ export function VoiceStudio({
   );
 }
 
-const GEMINI_VOICES = ["Kore", "Puck", "Charon", "Fenrir", "Aoede", "Leda", "Orus", "Zephyr"];
+const GEMINI_VOICES = NARRATOR_VOICES.map((v) => v.id);
+/** Kept as the default so existing projects keep the narrator they started with. */
+const DEFAULT_NARRATOR = "Kore";
 
 interface TakePayload {
   text: string;

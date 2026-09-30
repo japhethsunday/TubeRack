@@ -478,17 +478,50 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number
   return results;
 }
 
+/** How the narrator should sound. Every style asks for a real, human delivery. */
+export const VOICE_STYLES = {
+  natural: "a real person talking to camera: relaxed, warm and conversational, like explaining something to a friend",
+  energetic: "an upbeat YouTuber: lively and enthusiastic, with punchy emphasis, but still natural and never shouting",
+  calm: "a calm, reassuring narrator: gentle, unhurried and warm",
+  storyteller: "a gripping storyteller: expressive, building suspense, slowing down on the important moments",
+  documentary: "a confident documentary narrator: clear, grounded and authoritative, but human",
+} as const;
+export type VoiceStyle = keyof typeof VOICE_STYLES;
+
+/** Direction for the voice model. Gemini's speech models follow a spoken-style instruction before the text. */
+export function directSpeech(text: string, style: VoiceStyle = "natural"): string {
+  return `Read the following aloud as ${VOICE_STYLES[style] ?? VOICE_STYLES.natural}. Sound like a real human, not an AI or an announcer: natural pace, small pauses at commas and full stops, varied pitch, and stress the words that matter. Only say the text after the colon:\n${text}`;
+}
+
+/**
+ * Narration text as a person would say it: no emoji, markdown symbols,
+ * hashtags, bracketed stage notes or links, which make a voice sound read-out.
+ */
+export function speakable(text: string): string {
+  return text
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\[(?:[^\]]{0,60})\]|\((?:pause|beat|music|sfx|cut|b-roll|broll|on screen|onscreen|scene)[^)]{0,60}\)/gi, " ")
+    .replace(/[*_#`~>|]+/g, " ")
+    .replace(/\p{Extended_Pictographic}|\u200d|\ufe0f/gu, "")
+    .replace(/\s*[—–]\s*/g, ", ")
+    .replace(/\.{3,}/g, "…")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export class GeminiTtsProvider implements TtsProvider {
   readonly capability = "tts" as const;
   readonly name = "gemini";
 
   /** One TTS call; returns raw 16-bit mono PCM and its sample rate. */
-  private async synthesizeChunk(text: string, voice: string, model: string): Promise<{ pcm: Buffer; rate: number }> {
+  private async synthesizeChunk(text: string, voice: string, model: string, style: VoiceStyle = "natural"): Promise<{ pcm: Buffer; rate: number }> {
     const ai = getGeminiClient();
     const response = await withModelFallback(model, FALLBACK_MODELS.tts, (m) =>
       ai.models.generateContent({
         model: m,
-        contents: text,
+        contents: directSpeech(text, style),
         config: {
           responseModalities: ["AUDIO"],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
@@ -516,8 +549,11 @@ export class GeminiTtsProvider implements TtsProvider {
     engine?: string;
     /** Only use `engine` (no fallback to another voice service). */
     strict?: boolean;
+    /** Delivery style for voices that take direction. */
+    style?: VoiceStyle;
   }): Promise<{ audioBase64: string; mimeType: string; model: string; durationSec: number }> {
-    const text = request.text.trim();
+    const style: VoiceStyle = request.style && request.style in VOICE_STYLES ? request.style : "natural";
+    const text = speakable(request.text) || request.text.trim();
     if (!text) throw new Error("Speech synthesis failed: text cannot be empty.");
     if (text.length > TTS_MAX_CHARS) throw new Error(`Speech synthesis failed: text exceeds ${TTS_MAX_CHARS} characters.`);
     const env = getServerEnv();
@@ -539,7 +575,7 @@ export class GeminiTtsProvider implements TtsProvider {
       model: "google-cloud-tts",
     });
     const routes: { name: string; run: () => Promise<{ parts: { pcm: Buffer; rate: number }[]; model: string }> }[] = [];
-    if (isGeminiConfigured(env)) routes.push({ name: "gemini", run: async () => ({ parts: (await mapLimit(chunks, 4, (chunk) => completeSpeech(chunk, (t) => this.synthesizeChunk(t, voice, model)))).flat(), model }) });
+    if (isGeminiConfigured(env)) routes.push({ name: "gemini", run: async () => ({ parts: (await mapLimit(chunks, 4, (chunk) => completeSpeech(chunk, (t) => this.synthesizeChunk(t, voice, model, style)))).flat(), model }) });
     if (cloudTts) routes.push({ name: "cloud-tts", run: viaCloud });
     if (mistral) routes.push({ name: "voxtral", run: viaMistral });
     // Self-hosted Piper: no quota, the voice of last resort.
@@ -683,6 +719,7 @@ export async function writeScriptSections(req: ScriptWriteRequest): Promise<{ te
     `Brief (JSON): ${JSON.stringify(brief).slice(0, 6000)}`,
     `Sections, in order:\n${outline}`,
     `Aim for about ${perSection} words per section (~${req.targetWords} words total). Write natural spoken language for the stated tone and audience.`,
+    "It will be read aloud, so write the way a real creator talks on camera, not the way an article reads: contractions (you're, it's, don't), short sentences mixed with longer ones, direct \"you\", everyday words, the odd rhetorical question. No headings, lists, emoji, hashtags or stage directions inside the narration, and no stiff phrases like \"In today's video\", \"delve\", \"moreover\" or \"in conclusion\".",
     "If an approved hook is given, use it (lightly polished) as the hook section.",
     "Never invent statistics, studies, quotes, or view counts; where a fact is needed, write [FACT CHECK: what to verify].",
     `Respond ONLY with JSON: {"sections": ["text for section 1", ...]} containing exactly ${req.sections.length} strings.`,
