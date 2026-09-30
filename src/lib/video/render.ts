@@ -193,15 +193,37 @@ export async function renderComposition(o: RenderOptions): Promise<RenderResult>
     o = { ...o, width: Math.round((o.width * k) / 2) * 2, height: Math.round((o.height * k) / 2) * 2 };
   }
   // Fast path first: frame-by-frame hardware encoding, faster than real time.
+  const started = performance.now();
+  const length = Math.max(0.1, Math.min(o.duration, o.range?.to ?? o.duration) - Math.max(0, o.range?.from ?? 0));
+  let why = "not supported by this browser";
   try {
     const { renderFast } = await import("@/src/lib/video/render-fast");
     const fast = await renderFast(o);
-    if (fast) return fast;
+    if (fast) {
+      reportExport("fast", started, length, "");
+      return fast;
+    }
   } catch (error) {
     if (o.signal?.aborted || (error instanceof RenderError && /cancel/i.test(error.message))) throw error;
-    console.error("fast export failed, recording in real time:", error instanceof Error ? error.message : error);
+    why = error instanceof Error ? error.message : String(error);
+    console.error("fast export failed, recording in real time:", why);
   }
-  return renderRealtime(o);
+  const slow = await renderRealtime(o);
+  reportExport("realtime", started, length, why);
+  return slow;
+}
+
+/** One line in the server log per export: which path, how long, and why it fell back. */
+function reportExport(path: "fast" | "realtime", started: number, lengthSec: number, why: string) {
+  try {
+    const secs = (performance.now() - started) / 1000;
+    const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) ? "mobile" : "desktop";
+    const browser = /Edg\//.test(navigator.userAgent) ? "Edge" : /Chrome\//.test(navigator.userAgent) ? "Chrome" : /Safari\//.test(navigator.userAgent) ? "Safari" : /Firefox\//.test(navigator.userAgent) ? "Firefox" : "other";
+    const message = `export ${path} ${mobile} ${browser}: ${lengthSec.toFixed(0)}s video in ${secs.toFixed(0)}s (${(lengthSec / Math.max(0.1, secs)).toFixed(1)}x)${why ? ` | fell back: ${why}` : ""}`;
+    void fetch("/api/v1/client-errors", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: message.slice(0, 500), path: "/export" }), keepalive: true }).catch(() => undefined);
+  } catch {
+    // reporting must never affect the export
+  }
 }
 
 /** Real-time fallback: plays the timeline and records it (takes about as long as the range). */

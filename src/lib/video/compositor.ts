@@ -11,7 +11,7 @@ import { normalizeTransition } from "@/src/lib/video/presets";
  * Layering: tracks draw in list order (later tracks on top), captions last.
  */
 
-export type VisualSource = HTMLImageElement | HTMLVideoElement | HTMLCanvasElement | ImageBitmap;
+export type VisualSource = HTMLImageElement | HTMLVideoElement | HTMLCanvasElement | OffscreenCanvas | ImageBitmap;
 
 export interface DrawOptions {
   /** Resolves a clip's decoded visual (image/video element) or null. */
@@ -327,13 +327,40 @@ export function defaultFit(clip: Pick<TimelineClip, "fit" | "kind">, draft = fal
 /** Background mode "blur": the frame behind media is a blurred, dimmed copy of it (CapCut-style). */
 export const BLUR_BACKGROUND = "blur";
 
+/** Backdrop is blurred at 1/BACKDROP_DOWNSCALE size: a blur this strong looks the same, at a fraction of the cost. */
+const BACKDROP_DOWNSCALE = 8;
+let backdropScratch: HTMLCanvasElement | null = null;
+
 /** Fill the frame with a blurred cover-scaled copy of the source. */
 function drawBlurBackdrop(ctx: CanvasRenderingContext2D, src: VisualSource, W: number, H: number) {
   const { w, h } = sourceSize(src);
   const k = Math.max(W / w, H / h) * 1.08;
+  const filter = (px: number) => `blur(${px}px) brightness(0.62) saturate(1.15)`;
+  if (typeof document === "undefined") {
+    ctx.save();
+    ctx.filter = filter(Math.round(W / 45));
+    ctx.drawImage(src, (W - w * k) / 2, (H - h * k) / 2, w * k, h * k);
+    ctx.restore();
+    return;
+  }
+  // Blurring a full-size frame every frame was most of the export time.
+  const sw = Math.max(1, Math.round(W / BACKDROP_DOWNSCALE));
+  const sh = Math.max(1, Math.round(H / BACKDROP_DOWNSCALE));
+  backdropScratch ??= document.createElement("canvas");
+  if (backdropScratch.width !== sw) backdropScratch.width = sw;
+  if (backdropScratch.height !== sh) backdropScratch.height = sh;
+  const x = backdropScratch.getContext("2d");
+  if (!x) return;
+  x.clearRect(0, 0, sw, sh);
+  x.filter = filter(Math.max(1, Math.round(W / 45 / BACKDROP_DOWNSCALE)));
+  const kk = k / BACKDROP_DOWNSCALE;
+  x.drawImage(src, (sw - w * kk) / 2, (sh - h * kk) / 2, w * kk, h * kk);
+  x.filter = "none";
   ctx.save();
-  ctx.filter = `blur(${Math.round(W / 45)}px) brightness(0.62) saturate(1.15)`;
-  ctx.drawImage(src, (W - w * k) / 2, (H - h * k) / 2, w * k, h * k);
+  // Plain bilinear upscaling: already blurred, so "high" quality only costs time.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "low";
+  ctx.drawImage(backdropScratch, 0, 0, W, H);
   ctx.restore();
 }
 

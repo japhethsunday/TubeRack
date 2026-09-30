@@ -1,6 +1,7 @@
 "use client";
 
 import { Muxer, ArrayBufferTarget } from "mp4-muxer";
+import { ALL_FORMATS, BlobSource, CanvasSink, Input, type WrappedCanvas } from "mediabunny";
 import type { TimelineClip } from "@/src/lib/video/types";
 import { drawComposition, sourceTime, type VisualSource } from "@/src/lib/video/compositor";
 import { mixGain, MUSIC_DUCK, trackVolume, voiceRanges } from "@/src/lib/video/mix";
@@ -64,9 +65,10 @@ async function mixAudio(o: RenderOptions, clips: TimelineClip[], from: number, s
   const ducks = voiceRanges(o.comp);
   const audible = clips.filter((c) => !c.muted && !muted.has(c.trackId) && (c.kind === "voice" || c.kind === "music" || c.kind === "sfx" || c.kind === "video"));
   let deviceVoices = 0;
-  for (const clip of audible) {
+  // Fetch and decode every sound file at once (they used to load one after another).
+  const load = async (clip: TimelineClip): Promise<{ buffer: AudioBuffer | null; bufferStart: number } | null> => {
     const a = o.assetFor(clip.assetId);
-    if (!a) continue;
+    if (!a) return null;
     const clipStart0 = Math.max(clip.startSec, from);
     const clipEnd0 = Math.min(clip.startSec + clip.durationSec, to);
     const speed0 = clip.speed ?? 1;
@@ -76,9 +78,9 @@ async function mixAudio(o: RenderOptions, clips: TimelineClip[], from: number, s
     let bufferStart = 0;
     try {
       if (clip.kind === "video") {
-        if (clip.reverse || clip.volume <= 0) continue;
+        if (clip.reverse || clip.volume <= 0) return null;
         const loaded = await untilDone(loadAudio(ctx, a, needFrom, needTo), o.signal, 90_000).catch(() => null);
-        if (!loaded) continue; // no sound track, or unreadable: nothing to mix
+        if (!loaded) return null; // no sound track, or unreadable: nothing to mix
         buffer = loaded.buffer;
         bufferStart = loaded.startSec;
       } else if (a.source === "provider-output" || a.source === "upload-session") {
@@ -96,8 +98,21 @@ async function mixAudio(o: RenderOptions, clips: TimelineClip[], from: number, s
       const why = error instanceof Error ? error.message : "";
       console.error(`export audio "${clip.name}" failed:`, why);
       warnings.push(`Audio “${clip.name}” couldn't be loaded and was left out${why ? ` (${why})` : ""}.`);
-      continue;
+      return null;
     }
+    return { buffer, bufferStart };
+  };
+  const loadedAll: ({ buffer: AudioBuffer | null; bufferStart: number } | null)[] = new Array(audible.length).fill(null);
+  let nextIndex = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(4, audible.length) }, async () => {
+      for (let k = nextIndex++; k < audible.length; k = nextIndex++) loadedAll[k] = await load(audible[k]);
+    }),
+  );
+  for (const [k, clip] of audible.entries()) {
+    const got = loadedAll[k];
+    let buffer = got?.buffer ?? null;
+    const bufferStart = got?.bufferStart ?? 0;
     if (!buffer) continue;
     if (clip.reverse) buffer = reversed(ctx, buffer);
     const clipStart = Math.max(clip.startSec, from);
@@ -138,6 +153,45 @@ async function mixAudio(o: RenderOptions, clips: TimelineClip[], from: number, s
     warnings.push(`${deviceVoices} voice clip(s) use your device's built-in voice, which can't be recorded. Generate those takes in the Voice studio to include them.`);
   }
   return ctx.startRendering();
+}
+
+/**
+ * A video clip decoded as one continuous stream of frames (WebCodecs), instead
+ * of seeking a <video> element for every frame, which is what made exports
+ * with video clips slow, above all on phones.
+ */
+interface StreamedClip {
+  input: Input;
+  frames: AsyncGenerator<WrappedCanvas | null, void, unknown>;
+  last: VisualSource | null;
+}
+
+const visibleAt = (clip: TimelineClip, t: number) => t >= clip.startSec && t < clip.startSec + clip.durationSec;
+
+async function openStream(url: string, clip: TimelineClip, from: number, fps: number, total: number, signal?: AbortSignal): Promise<StreamedClip | null> {
+  let input: Input | null = null;
+  try {
+    const blob = await (await fetch(url, { signal })).blob();
+    input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
+    const track = await input.getPrimaryVideoTrack();
+    if (!track || !(await track.canDecode())) {
+      input.dispose();
+      return null;
+    }
+    const first = await track.getFirstTimestamp();
+    const duration = (await track.computeDuration()) - first;
+    const sink = new CanvasSink(track, { poolSize: 2 });
+    function* times() {
+      for (let i = 0; i < total; i++) {
+        const t = from + i / fps;
+        if (visibleAt(clip, t)) yield first + sourceTime(clip, t, duration > 0 ? duration : undefined);
+      }
+    }
+    return { input, frames: sink.canvasesAtTimestamps(times()), last: null };
+  } catch {
+    input?.dispose();
+    return null;
+  }
 }
 
 function seek(el: HTMLVideoElement, time: number): Promise<void> {
@@ -189,7 +243,9 @@ async function verifyExport(blob: Blob, expectSec: number, expectSound: boolean)
       const buf = await blob.arrayBuffer();
       const ac = new OfflineAudioContext(1, 1, SAMPLE_RATE);
       const audio = await ac.decodeAudioData(buf).catch(() => null);
-      if (!audio) return "the sound track doesn't decode";
+      // Some browsers (e.g. Safari) can't decode audio out of an MP4 here; that says
+      // nothing about the file, so keep it instead of re-exporting in real time.
+      if (!audio) return null;
       const ch = audio.getChannelData(0);
       let peak = 0;
       for (let i = 0; i < ch.length; i += 97) peak = Math.max(peak, Math.abs(ch[i]));
@@ -224,6 +280,8 @@ export async function renderFast(o: RenderOptions): Promise<RenderResult | null>
   o.onProgress({ phase: "preparing", ratio: 0, message: "Loading media…" });
   const images = new Map<string, HTMLImageElement>();
   const videos = new Map<string, HTMLVideoElement>();
+  const streams = new Map<string, StreamedClip>();
+  const total = Math.max(1, Math.round(span * fps));
   const media = clips.filter((c) => c.kind === "image" || c.kind === "video");
   prefetchAudio(o, clips);
   let loaded = 0;
@@ -236,7 +294,11 @@ export async function renderFast(o: RenderOptions): Promise<RenderResult | null>
       if (url) {
         try {
           if (clip.kind === "image" && clip.assetId && !images.has(clip.assetId)) images.set(clip.assetId, await loadImage(url, o.signal));
-          if (clip.kind === "video") videos.set(clip.id, await loadVideo(url, true, o.signal));
+          if (clip.kind === "video") {
+            const stream = await openStream(url, clip, from, fps, total, o.signal);
+            if (stream) streams.set(clip.id, stream);
+            else videos.set(clip.id, await loadVideo(url, true, o.signal));
+          }
         } catch {
           if (o.signal?.aborted) throw new RenderError("Export cancelled.");
           warnings.push(`“${clip.name}” couldn't be loaded and was left out.`);
@@ -285,7 +347,6 @@ export async function renderFast(o: RenderOptions): Promise<RenderResult | null>
   canvas.height = H;
   const ctx = canvas.getContext("2d", { willReadFrequently: false });
   if (!ctx) throw new RenderError("Canvas unavailable.");
-  const total = Math.max(1, Math.round(span * fps));
   const frameUs = 1e6 / fps;
   const assetOf = (c: TimelineClip) => o.assetFor(c.assetId);
   try {
@@ -293,12 +354,19 @@ export async function renderFast(o: RenderOptions): Promise<RenderResult | null>
       if (o.signal?.aborted) throw new RenderError("Export cancelled.");
       if (failure) throw failure;
       const t = from + i / fps;
+      for (const [clipId, st] of streams) {
+        const clip = clips.find((c) => c.id === clipId)!;
+        if (!visibleAt(clip, t)) continue;
+        const next = await st.frames.next();
+        // A gap in the file keeps the previous picture rather than flashing black.
+        if (!next.done && next.value) st.last = next.value.canvas;
+      }
       for (const [clipId, el] of videos) {
         const clip = clips.find((c) => c.id === clipId)!;
-        if (t >= clip.startSec && t < clip.startSec + clip.durationSec) await seek(el, sourceTime(clip, t, Number.isFinite(el.duration) ? el.duration : undefined));
+        if (visibleAt(clip, t)) await seek(el, sourceTime(clip, t, Number.isFinite(el.duration) ? el.duration : undefined));
       }
       drawComposition(ctx, o.comp, t, W, H, {
-        sourceFor: (c) => (c.kind === "video" ? (videos.get(c.id) as VisualSource | undefined) ?? null : c.assetId ? images.get(c.assetId) ?? null : null),
+        sourceFor: (c) => (c.kind === "video" ? streams.get(c.id)?.last ?? (videos.get(c.id) as VisualSource | undefined) ?? null : c.assetId ? images.get(c.assetId) ?? null : null),
         isDraft: (c) => assetOf(c)?.source === "local-draft",
       });
       if (o.watermark) drawWatermark(ctx, W, H);
@@ -325,6 +393,10 @@ export async function renderFast(o: RenderOptions): Promise<RenderResult | null>
     for (const el of videos.values()) {
       el.removeAttribute("src");
       el.load();
+    }
+    for (const st of streams.values()) {
+      await st.frames.return(undefined).catch(() => undefined);
+      st.input.dispose();
     }
   }
   const blob = new Blob([muxer.target.buffer], { type: "video/mp4" });
