@@ -4,18 +4,20 @@
  * numbers that aren't true.
  */
 
+import { PLAYBOOK, type PlaybookEntry } from "@/src/content/playbook";
+
 export interface HelpArticle {
   slug: string;
   title: string;
-  category: "Getting started" | "Making videos" | "Publishing" | "Credits & plans" | "Account & security";
+  category: "Getting started" | "Making videos" | "Publishing" | "Tools" | "Credits & plans" | "Account & security";
   summary: string;
   /** Paragraphs; lines starting with "1. " etc. render as steps, "• " as bullets. */
   body: string[];
 }
 
-export const HELP_CATEGORIES: HelpArticle["category"][] = ["Getting started", "Making videos", "Publishing", "Credits & plans", "Account & security"];
+export const HELP_CATEGORIES: HelpArticle["category"][] = ["Getting started", "Making videos", "Publishing", "Tools", "Credits & plans", "Account & security"];
 
-export const HELP_ARTICLES: HelpArticle[] = [
+const GUIDES: HelpArticle[] = [
   {
     slug: "what-is-recktube",
     title: "What is Recktube?",
@@ -216,3 +218,28 @@ export function searchHelp(query: string, articles: HelpArticle[] = HELP_ARTICLE
     .sort((x, y) => y.score - x.score)
     .map((x) => x.a);
 }
+
+const PLAN_LINE: Record<PlaybookEntry["plan"], string> = {
+  Free: "Available on every plan, including Free.",
+  Creator: "Available on the Creator, Pro and Studio plans.",
+  Pro: "Available on the Pro and Studio plans.",
+  Admin: "For the Recktube team.",
+};
+
+/** One "How to use" article per tool, from the support playbook. */
+const TOOL_ARTICLES: HelpArticle[] = PLAYBOOK.filter((e) => e.plan !== "Admin").map((e) => ({
+  slug: `guide-${e.id}`,
+  title: e.name,
+  category: "Tools",
+  summary: e.what,
+  body: [
+    `Where: ${e.where}. ${PLAN_LINE[e.plan]}`,
+    "How to use it:",
+    ...e.steps.map((step, i) => `${i + 1}. ${step}`),
+    "If something goes wrong:",
+    ...e.problems.map((p) => `• ${p.issue}: ${p.fix}`),
+    ...(e.handoff ? [`Need a person? ${e.handoff} Email support@recktube.xyz.`] : []),
+  ],
+}));
+
+export const HELP_ARTICLES: HelpArticle[] = [...GUIDES, ...TOOL_ARTICLES];

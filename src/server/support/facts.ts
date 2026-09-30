@@ -1,4 +1,5 @@
 import { NAV_SECTIONS } from "@/src/config/navigation";
+import { playbookText } from "@/src/content/playbook";
 import { FEATURES, featureFlags } from "@/src/server/admin-ops";
 
 /**
@@ -19,8 +20,7 @@ export const PRODUCT_FACTS = `About Recktube (recktube.xyz): an all-in-one studi
   • TikTok (paid plans only — the Free plan connects YouTube only): connect in Settings → Connections (also on My Channel). Post a finished video straight to TikTok (publish now) or send it to TikTok drafts, choose who can see it, and allow comments/duets/stitches. Use "Post to TikTok" from the video's publish options. TikTok needs MP4 or MOV: export in Chrome or Edge (some browsers such as Firefox export WebM, which TikTok rejects).
   • Instagram Reels and Facebook: plan and make videos for them (vertical 9:16 exports, captions, repurposing); there is no direct posting yet — download the export and upload it in their app.
 - Making videos: Script Studio → Generate video builds a full video (voice-over, scene visuals from free stock footage and AI pictures animated with cinematic camera moves, background music, 19 animated caption styles, thumbnail). The Video Studio is a full editor (timeline, transitions, text, filters, audio mix) that exports MP4 in the browser.
-- Plans (see recktube.xyz/pricing): Free $0 (100 credits a month, YouTube only); Creator $5/month (1,000 credits); Pro $12/month (3,000 credits); Studio $25/month (7,000 credits); credit pack $3 for 500 credits. Every paid plan adds posting to TikTok, AI video clips and AI motion.
-- AI video clips and "AI motion" (turning pictures into real moving shots) are paid-plan features. Free accounts see them with a "Paid" badge and an "Ask to upgrade" button.
+- AI video clips and "AI motion" (turning pictures into real moving shots) are on paid plans. Tools outside your plan show a plan badge in the menu and an upgrade screen listing what that plan unlocks.
 - Plans (USD per month): Free $0 (100 credits), Creator $5 (1000), Pro $12 (3000), Studio $25 (7000); credit pack $3 for 500. Free: Script Studio, Media Studio, Video Studio editor, Content Creator, Trend Radar, Niche Finder, research, connect YouTube to publish and see analytics; exports up to 720p with a small Recktube mark. Creator adds: 1080p/4K exports without the mark, Storyboard, Brand kit, Design, Most Paying Niches, content calendar, TikTok posting, AI video clips and motion, email support. Pro adds: Video Recreator, Channel Creator, Competitors, Content Gaps, Audience, Retention, Channel Strategy, title/thumbnail A/B tests, priority support. Studio adds: the most credits and fastest support. Locked tools show an upgrade screen; full comparison at recktube.xyz/pricing.
 - Credits: every account gets 100 free credits that refill every 30 days — enough for one full generated video or 10 images. Monthly credits do NOT roll over: every 30 days the monthly allowance resets and unused monthly credits expire; credit-pack and bonus credits are kept until used, and monthly credits are spent first. Costs: a full generated video 100; image 10; voice-over 5; transcription 5; AI video clip 25; research 2; text (ideas, scripts, titles) 1. If a generated video can't be made at all, its 100 credits are refunded automatically. Credits are only used when a generation succeeds. Admins can add bonus credits and set paid plans; there is no in-app card payment yet — upgrades are arranged with the team at support@recktube.xyz.
 - Password reset: on the sign-in page choose "Forgot password?", enter the account email, then type the 6-digit code we email (valid 15 minutes). Other devices are signed out after a reset.
@@ -28,7 +28,10 @@ export const PRODUCT_FACTS = `About Recktube (recktube.xyz): an all-in-one studi
 - Email preferences and notifications live in Settings. Briefs have a one-click unsubscribe.
 - Account deletion: Settings → Account, or the team can delete it on request.
 - Privacy: cached YouTube data is deleted after 30 days; data is never sold.
-- Support: support@recktube.xyz. Security reports: security@recktube.xyz.`;
+- Support: support@recktube.xyz. Security reports: security@recktube.xyz.
+
+SUPPORT PLAYBOOK (how each feature works, its plan, and the fix for common problems; use these exact steps):
+${playbookText()}`;
 
 /** Tools an admin has paused right now, so the assistant never sends people to a switched-off feature. */
 export async function liveStatus(): Promise<string> {
