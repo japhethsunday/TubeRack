@@ -12,6 +12,39 @@ const NAME_KEYS = new Set(["name", "fromName", "from_name", "userName", "fullNam
 /** Our own addresses are not personal data and help the model reason. */
 const KEEP = /@recktube\.xyz$/i;
 
+/** Luhn checksum: real card numbers pass it, most other long numbers don't. */
+function luhn(digits: string): boolean {
+  let sum = 0;
+  for (let i = 0; i < digits.length; i++) {
+    let d = Number(digits[digits.length - 1 - i]);
+    if (i % 2 === 1) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    sum += d;
+  }
+  return sum % 10 === 0;
+}
+
+/**
+ * One-way: card numbers and phone numbers people type never reach the AI.
+ * Conservative on purpose so dates, times, amounts and IDs stay untouched.
+ */
+export function hideNumbers(s: string): string {
+  // Card numbers: 13–19 digits, optionally in groups, passing the Luhn check.
+  let out = s.replace(/(?<![\d-])(?:\d[ -]?){12,18}\d(?![\d-])/g, (m) => {
+    const digits = m.replace(/\D/g, "");
+    return digits.length >= 13 && digits.length <= 19 && luhn(digits) ? "[card number]" : m;
+  });
+  // Phone numbers: international (+234 801 234 5678), local with a leading 0 (08012345678, 0801-234-5678)
+  // or (555) 123-4567. Needs 9–15 digits.
+  out = out.replace(/(?<![\w+-])(?:\+\d{1,3}[ .-]?|0)(?:\(?\d{2,4}\)?[ .-]?){2,4}\d{2,4}(?![\w-])|(?<![\w-])\(\d{3}\) ?\d{3}[ .-]\d{4}(?![\w-])/g, (m) => {
+    const n = m.replace(/\D/g, "").length;
+    return n >= 9 && n <= 15 ? "[phone number]" : m;
+  });
+  return out;
+}
+
 export class Masker {
   private toToken = new Map<string, string>();
   private toReal = new Map<string, string>();
@@ -53,6 +86,7 @@ export class Masker {
 
   text(s: string): string {
     let out = s.replace(EMAIL, (m) => (KEEP.test(m) || /@hidden\.example$/i.test(m) ? m : this.token(m, "email")));
+    out = hideNumbers(out);
     // Longest names first, so "Ada Lovelace" wins over "Ada".
     const names = [...this.toToken.entries()].filter(([, t]) => t.startsWith("Person_")).sort((a, b) => b[0].length - a[0].length);
     for (const [real, t] of names) {

@@ -34,3 +34,24 @@ describe("AI privacy masking", () => {
     assert.equal(m.text("No personal data here."), "No personal data here.");
   });
 });
+
+describe("phone and card masking", () => {
+  it("hides card and phone numbers people type", async () => {
+    const { hideNumbers } = await import("@/src/server/ai/mask");
+    assert.equal(hideNumbers("my card 4111 1111 1111 1111 was charged"), "my card [card number] was charged");
+    assert.equal(hideNumbers("card 4111-1111-1111-1111"), "card [card number]");
+    assert.equal(hideNumbers("call me on +234 801 234 5678 please"), "call me on [phone number] please");
+    assert.equal(hideNumbers("or 08012345678"), "or [phone number]");
+    assert.equal(hideNumbers("US (555) 123-4567"), "US [phone number]");
+  });
+  it("leaves dates, times, amounts and ids alone", async () => {
+    const { hideNumbers } = await import("@/src/server/ai/mask");
+    for (const s of ["2026-09-30T12:00", "balance 1500 credits", "order 12345", "joined 2026-09-29", "video dQw4w9WgXcQ", "id 3f2b6c1e-8a4d-4c2e-9b1a-1234567890ab", "1234567890123", "at 17:00 on 30/09/2026", "$19.99"]) {
+      assert.equal(hideNumbers(s), s, s);
+    }
+  });
+  it("applies inside the Masker", () => {
+    const m = new Masker();
+    assert.equal(m.text("I'm ada@example.com, +2348012345678"), "I'm user_1@hidden.example, [phone number]");
+  });
+});
