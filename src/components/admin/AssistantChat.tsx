@@ -154,7 +154,7 @@ export function AssistantChat({ turns, setTurns, compact, onNavigate }: { turns:
       // Pages behind the assistant show the change straight away.
       refreshAdminData();
       // Hands-free video posting continues in this tab (only our own admin page).
-      if (r.launch && /^\/admin\/promo\/run\?ids=[0-9a-f,-]+$/.test(r.launch)) window.setTimeout(() => window.location.assign(r.launch!), 1200);
+      if (r.launch && /^\/admin\/promo\/run\?ids=[0-9a-f%2C,-]+(&at=(now|morning|afternoon|evening))?(&start=\d{1,2})?(&pf=(yt|tt)(%2C|,)?(yt|tt)?)?$/.test(r.launch)) window.setTimeout(() => window.location.assign(r.launch!), 1200);
     } catch (e) {
       setProposal(ti, pi, { state: "error", result: e instanceof ApiError ? e.message : "Couldn't do that." });
     }

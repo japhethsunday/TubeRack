@@ -17,7 +17,12 @@ const ask = z.object({
     .array(z.object({ role: z.enum(["admin", "assistant"]), text: z.string().max(6000) }))
     .min(1)
     .max(30),
-  page: z.string().max(80).regex(/^\/admin(\/[a-z-]+)?$/).optional(),
+  /** The admin page open behind the chat; only its section is used (e.g. /admin/users/abc → /admin/users). */
+  page: z
+    .string()
+    .max(300)
+    .optional()
+    .transform((v) => (v ? /^\/admin(\/[a-z-]+)?/.exec(v)?.[0] : undefined)),
 });
 
 /** POST /api/v1/admin/assistant — ask the admin assistant (look-ups + proposed actions). */
