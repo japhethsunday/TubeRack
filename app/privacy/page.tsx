@@ -24,6 +24,7 @@ export default function PrivacyPage() {
         <li>To send account emails (verification, password reset, and briefings you opt into).</li>
       </ul>
       <p>We do not sell your data, use it for advertising, or use YouTube data for anything other than showing it to you and the features you request.</p>
+      <p>We do not use your content — your scripts, prompts, videos, voice-overs, images, channel data or messages — to train or fine-tune any AI model. What you create is yours.</p>
 
       <h2>Google and YouTube data</h2>
       <p>Recktube uses YouTube API Services. By connecting a channel you also agree to the <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer">YouTube Terms of Service</a>, and Google&apos;s handling of your data is described in the <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Google Privacy Policy</a>.</p>
