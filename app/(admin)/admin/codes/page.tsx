@@ -95,7 +95,7 @@ export default function AdminCodes() {
         </div>
         <div className="grid gap-3 sm:grid-cols-4">
           {kind === "individual" && (
-            <label className="space-y-1 sm:col-span-2"><span className={label}>Person's email</span><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@example.com" className={input} /></label>
+            <label className="space-y-1 sm:col-span-2"><span className={label}>Person&apos;s email</span><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@example.com" className={input} /></label>
           )}
           <label className={cx("space-y-1", kind === "group" ? "sm:col-span-2" : "sm:col-span-2")}><span className={label}>Code (leave empty for a random one)</span><input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder={kind === "group" ? "CREATOR50" : "auto"} className={cx(input, "font-mono font-bold tracking-wider")} /></label>
           <label className="space-y-1"><span className={label}>Credits each</span><input type="number" min={1} value={form.credits} onChange={(e) => setForm({ ...form, credits: e.target.value })} className={input} /></label>
