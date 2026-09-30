@@ -89,7 +89,7 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
           })}
         </nav>
       ) : (
-        <nav className="flex flex-col gap-0.5 overflow-y-auto p-3" aria-label="Admin">
+        <nav className="admin-rail-nav flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-3" aria-label="Admin">
           {items.map((n) => (
           <Link
             key={n.href}
@@ -115,9 +115,9 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
     <AssistantProvider>
     <div className="admin-fx dark min-h-screen bg-background text-foreground">
       <div className="admin-frame lg:flex">
-      <aside className="admin-rail z-40 hidden w-60 shrink-0 self-stretch lg:block">
-        <div className="sticky top-4 flex h-[calc(100dvh-4rem)] max-h-full flex-col">{sidebar(false)}</div>
-      </aside>
+      {/* Desktop: the rail is fixed to the window (always full height, never scrolls away); a spacer keeps its place in the layout. */}
+      <div className="hidden w-[16rem] shrink-0 lg:block" aria-hidden="true" />
+      <aside className="admin-rail admin-rail-fixed z-40 hidden flex-col lg:flex">{sidebar(false)}</aside>
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button aria-label="Close menu" className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />

@@ -599,6 +599,18 @@ a[class*="rounded-2xl"][class*="border"]:hover {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 30px 80px -30px rgba(0, 0, 0, 0.8);
   }
   .admin-fx .admin-rail { margin: 1rem 0 1rem 1rem; border-radius: 22px; }
+  /* Pinned to the window inside the frame: full height, the menu scrolls inside it if needed. */
+  .admin-fx .admin-rail-nav { scrollbar-width: thin; scrollbar-color: rgba(167, 139, 250, 0.35) transparent; }
+  .admin-fx .admin-rail-nav::-webkit-scrollbar { width: 6px; }
+  .admin-fx .admin-rail-nav::-webkit-scrollbar-thumb { background: rgba(167, 139, 250, 0.35); border-radius: 999px; }
+  .admin-fx .admin-rail.admin-rail-fixed {
+    position: fixed;
+    top: 2rem;
+    bottom: 2rem;
+    left: 2rem;
+    width: 15rem;
+    margin: 0;
+  }
 }
 /* A slow light sweep gliding along the top edge of the console frame. */
 @keyframes admin-sweep { from { transform: translateX(-30%); } to { transform: translateX(130%); } }
