@@ -1,3 +1,4 @@
+import { getSetting } from "@/src/server/admin-ops";
 import { getDb } from "@/src/server/db";
 import { adminEmails, isAdmin } from "@/src/server/admin";
 import type { SessionUser } from "@/src/server/auth";
@@ -21,6 +22,9 @@ export async function bossTodos(): Promise<BossTodo[]> {
   const db = getDb();
   if (!db) return [];
   const n = (v: unknown) => Number(v ?? 0);
+  // Failures the boss already reviewed ("clear the error alert") don't count again.
+  const seen = await getSetting<{ at?: string }>("failures_seen", {}).catch(() => ({}) as { at?: string });
+  const since = new Date(Math.max(Date.now() - 86_400_000, seen.at ? new Date(seen.at).getTime() || 0 : 0));
   const [s] = await db`
     SELECT
       (SELECT count(*) FROM support_conversations WHERE status = 'handoff') AS support,
@@ -29,8 +33,8 @@ export async function bossTodos(): Promise<BossTodo[]> {
       (SELECT count(*) FROM affiliates WHERE status = 'pending') AS affiliates,
       (SELECT coalesce(sum(commission_minor), 0) FROM affiliate_commissions WHERE status IN ('pending', 'approved')) AS owed,
       (SELECT count(*) FROM promo_videos WHERE source = 'autopilot' AND status = 'ready' AND created_at > now() - interval '3 days') AS promos,
-      (SELECT count(*) FROM usage_events WHERE created_at > now() - interval '1 day' AND status = 'failed') AS failed,
-      (SELECT count(*) FROM usage_events WHERE created_at > now() - interval '1 day' AND status = 'completed') AS ok,
+      (SELECT count(*) FROM usage_events WHERE created_at > ${since} AND status = 'failed') AS failed,
+      (SELECT count(*) FROM usage_events WHERE created_at > ${since} AND status = 'completed') AS ok,
       (SELECT count(*) FROM users WHERE created_at > now() - interval '1 day' AND deleted_at IS NULL) AS signups,
       (SELECT count(*) FROM campaigns WHERE status = 'sending') AS sending`;
   const todos: BossTodo[] = [];
@@ -49,7 +53,7 @@ export async function bossTodos(): Promise<BossTodo[]> {
     // inbox unavailable: skip
   }
   const failRate = n(s.ok) + n(s.failed) ? n(s.failed) / (n(s.ok) + n(s.failed)) : 0;
-  if (n(s.failed) >= 5 && failRate > 0.2) todos.push({ id: "failures", title: `${n(s.failed)} failed generations in 24 hours (${Math.round(failRate * 100)}%)`, detail: "Higher than normal. See what's failing.", href: "/admin/failed", tone: "urgent" });
+  if (n(s.failed) >= 5 && failRate > 0.2) todos.push({ id: "failures", title: `${n(s.failed)} failed generations in 24 hours (${Math.round(failRate * 100)}%)`, detail: "Higher than normal. See what's failing, or say \"clear the error alert\" once you've checked.", href: "/admin/failed", tone: "urgent" });
   if (n(s.promos)) todos.push({ id: "promos", title: `${n(s.promos)} promo video${n(s.promos) === 1 ? " is" : "s are"} ready to produce`, detail: "Written by autopilot. One tap each to make the video.", href: "/admin/promo", tone: "normal" });
   const lowFlags = n(s.flags) - n(s.flags_high);
   if (lowFlags > 0) todos.push({ id: "flags", title: `${lowFlags} safety flag${lowFlags === 1 ? "" : "s"} to review`, detail: "Lower priority checks from the daily scan.", href: "/admin/safety", tone: "normal" });

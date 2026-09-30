@@ -214,3 +214,11 @@ describe("support assistant choices", () => {
     assert.deepEqual(h.choices, []);
   });
 });
+
+describe("clearing the error alert", () => {
+  it("dismiss_failures is a confirm-only action gated to usage viewers", async () => {
+    const { prepare, ACTIONS } = await import("@/src/server/admin-agent/actions");
+    assert.match(prepare("dismiss_failures", {})!.summary, /clear the red error alert/);
+    assert.equal(ACTIONS.dismiss_failures.permission, "usage.view");
+  });
+});

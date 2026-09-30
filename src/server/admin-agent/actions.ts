@@ -141,6 +141,11 @@ export const ACTIONS = {
       return `Make ${a.count} promo video${a.count === 1 ? "" : "s"}${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : ""} and schedule ${a.count === 1 ? "it" : "them"} on ${where}, hands-free: ${plan}, your local time. A studio tab does the work: keep it open about 3–5 minutes per video.`;
     },
   },
+  dismiss_failures: {
+    permission: "usage.view",
+    args: z.object({}),
+    describe: () => "Mark today's failed generations as reviewed and clear the red error alert. Only new failures after now will raise it again. Nothing is deleted.",
+  },
   cancel_scheduled_post: {
     permission: "promo.write",
     args: z.object({ id: z.string().trim().min(8).max(80), title: z.string().trim().max(120).default("") }),
@@ -386,6 +391,11 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       const pf = (a.platforms as unknown as string[]).map((p) => (p === "tiktok" ? "tt" : "yt")).join(",");
       const q = new URLSearchParams({ ids: ids.join(","), at: String(a.when), start: String(a.startInDays), pf });
       return { text: `${ids.length} video${ids.length === 1 ? "" : "s"} written. Opening the studio to make and schedule ${ids.length === 1 ? "it" : "them"} now. Keep that tab open.`, launch: `/admin/promo/run?${q}` };
+    }
+    case "dismiss_failures": {
+      await putSetting("failures_seen", { at: new Date().toISOString() }, admin.id);
+      await log({});
+      return "Cleared. The error alert only comes back if new failures pile up.";
     }
     case "cancel_scheduled_post": {
       const ok = await cancelScheduledPost(String(a.id));
