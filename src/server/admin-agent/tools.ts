@@ -1,3 +1,4 @@
+import { listAdminCodes } from "@/src/server/growth/codes";
 import { listScheduledPosts } from "@/src/server/tiktok/schedule";
 import { z } from "zod";
 import { adminDb, adminEmails, adminOverview, adminUserDetail, adminUsers } from "@/src/server/admin";
@@ -164,6 +165,14 @@ export const TOOLS = {
       const rows = await adminDb()`SELECT subject, audience, status, scheduled_at FROM campaigns WHERE status IN ('scheduled', 'sending') ORDER BY scheduled_at NULLS FIRST LIMIT 20`;
       return { campaigns: rows.map((r) => ({ subject: String(r.subject), audience: String(r.audience), status: String(r.status), when: r.scheduled_at ? new Date(String(r.scheduled_at)).toISOString().slice(0, 16) : null })) };
     },
+  },
+  bonus_codes: {
+    permission: "credits.list",
+    about: "Every bonus code: type (group or individual + whose), credits, used X of Y, status (Active, Redeemed, Fully used, Expired, Off), expiry, and who redeemed it and when.",
+    args: z.object({}),
+    run: async () => ({
+      codes: (await listAdminCodes(60)).map((c) => ({ code: c.code, type: c.kind, forEmail: c.forEmail, credits: c.credits, used: c.uses, maxUses: c.maxUses, status: c.status, expires: c.expiresAt?.slice(0, 10) ?? "never", redeemedBy: c.redemptions.slice(0, 10) })),
+    }),
   },
   scheduled_posts: {
     permission: "promo.list",

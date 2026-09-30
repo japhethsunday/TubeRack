@@ -13,7 +13,7 @@ import { api, ApiError } from "@/src/lib/api";
 import { cx } from "@/src/components/ui/cx";
 
 export interface Proposal { action: string; summary: string; token: string; state?: "idle" | "busy" | "done" | "error" | "dismissed"; result?: string }
-export interface Turn { role: "admin" | "assistant"; text: string; proposals?: Proposal[]; lookups?: string[]; open?: string }
+export interface Turn { role: "admin" | "assistant"; text: string; proposals?: Proposal[]; lookups?: string[]; open?: string; choices?: string[] }
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -94,8 +94,9 @@ export function AssistantChat({ turns, setTurns, compact, onNavigate }: { turns:
   const router = useRouter();
   const pathname = usePathname();
   /** Go to an admin page; when it's the page already open, reload it with fresh data. */
-  function go(href: string) {
-    onNavigate?.();
+  /** Open an admin page. Only a tap closes the chat on phones; a reply opening a page keeps the chat up. */
+  function go(href: string, tapped = true) {
+    if (tapped) onNavigate?.();
     const [path, query = ""] = href.split("?");
     if (path === pathname) {
       if (query && `?${query}` !== window.location.search) window.location.assign(href);
@@ -120,13 +121,13 @@ export function AssistantChat({ turns, setTurns, compact, onNavigate }: { turns:
     setBusy(true);
     setError(null);
     try {
-      const r = await api.post<{ text: string; proposals: Proposal[]; lookups: string[]; open?: string | null }>("/api/v1/admin/assistant", {
+      const r = await api.post<{ text: string; proposals: Proposal[]; lookups: string[]; open?: string | null; choices?: string[] }>("/api/v1/admin/assistant", {
         history: next.map((t) => ({ role: t.role, text: t.text })).slice(-30),
         page: pathname,
       });
       const open = r.open && /^\/admin(\/[a-z-]+)?(\?q=[^#\s]*)?$/.test(r.open) ? r.open : undefined;
-      setTurns((all) => [...all, { role: "assistant", text: r.text, proposals: r.proposals.map((p) => ({ ...p, state: "idle" })), lookups: r.lookups, ...(open ? { open } : {}) }]);
-      if (open) go(open);
+      setTurns((all) => [...all, { role: "assistant", text: r.text, proposals: r.proposals.map((p) => ({ ...p, state: "idle" })), lookups: r.lookups, ...(open ? { open } : {}), ...(r.choices?.length ? { choices: r.choices } : {}) }]);
+      if (open) go(open, false);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "The assistant couldn't answer. Try again.");
     }
@@ -292,6 +293,15 @@ export function AssistantChat({ turns, setTurns, compact, onNavigate }: { turns:
                   </div>
                 )}
                 <div className="whitespace-pre-wrap break-words rounded-2xl rounded-tl-md border border-white/[0.07] bg-white/[0.04] px-3.5 py-2.5 text-sm leading-relaxed text-white/90">{t.text}</div>
+                {!!t.choices?.length && ti === turns.length - 1 && (
+                  <div role="group" aria-label="Choose an answer" className="flex flex-wrap gap-2">
+                    {t.choices.map((c) => (
+                      <button key={c} type="button" disabled={busy} onClick={() => void ask(c)} className="rounded-full border border-violet-400/40 bg-violet-500/10 px-3.5 py-2 text-left text-xs font-semibold text-violet-100 transition hover:border-violet-300/70 hover:bg-violet-500/20 active:scale-[0.97] disabled:opacity-50">
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {t.open && (
                   <button type="button" onClick={() => go(t.open!)} className="inline-flex items-center gap-1 rounded-full border border-violet-400/40 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-100 transition hover:bg-violet-500/20">
                     Open {t.open.replace(/^\/admin\/?/, "").split("?")[0].replace(/-/g, " ") || "overview"} <ChevronRight className="size-3.5" aria-hidden="true" />

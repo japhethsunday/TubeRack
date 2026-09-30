@@ -41,7 +41,7 @@ const proposal = z.object({
 const save = z.object({
   id: id.nullable().default(null),
   turns: z
-    .array(z.object({ role: z.enum(["admin", "assistant"]), text: z.string().max(8000), proposals: z.array(proposal).max(8).optional(), lookups: z.array(z.string().max(40)).max(10).optional(), open: z.string().regex(/^\/admin(\/[a-z-]+)?(\?q=[^#\s]{0,200})?$/).optional() }))
+    .array(z.object({ role: z.enum(["admin", "assistant"]), text: z.string().max(8000), proposals: z.array(proposal).max(8).optional(), lookups: z.array(z.string().max(40)).max(10).optional(), choices: z.array(z.string().max(60)).max(6).optional(), open: z.string().regex(/^\/admin(\/[a-z-]+)?(\?q=[^#\s]{0,200})?$/).optional() }))
     .min(1)
     .max(200),
 });

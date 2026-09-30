@@ -73,3 +73,108 @@ export async function redeemAtSignup(userId: string, raw: string | undefined | n
     return 0;
   }
 }
+
+/* ---------- Admin: create, list and delete codes ---------- */
+
+export type CodeKind = "group" | "individual";
+
+export interface AdminCode {
+  code: string;
+  kind: CodeKind;
+  credits: number;
+  note: string;
+  forEmail: string | null;
+  maxUses: number | null;
+  uses: number;
+  active: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+  /** "Active", "Redeemed" (individual, used), "Fully used", "Expired" or "Off". */
+  status: string;
+  redemptions: { email: string; at: string }[];
+}
+
+/** A readable random code, e.g. GIFT-7K3Q9P. */
+function randomCode(prefix: string): string {
+  return `${prefix}-${randomBytes(6).toString("base64url").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6).padEnd(6, "X")}`;
+}
+
+/**
+ * Create a code. Group: anyone can use it once, up to `maxUses` people
+ * (null = unlimited). Individual: only the account with that email can use it, once.
+ */
+export async function createAdminCode(input: { kind: CodeKind; credits: number; code?: string; email?: string; maxUses?: number | null; days?: number | null; note?: string; createdBy: string }): Promise<{ code: string; forEmail: string | null }> {
+  const db = getDb();
+  if (!db) throw validationError("Codes aren't available right now.");
+  let userId: string | null = null;
+  let forEmail: string | null = null;
+  if (input.kind === "individual") {
+    const email = (input.email ?? "").trim().toLowerCase();
+    if (!email) throw validationError("Add the email of the person this code is for.");
+    const [u] = await db`SELECT id, email FROM users WHERE lower(email) = ${email} AND deleted_at IS NULL LIMIT 1`;
+    if (!u) throw validationError(`No account uses ${email}. They need to sign up first.`);
+    userId = String(u.id);
+    forEmail = String(u.email);
+  }
+  const maxUses = input.kind === "individual" ? 1 : input.maxUses ?? null;
+  const expires = input.days ? new Date(Date.now() + input.days * 86_400_000) : null;
+  const wanted = normalizeCode(input.code ?? "");
+  if (wanted && wanted.length < 3) throw validationError("Use 3–32 letters, numbers, - or _.");
+  for (let i = 0; i < 5; i++) {
+    const code = wanted || randomCode(input.kind === "individual" ? "GIFT" : "BONUS");
+    const rows = await db`
+      INSERT INTO promo_codes (code, credits, note, expires_at, max_uses, user_id, created_by)
+      VALUES (${code}, ${input.credits}, ${(input.note ?? "").slice(0, 200)}, ${expires}, ${maxUses}, ${userId}, ${input.createdBy})
+      ON CONFLICT DO NOTHING RETURNING code`;
+    if (rows.length) return { code, forEmail };
+    if (wanted) throw validationError("That code already exists.");
+  }
+  throw validationError("Couldn't create a code. Try again.");
+}
+
+function statusOf(c: { active: boolean; expiresAt: string | null; maxUses: number | null; uses: number; kind: CodeKind }): string {
+  if (!c.active) return "Off";
+  if (c.kind === "individual" && c.uses > 0) return "Redeemed";
+  if (c.maxUses !== null && c.uses >= c.maxUses) return "Fully used";
+  if (c.expiresAt && new Date(c.expiresAt).getTime() < Date.now()) return "Expired";
+  return "Active";
+}
+
+/** Every code with who redeemed it and when (newest first). */
+export async function listAdminCodes(limit = 200): Promise<AdminCode[]> {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db`
+    SELECT c.code, c.credits, c.note, c.expires_at, c.max_uses, c.uses, c.active, c.created_at, c.user_id, u.email AS for_email,
+      coalesce((SELECT json_agg(json_build_object('email', ru.email, 'at', r.created_at) ORDER BY r.created_at DESC)
+                FROM (SELECT * FROM promo_redemptions WHERE code = c.code ORDER BY created_at DESC LIMIT 20) r
+                JOIN users ru ON ru.id = r.user_id), '[]') AS redemptions
+    FROM promo_codes c LEFT JOIN users u ON u.id = c.user_id
+    ORDER BY c.created_at DESC LIMIT ${limit}`;
+  return rows.map((r) => {
+    const base = {
+      code: String(r.code),
+      kind: (r.user_id ? "individual" : "group") as CodeKind,
+      credits: Number(r.credits),
+      note: String(r.note ?? ""),
+      forEmail: r.for_email ? String(r.for_email) : null,
+      maxUses: r.max_uses === null ? null : Number(r.max_uses),
+      uses: Number(r.uses),
+      active: Boolean(r.active),
+      expiresAt: r.expires_at ? new Date(String(r.expires_at)).toISOString() : null,
+      createdAt: new Date(String(r.created_at)).toISOString(),
+      redemptions: ((r.redemptions as { email: string; at: string }[]) ?? []).map((x) => ({ email: String(x.email), at: new Date(x.at).toISOString() })),
+    };
+    return { ...base, status: statusOf(base) };
+  });
+}
+
+/** Delete a code. Credits people already received are kept; its redemption history is removed with it. */
+export async function deleteAdminCode(raw: string): Promise<{ code: string; uses: number }> {
+  const db = getDb();
+  if (!db) throw validationError("Codes aren't available right now.");
+  const code = normalizeCode(raw);
+  const rows = await db`DELETE FROM promo_codes WHERE code = ${code} RETURNING code, uses`;
+  if (!rows.length) throw validationError(`There's no code ${code}.`);
+  return { code, uses: Number(rows[0].uses) };
+}

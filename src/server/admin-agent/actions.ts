@@ -6,7 +6,7 @@ import { audit } from "@/src/server/audit";
 import { adjustCredits, setCreditPlan } from "@/src/server/credits";
 import { notifyCreditGift } from "@/src/server/credit-emails";
 import { FEATURES, featureFlags, putSetting } from "@/src/server/admin-ops";
-import { normalizeCode } from "@/src/server/growth/codes";
+import { createAdminCode, deleteAdminCode, normalizeCode } from "@/src/server/growth/codes";
 import { PROMO_FEATURES, createPromoProject, styleFor, writePromo } from "@/src/server/growth/promo";
 import { cancelScheduledPosts } from "@/src/server/tiktok/schedule";
 import { runPromoAutopilot } from "@/src/server/growth/promo-autopilot";
@@ -159,9 +159,25 @@ export const ACTIONS = {
   },
   create_bonus_code: {
     permission: "credits.change",
-    args: z.object({ code: z.string().trim().min(3).max(32), credits: z.number().int().min(1).max(10_000), maxUses: z.number().int().min(1).max(100_000).nullable().default(null), days: z.number().int().min(1).max(365).nullable().default(null) }),
-    describe: (a: { code: string; credits: number; maxUses: number | null; days: number | null }) =>
-      `Create bonus code ${normalizeCode(a.code)} worth ${a.credits} credits${a.maxUses ? `, up to ${a.maxUses} uses` : ""}${a.days ? `, valid ${a.days} days` : ""}.`,
+    args: z.object({
+      kind: z.enum(["group", "individual"]),
+      credits: z.number().int().min(1).max(10_000),
+      /** Empty: a random code. */
+      code: z.string().trim().max(32).default(""),
+      /** Individual codes: the one account that can use it. */
+      email: z.string().trim().max(254).default(""),
+      /** Group codes: how many people can use it (null = unlimited). */
+      maxUses: z.number().int().min(1).max(100_000).nullable().default(null),
+      days: z.number().int().min(1).max(365).nullable().default(null),
+      note: z.string().trim().max(200).default(""),
+    }),
+    describe: (a: { kind: string; credits: number; code: string; email: string; maxUses: number | null; days: number | null }) =>
+      `Create ${a.kind === "individual" ? `an individual code for ${a.email || "(no email)"} only` : `a group code for ${a.maxUses ? `up to ${a.maxUses} people` : "unlimited people"}`}${a.code ? `: ${normalizeCode(a.code)}` : " (random code)"}, worth ${a.credits} credits each${a.days ? `, valid ${a.days} days` : ", never expires"}. Each person can use it once.`,
+  },
+  delete_bonus_code: {
+    permission: "credits.change",
+    args: z.object({ code: z.string().trim().min(3).max(32) }),
+    describe: (a: { code: string }) => `Delete bonus code ${normalizeCode(a.code)}. It stops working immediately; people who already redeemed it keep their credits.`,
   },
   pause_tool: {
     permission: "features.edit",
@@ -390,15 +406,14 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       return `Approved ${a.email} as an affiliate.`;
     }
     case "create_bonus_code": {
-      const code = normalizeCode(a.code);
-      if (code.length < 3) throw validationError("Use 3–32 letters, numbers, - or _.");
-      const expires = a.days ? new Date(Date.now() + Number(a.days) * 86_400_000) : null;
-      const rows = await adminDb()`
-        INSERT INTO promo_codes (code, credits, note, expires_at, max_uses, created_by)
-        VALUES (${code}, ${a.credits}, ${"Created with the admin assistant"}, ${expires}, ${a.maxUses}, ${admin.id}) ON CONFLICT DO NOTHING RETURNING code`;
-      if (!rows.length) throw validationError("That code already exists.");
-      await log({ code, credits: a.credits });
-      return `Created code ${code}.`;
+      const out = await createAdminCode({ kind: a.kind, credits: a.credits, code: a.code, email: a.email, maxUses: a.maxUses, days: a.days, note: a.note || "Created with the admin assistant", createdBy: admin.id });
+      await log({ code: out.code, credits: a.credits, kind: a.kind });
+      return `Created ${out.code}${out.forEmail ? ` for ${out.forEmail}` : ""}. Share it as https://www.recktube.xyz/redeem?code=${out.code}`;
+    }
+    case "delete_bonus_code": {
+      const out = await deleteAdminCode(a.code);
+      await log(out);
+      return `Deleted ${out.code}${out.uses ? ` (it had been redeemed ${out.uses} time${out.uses === 1 ? "" : "s"}; those credits stay)` : ""}.`;
     }
     case "pause_tool":
     case "resume_tool": {

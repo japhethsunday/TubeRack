@@ -119,9 +119,9 @@ export function AdminShell({ email, role, children }: { email: string; role: Adm
       <div className="hidden w-[16rem] shrink-0 lg:block" aria-hidden="true" />
       <aside className="admin-rail admin-rail-fixed z-40 hidden flex-col lg:flex">{sidebar(false)}</aside>
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button aria-label="Close menu" className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
-          <aside className="admin-rail relative flex h-full w-[min(18rem,85vw)] flex-col overflow-y-auto pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">{sidebar(true)}</aside>
+        <div className="fixed inset-0 z-[90] lg:hidden" role="dialog" aria-modal="true" aria-label="Admin menu">
+          <button aria-label="Close menu" className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <aside className="admin-rail admin-drawer relative flex h-full w-[min(18rem,85vw)] flex-col overflow-y-auto pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-2xl shadow-black">{sidebar(true)}</aside>
         </div>
       )}
       <div className="min-w-0 flex-1">

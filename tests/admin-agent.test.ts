@@ -178,3 +178,19 @@ describe("assistant email series", () => {
     assert.equal(d.toISOString(), "2026-10-02T07:00:00.000Z");
   });
 });
+
+describe("bonus codes and choices", () => {
+  it("create_bonus_code needs a type and describes it", async () => {
+    const { prepare } = await import("@/src/server/admin-agent/actions");
+    assert.equal(prepare("create_bonus_code", { credits: 50 }), null);
+    const g = prepare("create_bonus_code", { kind: "group", credits: 50, maxUses: 100, days: 30 });
+    assert.match(g!.summary, /group code for up to 100 people.*50 credits each.*valid 30 days/);
+    const i = prepare("create_bonus_code", { kind: "individual", credits: 200, email: "ada@example.com" });
+    assert.match(i!.summary, /individual code for ada@example.com only/);
+  });
+  it("delete_bonus_code exists and is gated", async () => {
+    const { prepare, ACTIONS } = await import("@/src/server/admin-agent/actions");
+    assert.match(prepare("delete_bonus_code", { code: "creator50" })!.summary, /Delete bonus code CREATOR50/);
+    assert.equal(ACTIONS.delete_bonus_code.permission, "credits.change");
+  });
+});

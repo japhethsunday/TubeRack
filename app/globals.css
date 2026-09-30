@@ -699,3 +699,6 @@ a[class*="rounded-2xl"][class*="border"]:hover {
   .admin-fx .admin-lift:hover,
   .admin-fx main .grid > [class*="rounded-xl"][class*="border"]:hover { transform: none; }
 }
+
+/* Phone admin menu: solid, so the page never shows through it. */
+.admin-fx .admin-rail.admin-drawer { background: #0d0a16; border-radius: 0 22px 22px 0; margin: 0; }

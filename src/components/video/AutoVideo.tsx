@@ -187,13 +187,14 @@ export function GenerateVideoDialog({
   const autoStarted = useRef(false);
   useEffect(() => {
     if (!auto || autoStarted.current || writable.length === 0) return;
-    autoStarted.current = true;
     const t = window.setTimeout(() => {
+      if (autoStarted.current) return;
+      autoStarted.current = true;
       void run().then((ok) => (ok ? auto.onDone() : auto.onFail(fatalRef.current || "Video generation stopped.")));
     }, 0);
     return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when the dialog opens.
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- start once, as soon as the script has loaded.
+  }, [writable.length]);
   const fatalRef = useRef("");
 
   async function run(): Promise<boolean> {
