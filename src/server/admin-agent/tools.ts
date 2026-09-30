@@ -58,7 +58,7 @@ export const TOOLS = {
         account: { email: d.user.email, name: d.user.name, status: d.user.status, verified: d.user.verified, joined: d.user.createdAt.slice(0, 10), isAdmin: d.user.admin },
         workspaces: d.workspaces.map((w) => ({ role: w.role, plan: TIER_NAME[tierOf({ unlimited: w.unlimited, monthlyGrant: w.monthlyGrant })], credits: w.unlimited ? "unlimited" : w.balance, monthlyAllowance: w.monthlyGrant, projects: w.projects, youtube: w.youtube })),
         recentGenerations: d.usage.slice(0, 12).map((x) => `${x.createdAt.slice(0, 16)} ${x.kind} ${x.status}${x.provider ? ` (${x.provider})` : ""}`),
-        creditHistory: d.ledger.slice(0, 8).map((x) => `${x.createdAt.slice(0, 10)} ${x.amount > 0 ? "+" : ""}${x.amount} ${x.kind}${x.ref ? ` — ${x.ref.slice(0, 60)}` : ""}`),
+        creditHistory: d.ledger.slice(0, 15).map((x) => `${x.createdAt.slice(0, 16)} ${x.amount > 0 ? "+" : ""}${x.amount} ${x.kind} → balance ${x.balanceAfter}${x.ref ? ` — ${x.ref.slice(0, 60)}` : ""}`),
         projects: d.projects.slice(0, 8).map((p) => p.name),
         activeSessions: d.sessions.length,
         friendsInvited: n(extra?.invited),

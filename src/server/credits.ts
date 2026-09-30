@@ -94,12 +94,14 @@ export async function adjustCredits(workspaceId: string, delta: number, reason: 
   // Bought or gifted credits carry over; refunds of spent monthly credits don't.
   const carries = delta > 0 && !/^(refund|reset)/.test(kind ?? "");
   const rows = await db`
-    UPDATE credit_accounts
-    SET balance = GREATEST(0, balance + ${delta}),
-        extra_balance = LEAST(GREATEST(0, balance + ${delta}), extra_balance + ${carries ? delta : 0}),
+    UPDATE credit_accounts a
+    SET balance = GREATEST(0, a.balance + ${delta}),
+        extra_balance = LEAST(GREATEST(0, a.balance + ${delta}), a.extra_balance + ${carries ? delta : 0}),
         updated_at = now()
-    WHERE workspace_id = ${workspaceId} RETURNING id, balance`;
-  if (rows[0]) await db`INSERT INTO credit_transactions (account_id, kind, amount, balance_after, ref) VALUES (${String(rows[0].id)}, ${kind ?? (delta >= 0 ? "admin:add" : "admin:remove")}, ${delta}, ${Number(rows[0].balance)}, ${reason})`;
+    FROM (SELECT id, balance FROM credit_accounts WHERE workspace_id = ${workspaceId} FOR UPDATE) old
+    WHERE a.id = old.id RETURNING a.id, a.balance, old.balance AS before`;
+  // Log what really changed: removing 500 from 94 takes 94, not 500.
+  if (rows[0]) await db`INSERT INTO credit_transactions (account_id, kind, amount, balance_after, ref) VALUES (${String(rows[0].id)}, ${kind ?? (delta >= 0 ? "admin:add" : "admin:remove")}, ${Number(rows[0].balance) - Number(rows[0].before)}, ${Number(rows[0].balance)}, ${reason})`;
   return creditState(workspaceId);
 }
 

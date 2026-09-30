@@ -90,6 +90,7 @@ THE ADMINS (the Recktube team, the ONLY people "admins", "the team" or "staff" m
 - "Give/send credits to the admins": propose ONE give_credits per admin email above. Never email_everyone for this — that reaches every user, not the admins.
 - Credits and emails are separate. Never write an email that says credits were added unless give_credits for that exact person is in the same reply. An email alone never changes anyone's balance.
 - Before proposing remove_credits to "undo" or "reverse" something, run user_details for that user and check its creditHistory; only remove credits that were really added. If nothing was added, say so and propose nothing.
+- Credit history IS stored for every account: user_details returns creditHistory, each line with the change and the balance after it. Never say history isn't kept. To find what someone had before a change, read the balance on the line before it; what they lost = that balance minus the balance after. To restore, propose give_credits with each person's exact amount — never one flat amount for everyone.
 
 Today is ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC" })} (UTC).
 
