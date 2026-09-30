@@ -1,3 +1,4 @@
+import { getDb } from "@/src/server/db";
 import { randomUUID } from "node:crypto";
 import { GeminiTextProvider, isTextConfigured } from "@/src/server/ai/gemini";
 import { PRODUCT_FACTS } from "@/src/server/support/facts";
@@ -76,17 +77,30 @@ export function normalizePackage(o: Record<string, unknown>): PromoPackage {
   };
 }
 
+/** Titles and hooks of recent promos, so every new one is a new idea. */
+async function recentPromoIdeas(): Promise<string[]> {
+  try {
+    const db = getDb();
+    if (!db) return [];
+    const rows = await db`SELECT package->>'title' AS title, package->>'hook' AS hook FROM promo_videos ORDER BY created_at DESC LIMIT 40`;
+    return rows.map((r) => `${String(r.title ?? "").slice(0, 90)} — “${String(r.hook ?? "").slice(0, 120)}”`).filter((x) => x.length > 8);
+  } catch {
+    return [];
+  }
+}
+
 export async function writePromo(input: { feature: string; style: string; platform: string; lengthSec: number; angle: string }): Promise<PromoPackage> {
   if (!isTextConfigured()) throw backendUnavailable("AI writing");
   const f = PROMO_FEATURES.find((x) => x.id === input.feature) ?? PROMO_FEATURES[0];
+  const made = await recentPromoIdeas();
   const prompt = `You are a performance video marketer making a vertical 9:16 short-form ad for Recktube, made with Recktube itself.
 
 ${PRODUCT_FACTS}
 
 Feature to promote: ${f.name} — ${f.pitch}
 Style: ${input.style}. Platform: ${input.platform}. Target length: ${input.lengthSec} seconds.
-${input.angle ? `Founder's angle: ${input.angle.slice(0, 600)}` : ""}
-
+${input.angle ? `Founder's angle: ${input.angle.slice(0, 600)}` : "No angle given: INVENT a fresh, specific idea yourself — e.g. a concrete creator in a real niche (cooking, finance, gaming, faceless history…) with a real problem this feature solves, a surprising insight about growing on YouTube, or a relatable moment creators know. Be original, not generic."}
+${made.length ? `\nALREADY MADE — do NOT reuse these ideas, hooks, scenarios or titles, and make this one clearly different from all of them:\n${made.map((m) => `- ${m}`).join("\n")}\n` : ""}
 Rules:
 - Hook in the first 2 seconds that stops the scroll (a pain creators feel, or a surprising outcome). No clickbait lies.
 - Only real features and facts from above. No invented stats, user counts, testimonials, prices or guarantees.

@@ -73,7 +73,7 @@ export async function runPromoAutopilot(opts: { force?: boolean; count?: number;
   const made: { id: string; pkg: PromoPackage; feature: string }[] = [];
   for (const c of pickCombos(target, recent)) {
     try {
-      const pkg = await writePromo({ feature: c.feature, style: c.style, platform: "YouTube Shorts", lengthSec: 30, angle: c.angle });
+      const pkg = await writePromo({ feature: c.feature, style: c.style, platform: "YouTube Shorts", lengthSec: 30, angle: "" }); // the AI invents a fresh idea, avoiding past ones
       if (!pkg.scenes.length) continue;
       const [r] = await db`
         INSERT INTO promo_videos (created_by, feature, style, platform, length_sec, package, source, status)
