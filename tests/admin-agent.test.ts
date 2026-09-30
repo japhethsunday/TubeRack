@@ -134,11 +134,15 @@ describe("assistant promo videos", () => {
 });
 
 describe("assistant hands-free posting", () => {
-  it("make_and_post_videos defaults to YouTube now and is limited to 1-7 videos", async () => {
+  it("make_and_post_videos defaults to scheduled on YouTube and TikTok and is limited to 1-7 videos", async () => {
     const { prepare, ACTIONS } = await import("@/src/server/admin-agent/actions");
     const p = prepare("make_and_post_videos", {});
     assert.equal(p?.args.count, 2);
-    assert.match(p!.summary, /schedule them on YouTube, hands-free: the first goes live now, the others one per day at 5 PM/);
+    assert.deepEqual(p?.args.platforms, ["youtube", "tiktok"]);
+    assert.equal(p?.args.when, "afternoon");
+    assert.match(p!.summary, /schedule them on YouTube and TikTok, hands-free: one per day at 2 PM/);
+    const now = prepare("make_and_post_videos", { when: "now", platforms: ["youtube"] });
+    assert.match(now!.summary, /the first goes live now, the others one per day at 5 PM/);
     assert.equal(prepare("make_and_post_videos", { count: 8 }), null);
     assert.equal(ACTIONS.make_and_post_videos.permission, "promo.write");
   });

@@ -129,8 +129,14 @@ export function AutopilotRunner({
           scheduleAt={slot}
           youtube={yt}
           tiktok={tt ? { caption: tiktokCaption, postAt: releaseDate ? releaseDate.toISOString() : "", promoId } : null}
-          onDone={async (videoId) => {
-            if (videoId) await api.post(`/api/v1/admin/promo/${promoId}`, { action: "posted", videoId, ...(releaseDate && yt ? { scheduledFor: releaseDate.toISOString() } : {}) }).catch(() => undefined);
+          onDone={async (videoId, note) => {
+            if (videoId) await api.post(`/api/v1/admin/promo/${promoId}`, { action: "posted", videoId, ...(releaseDate && yt ? { scheduledFor: releaseDate.toISOString() } : {}), ...(note ? { note: note.slice(0, 400) } : {}) }).catch(() => undefined);
+            if (note) {
+              setError(note);
+              setStage("failed");
+              window.setTimeout(() => void goNext(), 4000);
+              return;
+            }
             void goNext();
           }}
           onFail={(m) => void fail(m)}
@@ -141,7 +147,7 @@ export function AutopilotRunner({
 }
 
 /** Same render + upload as the Publish button, filled in and started automatically. */
-function AutoPublish(props: { projectId: string; projectName: string; topic: string; title: string; description: string; tags: string[]; scheduleAt: string; youtube: boolean; tiktok: { caption: string; postAt: string; promoId: string } | null; onDone: (videoId: string) => void; onFail: (m: string) => void }) {
+function AutoPublish(props: { projectId: string; projectName: string; topic: string; title: string; description: string; tags: string[]; scheduleAt: string; youtube: boolean; tiktok: { caption: string; postAt: string; promoId: string } | null; onDone: (videoId: string, note?: string) => void; onFail: (m: string) => void }) {
   const [rendered, setRendered] = useState<{ blob: Blob; mime: string } | null>(null);
   const [ytDone, setYtDone] = useState<string | null>(null);
   const video = useVideo();
@@ -190,7 +196,7 @@ function AutoPublish(props: { projectId: string; projectName: string; topic: str
       };
   // TikTok after YouTube (reusing its render), or on its own.
   if (props.tiktok && (!props.youtube || ytDone !== null)) {
-    return <TikTokStep comp={comp} duration={source.duration} render={source.render} assetFor={assetFor} projectId={props.projectId} prerendered={rendered} job={props.tiktok} onDone={() => props.onDone(ytDone ?? "")} onFail={props.onFail} />;
+    return <TikTokStep comp={comp} duration={source.duration} render={source.render} assetFor={assetFor} projectId={props.projectId} prerendered={rendered} job={props.tiktok} onDone={() => props.onDone(ytDone ?? "")} onFail={(m) => (ytDone ? props.onDone(ytDone, `On YouTube, but ${m}`) : props.onFail(m))} />;
   }
   return (
     <PublishDialog

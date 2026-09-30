@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, MonitorPlay, Smartphone, Sparkles, Wand2 } from "lucide-react";
 import { useProjects } from "@/src/components/projects/ProjectsProvider";
@@ -9,6 +9,24 @@ import { emptyStrategyBrief } from "@/src/lib/intelligence/profiles";
 import { cx } from "@/src/components/ui/cx";
 
 const MAX = 1500;
+const DRAFT_KEY = "recktube:idea-draft";
+
+function readDraft(): string {
+  try {
+    return (localStorage.getItem(DRAFT_KEY) ?? "").slice(0, MAX);
+  } catch {
+    return "";
+  }
+}
+
+function writeDraft(v: string) {
+  try {
+    if (v) localStorage.setItem(DRAFT_KEY, v);
+    else localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // Private mode or storage full: the box still works, it just won't survive a reload.
+  }
+}
 
 const EXAMPLES = [
   { label: "Morning habits", text: "A 30-second Short: 3 morning habits that make you more productive. Calm voice, end with a question." },
@@ -35,13 +53,26 @@ export function IdeaStarter({ className }: { className?: string }) {
   const projects = useProjects();
   const intel = useIntel();
   const uid = useId();
-  const [text, setText] = useState("");
+  const [text, setTextState] = useState("");
   const [format, setFormat] = useState<"Short" | "Long">("Short");
   const idea = text.trim();
   const ok = idea.length >= 10;
 
+  // Restore after mount so server and client render the same first frame.
+  useEffect(() => {
+    const saved = readDraft();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore of the saved draft.
+    if (saved) setTextState(saved);
+  }, []);
+
+  function setText(v: string) {
+    setTextState(v);
+    writeDraft(v);
+  }
+
   function start() {
     if (!ok) return;
+    writeDraft("");
     const short = format === "Short";
     const channel = projects.channels[0] ?? projects.addChannel("My channel", "");
     const title = titleFrom(idea);

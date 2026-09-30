@@ -130,10 +130,9 @@ export const ACTIONS = {
       count: z.number().int().min(1).max(7).default(2),
       feature: z.enum(PROMO_FEATURES.map((f) => f.id) as [string, ...string[]]).optional(),
       angle: z.string().trim().max(300).default(""),
-      platforms: z.array(z.enum(["youtube", "tiktok"])).min(1).max(2).default(["youtube"]),
+      platforms: z.array(z.enum(["youtube", "tiktok"])).min(1).max(2).default(["youtube", "tiktok"]),
       kind: z.enum(["how-to", "ad", "mix"]).default("how-to"),
-
-      when: z.enum(["now", "morning", "afternoon", "evening"]).default("now"),
+      when: z.enum(["now", "morning", "afternoon", "evening"]).default("afternoon"),
       startInDays: z.number().int().min(0).max(14).default(0),
     }),
     describe: (a: { count: number; feature?: string; angle: string; platforms: string[]; when: string; startInDays: number; kind: string }) => {
