@@ -27,7 +27,9 @@ export const PROMO_FEATURES = [
   { id: "publish", name: "Publish to YouTube", path: "/youtube", pitch: "Publish and schedule straight to your channel, then track results." },
 ] as const;
 
-export const PROMO_STYLES = ["Problem → solution", "Fast demo", "Before / after", "Tips list", "Story", "Bold claim + proof"] as const;
+export const PROMO_STYLES = ["How-to tutorial", "Problem → solution", "Step-by-step guide", "Fast demo", "Myth vs fact", "Before / after", "Tips list", "Story", "Bold claim + proof"] as const;
+/** Styles that teach a real creator skill first and show Recktube as the tool. */
+export const TEACHING_STYLES = new Set<string>(["How-to tutorial", "Step-by-step guide", "Myth vs fact", "Tips list"]);
 export const PROMO_PLATFORMS = ["YouTube Shorts", "TikTok", "Instagram Reels"] as const;
 
 export interface PromoScene { durationSec: number; visual: string; onScreenText: string; narration: string }
@@ -99,6 +101,7 @@ ${PRODUCT_FACTS}
 
 Feature to promote: ${f.name} — ${f.pitch}
 Style: ${input.style}. Platform: ${input.platform}. Target length: ${input.lengthSec} seconds.
+${TEACHING_STYLES.has(input.style) ? `This is a TEACHING Short: the title and hook promise one concrete, searchable creator skill ("How to post on TikTok the right way", "How to get your first 1,000 subscribers", "How to write a hook that stops the scroll", "How to pick a profitable niche", "How to make Shorts without showing your face", "How to schedule a week of videos"…) — invent a fresh one people actually search for. Give genuinely useful, correct steps anyone can follow, and show ${f.name} naturally as the fastest way to do it. The value comes first; the Recktube mention is part of the solution, not a hard sell.` : ""}
 ${input.angle ? `Founder's angle: ${input.angle.slice(0, 600)}` : "No angle given: INVENT a fresh, specific idea yourself — e.g. a concrete creator in a real niche (cooking, finance, gaming, faceless history…) with a real problem this feature solves, a surprising insight about growing on YouTube, or a relatable moment creators know. Be original, not generic."}
 ${made.length ? `\nALREADY MADE — do NOT reuse these ideas, hooks, scenarios or titles, and make this one clearly different from all of them:\n${made.map((m) => `- ${m}`).join("\n")}\n` : ""}
 Rules:

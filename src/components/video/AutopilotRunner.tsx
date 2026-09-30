@@ -117,7 +117,25 @@ function AutoPublish(props: { projectId: string; projectName: string; topic: str
   const comp = video.ready ? video.compFor(props.projectId) : null;
   const assets = useMemo(() => media.assetsFor(props.projectId), [media, props.projectId]);
   const scenes = useMemo(() => scripts.scenesFor(props.projectId), [scripts, props.projectId]);
-  if (!comp || comp.clips.length === 0 || !media.ready || !scripts.ready) {
+  // Load this device's copies of the music, voice and pictures first (like the Publish button),
+  // so the render never leaves out the soundtrack.
+  const { want } = media;
+  useEffect(() => {
+    if (assets.length) want(assets.map((a) => a.id));
+  }, [assets, want]);
+  const [settled, setSettled] = useState(false);
+  const [waitedLong, setWaitedLong] = useState(false);
+  useEffect(() => {
+    const a = window.setTimeout(() => setSettled(true), 4000);
+    // Never wait forever: after 30s render with what loaded.
+    const b = window.setTimeout(() => setWaitedLong(true), 30_000);
+    return () => {
+      window.clearTimeout(a);
+      window.clearTimeout(b);
+    };
+  }, []);
+  const missingAudio = !waitedLong && assets.some((a) => (a.kind === "music" || a.kind === "voice") && a.source === "local-draft" && !media.blobUrlFor(a.id));
+  if (!comp || comp.clips.length === 0 || !media.ready || !scripts.ready || !settled || missingAudio) {
     return <p className="fixed bottom-4 left-1/2 z-[80] -translate-x-1/2 rounded-lg bg-black/80 px-3 py-2 text-xs text-white">Preparing the video…</p>;
   }
   const issues = validateComposition(comp, scenes, assets);
