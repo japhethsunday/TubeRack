@@ -1,6 +1,7 @@
 "use client";
 
 import { GoogleButton } from "@/src/components/auth/GoogleButton";
+import { TermsNotice } from "@/src/components/auth/TermsNotice";
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Lock, Mail } from "lucide-react";
@@ -113,6 +114,7 @@ export function LoginForm({ returnTo, expired, externalError }: { returnTo: stri
               {loading ? "Signing in…" : "Sign in"}
               {!loading && <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />}
             </Button>
+            <TermsNotice action="signing in" />
           </div>
         </form>
         </>

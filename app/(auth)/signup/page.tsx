@@ -1,6 +1,7 @@
 "use client";
 
 import { GoogleButton } from "@/src/components/auth/GoogleButton";
+import { TermsNotice } from "@/src/components/auth/TermsNotice";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Gift, Lock, Mail, User } from "lucide-react";
@@ -161,6 +162,7 @@ export default function SignupPage() {
                       {loading ? "Creating your workspace…" : "Sign up"}
                       {!loading && <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />}
                     </Button>
+                    <TermsNotice action="signing up, including with Google" />
                   </div>
                 </form>
               </>

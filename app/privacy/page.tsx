@@ -34,14 +34,13 @@ export default function PrivacyPage() {
       <h2>Service providers</h2>
       <p>We use trusted providers to run Recktube. Each processes your data only to deliver the feature you use:</p>
       <ul>
-        <li><strong>Hosting and data:</strong> Vercel (hosting), Supabase (database and file storage), Resend (email).</li>
-        <li><strong>Text, research, images and voice:</strong> Google (Gemini API and Cloud Text-to-Speech), with Mistral AI, NVIDIA and BytePlus as backups when the main service is busy. The prompts, scripts and text you generate with are sent to them to produce the result.</li>
-        <li><strong>Support assistant and email support:</strong> when you use in-app support or email <a href="mailto:support@recktube.xyz">support@recktube.xyz</a>, your message and the account details needed to help you (such as your credit balance or why a video failed) are processed by Google&apos;s Gemini API to write the answer. Before anything is sent, your name and email address are replaced with placeholders, so the provider does not see who you are; please don&apos;t include passwords, card numbers or other sensitive details in your messages. Our team&apos;s internal tools work the same way.</li>
-        <li><strong>AI video clips:</strong> open-source video models run on Hugging Face. The prompt and any image you choose to animate are sent there.</li>
-        <li><strong>Backup voice:</strong> a self-hosted speech server operated by Recktube.</li>
-        <li><strong>Stock footage and music:</strong> Pixabay and Jamendo (search terms only).</li>
+        <li><strong>Hosting, storage and email:</strong> cloud hosting, database, file storage and email delivery providers that keep Recktube running.</li>
+        <li><strong>Text, research, images, video and voice:</strong> AI service providers that turn your prompts, scripts and text into the result you asked for, with backup providers used when the main service is busy.</li>
+        <li><strong>Support assistant and email support:</strong> when you use in-app support or email <a href="mailto:support@recktube.xyz">support@recktube.xyz</a>, your message and the account details needed to help you (such as your credit balance or why a video failed) are processed by an AI service provider to write the answer. Before anything is sent, your name, email address, phone numbers and card numbers are replaced with placeholders, so the provider does not see who you are; please don&apos;t include passwords or other sensitive details in your messages. Our team&apos;s internal tools work the same way.</li>
+        <li><strong>Stock footage and music:</strong> stock media libraries (search terms only).</li>
         <li><strong>YouTube:</strong> YouTube API Services, only for your connected channel.</li>
       </ul>
+      <p>Our providers may use your data only to provide their service to us. A current list of our providers is available on request at <a href="mailto:support@recktube.xyz">support@recktube.xyz</a>.</p>
 
       <h2>Retention and deletion</h2>
       <p>Your data is kept while your account is active. You can delete individual items at any time and delete your whole account from <Link href="/settings">Settings</Link>, which removes your projects, media and connected-channel data.</p>
