@@ -2,10 +2,12 @@ import { getDb } from "@/src/server/db";
 import { BackendError } from "@/src/server/errors";
 
 /**
- * Credits. Every workspace gets a monthly allowance (refilled to at least
- * `monthly_grant` every 30 days) plus any credits an admin adds. Each
- * successful generation spends credits; at zero, generation pauses until the
- * next refill or an admin top-up. Unlimited accounts are never charged.
+ * Credits. Every workspace gets a monthly allowance that RESETS to
+ * `monthly_grant` every 30 days — unused monthly credits don't roll over.
+ * Credits that were bought (credit packs) or gifted (admin, codes,
+ * referrals) are "extra" credits: they carry over until used. Monthly
+ * credits are spent first. At zero, generation pauses until the next reset
+ * or a top-up. Unlimited accounts are never charged.
  */
 
 /**
@@ -19,6 +21,8 @@ export const costOf = (kind: string) => CREDIT_COST[kind] ?? 1;
 export interface CreditState {
   accountId: string;
   balance: number;
+  /** Bought or gifted credits inside `balance` that carry over at the reset. */
+  extra: number;
   monthlyGrant: number;
   unlimited: boolean;
   refilledAt: string | null;
@@ -31,19 +35,24 @@ export async function creditState(workspaceId: string): Promise<CreditState | nu
   const rows = await db`
     INSERT INTO credit_accounts (workspace_id, balance, monthly_grant) VALUES (${workspaceId}, 0, ${DEFAULT_MONTHLY_CREDITS})
     ON CONFLICT (workspace_id) DO UPDATE SET workspace_id = EXCLUDED.workspace_id
-    RETURNING id, balance, monthly_grant, unlimited, refilled_at`;
+    RETURNING id, balance, extra_balance, monthly_grant, unlimited, refilled_at`;
   let r = rows[0] as Record<string, unknown>;
   const due = !r.refilled_at || Date.now() - new Date(String(r.refilled_at)).getTime() > 30 * 86_400_000;
   if (due) {
+    // Monthly credits reset (unused ones expire); unspent extra credits are kept.
+    // Monthly credits are spent first, so the extra left is at most the balance.
     const upd = await db`
-      UPDATE credit_accounts SET balance = GREATEST(balance, monthly_grant), refilled_at = now(), updated_at = now()
-      WHERE id = ${String(r.id)} RETURNING id, balance, monthly_grant, unlimited, refilled_at`;
+      UPDATE credit_accounts
+      SET extra_balance = LEAST(extra_balance, balance),
+          balance = monthly_grant + LEAST(extra_balance, balance),
+          refilled_at = now(), updated_at = now()
+      WHERE id = ${String(r.id)} RETURNING id, balance, extra_balance, monthly_grant, unlimited, refilled_at`;
     const before = Number(r.balance);
     r = upd[0] as Record<string, unknown>;
-    const added = Number(r.balance) - before;
-    if (added > 0) await db`INSERT INTO credit_transactions (account_id, kind, amount, balance_after, ref) VALUES (${String(r.id)}, 'monthly', ${added}, ${Number(r.balance)}, 'Monthly allowance')`;
+    const change = Number(r.balance) - before;
+    if (change !== 0 && r.refilled_at) await db`INSERT INTO credit_transactions (account_id, kind, amount, balance_after, ref) VALUES (${String(r.id)}, 'monthly', ${change}, ${Number(r.balance)}, 'Monthly reset: new allowance (unused monthly credits expire)')`;
   }
-  return { accountId: String(r.id), balance: Number(r.balance), monthlyGrant: Number(r.monthly_grant), unlimited: Boolean(r.unlimited), refilledAt: r.refilled_at ? new Date(String(r.refilled_at)).toISOString() : null };
+  return { accountId: String(r.id), balance: Number(r.balance), extra: Math.min(Number(r.extra_balance ?? 0), Number(r.balance)), monthlyGrant: Number(r.monthly_grant), unlimited: Boolean(r.unlimited), refilledAt: r.refilled_at ? new Date(String(r.refilled_at)).toISOString() : null };
 }
 
 /**
@@ -71,7 +80,7 @@ export async function spendCredits(workspaceId: string, kind: string, ref?: stri
   if (!db) return;
   const cost = costOf(kind);
   const rows = await db`
-    UPDATE credit_accounts SET balance = GREATEST(0, balance - ${cost}), updated_at = now()
+    UPDATE credit_accounts SET balance = GREATEST(0, balance - ${cost}), extra_balance = LEAST(extra_balance, GREATEST(0, balance - ${cost})), updated_at = now()
     WHERE workspace_id = ${workspaceId} AND NOT unlimited RETURNING id, balance`;
   if (rows[0]) await db`INSERT INTO credit_transactions (account_id, kind, amount, balance_after, ref) VALUES (${String(rows[0].id)}, ${`usage:${kind}`}, ${-cost}, ${Number(rows[0].balance)}, ${ref ?? null})`;
 }
@@ -81,8 +90,13 @@ export async function adjustCredits(workspaceId: string, delta: number, reason: 
   const db = getDb();
   if (!db) return null;
   await creditState(workspaceId);
+  // Bought or gifted credits carry over; refunds of spent monthly credits don't.
+  const carries = delta > 0 && !/^(refund|reset)/.test(kind ?? "");
   const rows = await db`
-    UPDATE credit_accounts SET balance = GREATEST(0, balance + ${delta}), updated_at = now()
+    UPDATE credit_accounts
+    SET balance = GREATEST(0, balance + ${delta}),
+        extra_balance = LEAST(GREATEST(0, balance + ${delta}), extra_balance + ${carries ? delta : 0}),
+        updated_at = now()
     WHERE workspace_id = ${workspaceId} RETURNING id, balance`;
   if (rows[0]) await db`INSERT INTO credit_transactions (account_id, kind, amount, balance_after, ref) VALUES (${String(rows[0].id)}, ${kind ?? (delta >= 0 ? "admin:add" : "admin:remove")}, ${delta}, ${Number(rows[0].balance)}, ${reason})`;
   return creditState(workspaceId);

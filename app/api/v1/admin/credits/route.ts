@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     if (input.reset) {
       if (!before) throw notFound("Credit account");
       const diff = Number(before.monthly_grant) - Number(before.balance);
-      state = diff ? await adjustCredits(workspaceId, diff, input.reason?.trim() || "Reset to monthly allowance") : state;
+      state = diff ? await adjustCredits(workspaceId, diff, input.reason?.trim() || "Reset to monthly allowance", "reset:monthly") : state;
       await audit({ userId: admin.id, workspaceId, action: "admin.credits.reset", resourceType: "credit_accounts", resourceId: workspaceId, metadata: { from: Number(before.balance), to: Number(before.monthly_grant) } });
       return NextResponse.json({ data: { ...(state ?? {}), emailed: 0 } });
     }

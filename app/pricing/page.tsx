@@ -157,7 +157,7 @@ export default async function Pricing() {
             <h2 className="text-lg font-semibold">Questions</h2>
             <Faq q="How do I pay?" a="Choose a plan after you sign up. Payments are processed securely by Paystack. You can also email support@recktube.xyz and we'll set up your plan." />
             <Faq q="Can I cancel?" a="Yes, any time. Your plan stays active until the end of the month you paid for, then your account returns to the Free plan." />
-            <Faq q="Do unused monthly credits roll over?" a="Every 30 days your balance is topped back up to your plan's monthly amount. Credits above that amount, such as a credit pack, are kept." />
+            <Faq q="Do unused monthly credits roll over?" a="No. Every 30 days your monthly credits reset to your plan's amount, and unused monthly credits expire. Credits from a credit pack are kept until you use them, and monthly credits are always used first." />
             <Faq q="Refunds" a="If something went wrong with a payment, email support@recktube.xyz within 7 days and we'll make it right. Full details: recktube.xyz/refund-policy" />
           </div>
         </section>

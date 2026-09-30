@@ -144,6 +144,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     summary: "100 free credits every 30 days, and what each tool costs.",
     body: [
       "Every account gets 100 free credits that refill every 30 days — enough for one full generated video or 10 images.",
+      "Monthly credits don't roll over: every 30 days they reset to your plan's amount. Credits from a credit pack are kept until used, and monthly credits are spent first.",
       "What things cost:",
       "• Full generated video: 100",
       "• Image: 10",

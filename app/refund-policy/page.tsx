@@ -16,7 +16,8 @@ export default function RefundPolicy() {
       <h2>Plans and billing</h2>
       <ul>
         <li>Paid plans (Creator, Pro and Studio) are billed monthly, in advance, at the price shown on the Pricing page when you subscribe.</li>
-        <li>Credit packs are one-off purchases. The credits are added to your balance straight away.</li>
+        <li>Credit packs are one-off purchases. The credits are added to your balance straight away and are kept until you use them.</li>
+        <li>Monthly plan credits reset every 30 days. Unused monthly credits expire and are not refundable.</li>
         <li>Payments are processed securely by Paystack. Recktube never sees or stores your full card number.</li>
       </ul>
 
