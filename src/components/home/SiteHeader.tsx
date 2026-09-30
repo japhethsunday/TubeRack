@@ -40,8 +40,9 @@ const MENUS: { label: string; links: NavLink[] }[] = [
 ];
 
 const ANCHORS = [
-  { href: "#how", label: "How it works" },
-  { href: "#features", label: "Features" },
+  { href: "/#how", label: "How it works" },
+  { href: "/#features", label: "Features" },
+  { href: "/pricing", label: "Pricing" },
 ];
 
 function Dropdown({ label, links }: { label: string; links: NavLink[] }) {
