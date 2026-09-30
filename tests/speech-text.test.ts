@@ -18,3 +18,13 @@ test("direction wraps the text and asks for a human delivery", () => {
   assert.match(d, /not an AI/);
   assert.ok(d.endsWith(":\nHello there."));
 });
+
+test("voice quota: wait on per-minute limits, not on daily or blocked ones", async () => {
+  const { quotaRetryMs } = await import("@/src/server/ai/gemini");
+  const perMinute = new Error('{"error":{"code":429,"message":"Quota exceeded for metric: generate_content_free_tier_requests, limit: 10, model: gemini-2.5-flash-tts\\nPlease retry in 47.612534442s.","status":"RESOURCE_EXHAUSTED"}}');
+  assert.equal(quotaRetryMs(perMinute), 49113);
+  assert.equal(quotaRetryMs(new Error("429 RESOURCE_EXHAUSTED limit: 0, model: x. Please retry in 5s.")), null);
+  assert.equal(quotaRetryMs(new Error("429 quota GenerateRequestsPerDayPerProjectPerModel retry in 5s")), null);
+  assert.equal(quotaRetryMs(new Error("503 overloaded")), null);
+  assert.equal(quotaRetryMs(new Error("429 RESOURCE_EXHAUSTED Please retry in 992.43535ms.")), 2493);
+});

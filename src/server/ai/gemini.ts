@@ -488,6 +488,18 @@ export const VOICE_STYLES = {
 } as const;
 export type VoiceStyle = keyof typeof VOICE_STYLES;
 
+/** For a per-minute quota error, how long the service asks us to wait (ms, padded); null otherwise. */
+export function quotaRetryMs(error: unknown): number | null {
+  const text = error instanceof Error ? error.message : String(error);
+  if (!/\b429\b|RESOURCE_EXHAUSTED|quota/i.test(text)) return null;
+  // A daily cap or a model we can't use at all: waiting won't help.
+  if (/per[_ ]?day|PerDay|limit: 0\b/i.test(text)) return null;
+  const m = /retry in ([\d.]+)\s*(ms|s)\b/i.exec(text) ?? /"retryDelay"\s*:\s*"([\d.]+)(s)"/i.exec(text);
+  if (!m) return null;
+  const ms = Number(m[1]) * (m[2].toLowerCase() === "ms" ? 1 : 1000);
+  return ms > 60_000 ? null : Math.ceil(ms) + 1500;
+}
+
 /** Direction for the voice model. Gemini's speech models follow a spoken-style instruction before the text. */
 export function directSpeech(text: string, style: VoiceStyle = "natural"): string {
   return `Read the following aloud as ${VOICE_STYLES[style] ?? VOICE_STYLES.natural}. Sound like a real human, not an AI or an announcer: natural pace, small pauses at commas and full stops, varied pitch, and stress the words that matter. Only say the text after the colon:\n${text}`;
@@ -517,6 +529,23 @@ export class GeminiTtsProvider implements TtsProvider {
 
   /** One TTS call; returns raw 16-bit mono PCM and its sample rate. */
   private async synthesizeChunk(text: string, voice: string, model: string, style: VoiceStyle = "natural"): Promise<{ pcm: Buffer; rate: number }> {
+    // The free tier allows only a few voice requests a minute. When it says
+    // "retry in Ns", wait and use the natural voice again instead of falling
+    // back to a more robotic backup voice (up to ~2.5 minutes in total).
+    const started = Date.now();
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.synthesizeOnce(text, voice, model, style);
+      } catch (error) {
+        const wait = quotaRetryMs(error);
+        if (wait === null || attempt >= 3 || Date.now() - started + wait > 150_000) throw error;
+        console.warn(`[tts] voice quota busy; waiting ${Math.round(wait / 1000)}s to keep the natural voice`);
+        await sleep(wait);
+      }
+    }
+  }
+
+  private async synthesizeOnce(text: string, voice: string, model: string, style: VoiceStyle): Promise<{ pcm: Buffer; rate: number }> {
     const ai = getGeminiClient();
     const response = await withModelFallback(model, FALLBACK_MODELS.tts, (m) =>
       ai.models.generateContent({
@@ -575,7 +604,7 @@ export class GeminiTtsProvider implements TtsProvider {
       model: "google-cloud-tts",
     });
     const routes: { name: string; run: () => Promise<{ parts: { pcm: Buffer; rate: number }[]; model: string }> }[] = [];
-    if (isGeminiConfigured(env)) routes.push({ name: "gemini", run: async () => ({ parts: (await mapLimit(chunks, 4, (chunk) => completeSpeech(chunk, (t) => this.synthesizeChunk(t, voice, model, style)))).flat(), model }) });
+    if (isGeminiConfigured(env)) routes.push({ name: "gemini", run: async () => ({ parts: (await mapLimit(chunks, 2, (chunk) => completeSpeech(chunk, (t) => this.synthesizeChunk(t, voice, model, style)))).flat(), model }) });
     if (cloudTts) routes.push({ name: "cloud-tts", run: viaCloud });
     if (mistral) routes.push({ name: "voxtral", run: viaMistral });
     // Self-hosted Piper: no quota, the voice of last resort.
