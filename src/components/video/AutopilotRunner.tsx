@@ -17,6 +17,11 @@ import { durationOf, healthOf, validateComposition } from "@/src/lib/video/build
 import type { RenderAsset } from "@/src/lib/video/render";
 
 export type AutoPlatform = "yt" | "tt";
+
+/** Promo videos keep one professional brand narrator, delivered like a confident creator. */
+const PROMO_SOUND = { voice: "Achird", style: "energetic" };
+/** Polished, upbeat beds that suit a product video; rotated so promos don't all sound alike. */
+const PROMO_MUSIC = ["corporate", "motivational", "inspirational", "cinematic"];
 import type { ScriptSection } from "@/src/lib/script/types";
 
 interface Promo { id: string; projectId: string | null; pkg: { title: string; captions: { platform: string; title: string; caption: string; hashtags: string[] }[] } }
@@ -111,7 +116,7 @@ export function AutopilotRunner({
         </span>
       </div>
       {stage === "generate" && (
-        <GenerateVideoDialog project={project} sections={sections} wpm={wpm} onClose={() => undefined} auto={{ onDone: () => setStage("publish"), onFail: (m) => void fail(m) }} />
+        <GenerateVideoDialog project={project} sections={sections} wpm={wpm} onClose={() => undefined} auto={{ onDone: () => setStage("publish"), onFail: (m) => void fail(m), ...PROMO_SOUND, music: PROMO_MUSIC[(index + promoId.charCodeAt(0)) % PROMO_MUSIC.length] }} />
       )}
       {stage === "publish" && promo && (
         <AutoPublish

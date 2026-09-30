@@ -123,10 +123,11 @@ Teaching rules (most important):
 ${input.angle ? `Founder's angle: ${input.angle.slice(0, 600)}` : "No angle given: INVENT a fresh, specific idea yourself — e.g. a concrete creator in a real niche (cooking, finance, gaming, faceless history…) with a real problem this feature solves, a surprising insight about growing on YouTube, or a relatable moment creators know. Be original, not generic."}
 ${made.length ? `\nALREADY MADE — do NOT reuse these ideas, hooks, scenarios or titles, and make this one clearly different from all of them:\n${made.map((m) => `- ${m}`).join("\n")}\n` : ""}
 Rules:
+- Quality bar: this must look and sound like a polished ad from a top brand. Every line earns its place; no filler, no repetition, one clear idea per scene, and scenes flow as a story (problem, turn, payoff, call to action).
 - Hook in the first 2 seconds that stops the scroll (a pain creators feel, or a surprising outcome). No clickbait lies.
 - Only real features and facts from above. No invented stats, user counts, testimonials, prices or guarantees.
 - 5–9 scenes; durations add up to about ${input.lengthSec}s. Each scene: what's on screen (screen recording of the app, b-roll, text animation…), short bold on-screen text (≤ 6 words), and the voice-over line.
-- Voice-over: natural, energetic, spoken English; the scenes' narration joined together must read as ONE flowing script (it is recorded in a single take). Aim for about ${Math.round(input.lengthSec * 2.4)} words in total so the video really lasts about ${input.lengthSec}s; each scene's narration is 1–2 complete sentences (roughly 8–25 words), never a fragment.
+- Voice-over: sounds like a real, confident creator talking to camera, not an announcer or a robot: contractions (you're, it's), everyday words, short punchy sentences mixed with longer ones, speaking directly to "you". No hype words ("revolutionary", "game-changer", "unleash", "supercharge", "seamless"), no emoji, hashtags or symbols in the narration; the scenes' narration joined together must read as ONE flowing script (it is recorded in a single take). Aim for about ${Math.round(input.lengthSec * 2.4)} words in total so the video really lasts about ${input.lengthSec}s; each scene's narration is 1–2 complete sentences (roughly 8–25 words), never a fragment.
 - End with a clear CTA to try Recktube free at recktube.xyz.
 - Captions for YouTube Shorts, TikTok and Instagram Reels: a title/first line, a caption within that platform's norms, and 5–10 relevant hashtags (always include #Recktube).
 - Thumbnail/cover text ≤ 5 words.

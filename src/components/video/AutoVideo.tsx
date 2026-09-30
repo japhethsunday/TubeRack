@@ -139,7 +139,14 @@ export function GenerateVideoDialog({
   wpm: number;
   onClose: () => void;
   /** Hands-free (Promo autopilot): start at once, replace any old edit, report the outcome. */
-  auto?: { onDone: () => void; onFail: (message: string) => void };
+  auto?: {
+    onDone: () => void;
+    onFail: (message: string) => void;
+    /** Fixed narrator, delivery and music (e.g. promo videos keep one brand voice). */
+    voice?: string;
+    style?: string;
+    music?: string;
+  };
 }) {
   const router = useRouter();
   const { putScenes } = useScripts();
@@ -154,7 +161,7 @@ export function GenerateVideoDialog({
   const [fatal, setFatal] = useState<string | null>(null);
   const [replaceOk, setReplaceOk] = useState(false);
   const [visualMode, setVisualMode] = useState<VisualMode>("mix");
-  const [musicMood, setMusicMood] = useState<string>("background");
+  const [musicMood, setMusicMood] = useState<string>(auto?.music ?? "background");
   const paidUser = usePaid();
   const [aiMotion, setAiMotion] = useState(false);
   const cancelled = useRef(false);
@@ -242,11 +249,11 @@ export function GenerateVideoDialog({
       const voiceScene = async (scene: Scene) => {
         // Voice services refuse bursts ("too many requests"): wait and try again
         // with the same narrator, so one video never mixes voices.
-        let out = await synthesizeProviderSpeech(sceneSpeech(scene), undefined, engine);
+        let out = await synthesizeProviderSpeech(sceneSpeech(scene), auto?.voice, engine, auto?.style);
         for (const wait of [3000, 8000, 15000]) {
           if (out.ok || isCancelled()) break;
           await new Promise((r) => setTimeout(r, wait));
-          out = await synthesizeProviderSpeech(sceneSpeech(scene), undefined, engine); // same narrator every time
+          out = await synthesizeProviderSpeech(sceneSpeech(scene), auto?.voice, engine, auto?.style); // same narrator every time
         }
         if (out.ok && !engine) engine = out.data.model;
         if (!out.ok) {
@@ -279,11 +286,11 @@ export function GenerateVideoDialog({
       // its share of the recording in proportion to its words.
       const fullText = scenes.map((sc) => sceneSpeech(sc).trim()).filter(Boolean).join("\n\n");
       if (scenes.length > 1 && fullText.length > 0 && fullText.length <= 3500) {
-        let out = await synthesizeProviderSpeech(fullText);
+        let out = await synthesizeProviderSpeech(fullText, auto?.voice, undefined, auto?.style);
         for (const wait of [3000, 8000, 15000]) {
           if (out.ok || isCancelled()) break;
           await new Promise((r) => setTimeout(r, wait));
-          out = await synthesizeProviderSpeech(fullText);
+          out = await synthesizeProviderSpeech(fullText, auto?.voice, undefined, auto?.style);
         }
         const dur = out.ok ? await audioDuration(out.data.url) : 0;
         if (out.ok && dur > 1) {

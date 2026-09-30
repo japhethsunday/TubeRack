@@ -85,11 +85,11 @@ export function generateProviderImage(prompt: string, aspectRatio: "16:9" | "9:1
 }
 
 /** With an engine, the narration stays on that exact voice service (no silent switch to another voice). */
-export function synthesizeProviderSpeech(text: string, voice?: string, engine?: string) {
+export function synthesizeProviderSpeech(text: string, voice?: string, engine?: string, style?: string) {
   // The narrator and delivery style chosen in the Voice studio apply everywhere.
   const prefs = typeof window === "undefined" ? { style: "natural" as const, voice: undefined } : readVoicePrefs();
   return attempt(() =>
-    api.post<{ url: string; mimeType: string; model: string; durationSec?: number }>("/api/v1/ai/speech", { text, voice: voice ?? prefs.voice, engine, strict: Boolean(engine), style: prefs.style }),
+    api.post<{ url: string; mimeType: string; model: string; durationSec?: number }>("/api/v1/ai/speech", { text, voice: voice ?? prefs.voice, engine, strict: Boolean(engine), style: style ?? prefs.style }),
   );
 }
 
