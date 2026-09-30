@@ -1,3 +1,5 @@
+import { isAdmin } from "@/src/server/admin";
+import { requireFeature } from "@/src/server/credits";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { guardProviderCall, providerFailure, recordUsage, type ProviderCaller } from "@/src/server/ai/guard";
@@ -20,6 +22,7 @@ export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
     caller = await guardProviderCall("text");
+    await requireFeature(caller.workspaceId, "recreator", isAdmin(caller.user));
     const input = await parseBody(request, body);
     let result;
     try {

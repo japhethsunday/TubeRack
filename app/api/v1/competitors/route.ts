@@ -1,3 +1,5 @@
+import { isAdmin } from "@/src/server/admin";
+import { requireFeature } from "@/src/server/credits";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireWorkspace } from "@/src/server/workspace";
@@ -22,6 +24,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const caller = await requireWorkspace("editor");
+    await requireFeature(caller.workspaceId, "competitors", isAdmin(caller.user));
     const limit = limiterFor("write").take(`competitor:${caller.user.id}`);
     if (limit.allowed === false) throw rateLimited(limit.retryAfterSec);
     const { channel } = await parseBody(request, z.object({ channel: z.string().trim().min(2).max(300) }));

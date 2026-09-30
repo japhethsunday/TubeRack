@@ -1,3 +1,5 @@
+import { isAdmin } from "@/src/server/admin";
+import { requireFeature } from "@/src/server/credits";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { guardProviderCall, providerFailure, youtubeSearchBudget } from "@/src/server/ai/guard";
@@ -16,7 +18,9 @@ const body = z.object({
 /** POST /api/v1/recreate/outliers — videos beating their channel's size in a niche. */
 export async function POST(request: Request) {
   try {
-    await youtubeSearchBudget(await guardProviderCall());
+    const caller = await guardProviderCall();
+    await requireFeature(caller.workspaceId, "recreator", isAdmin(caller.user));
+    await youtubeSearchBudget(caller);
     const input = await parseBody(request, body);
     return NextResponse.json({ data: await findOutliers(input) });
   } catch (error) {

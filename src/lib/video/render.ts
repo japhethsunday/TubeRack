@@ -42,6 +42,8 @@ export interface RenderOptions {
   assetFor: (id: string | undefined) => RenderAsset | null;
   onProgress: (p: { phase: "preparing" | "rendering" | "finalizing"; ratio: number; message: string; elapsedSec?: number; etaSec?: number }) => void;
   signal?: AbortSignal;
+  /** Free plan: stamp the Recktube mark and cap the size at 720p. */
+  watermark?: boolean;
 }
 
 export interface RenderResult {
@@ -186,6 +188,10 @@ function fadeGain(c: TimelineClip, t: number): number {
 
 /** Render the composition to a video Blob (takes about as long as the range). */
 export async function renderComposition(o: RenderOptions): Promise<RenderResult> {
+  if (o.watermark) {
+    const k = Math.min(1, 720 / Math.min(o.width, o.height));
+    o = { ...o, width: Math.round((o.width * k) / 2) * 2, height: Math.round((o.height * k) / 2) * 2 };
+  }
   // Fast path first: frame-by-frame hardware encoding, faster than real time.
   try {
     const { renderFast } = await import("@/src/lib/video/render-fast");
@@ -389,11 +395,13 @@ async function renderRealtime(o: RenderOptions): Promise<RenderResult> {
     }
   };
 
-  const draw = (t: number) =>
+  const draw = (t: number) => {
     drawComposition(ctx, o.comp, t, W, H, {
       sourceFor: (c) => (c.kind === "video" ? (videos.get(c.id) as VisualSource | undefined) ?? null : c.assetId ? images.get(c.assetId) ?? null : null),
       isDraft: (c) => assetOf(c)?.source === "local-draft",
     });
+    if (o.watermark) drawWatermark(ctx, W, H);
+  };
 
   // Pre-roll: seek videos to their first frame, then start clock + recorder together.
   syncVideos(from, false);
@@ -455,4 +463,44 @@ async function renderRealtime(o: RenderOptions): Promise<RenderResult> {
   const blob = new Blob(chunks, { type });
   if (blob.size < 1000) throw new RenderError("The export produced an empty file. Keep this tab open while exporting and try again.");
   return { blob, mime: type, warnings, width: W, height: H, fps: o.fps, durationSec: span };
+}
+
+/** The Free-plan mark: a small "Recktube" badge in the bottom-right corner. */
+export function drawWatermark(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+  const u = Math.min(W, H) / 720;
+  const pad = Math.round(18 * u);
+  const size = Math.round(20 * u);
+  const box = Math.round(26 * u);
+  ctx.save();
+  ctx.font = `600 ${size}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  const label = "Recktube";
+  const tw = ctx.measureText(label).width;
+  const w = box + Math.round(8 * u) + tw + Math.round(20 * u);
+  const h = box + Math.round(12 * u);
+  const x = W - pad - w;
+  const y = H - pad - h;
+  ctx.globalAlpha = 0.78;
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, h / 2);
+  ctx.fill();
+  const bx = x + Math.round(6 * u);
+  const by = y + (h - box) / 2;
+  const g = ctx.createLinearGradient(bx, by, bx + box, by + box);
+  g.addColorStop(0, "#c026d3");
+  g.addColorStop(0.5, "#7c3aed");
+  g.addColorStop(1, "#0284c7");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, box, box, Math.round(7 * u));
+  ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `800 ${Math.round(17 * u)}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  ctx.fillText("R", bx + box / 2, by + box / 2 + u);
+  ctx.textAlign = "left";
+  ctx.font = `600 ${size}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  ctx.fillText(label, bx + box + Math.round(8 * u), y + h / 2 + u);
+  ctx.restore();
 }

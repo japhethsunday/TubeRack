@@ -1,4 +1,5 @@
 "use client";
+import { useFeature } from "@/src/lib/use-plan";
 
 import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Music2 } from "lucide-react";
@@ -69,6 +70,7 @@ export function PostToTikTokButton({ source, prerendered }: { source: PublishSou
 type Phase = "idle" | "render" | "upload" | "send" | "processing" | "done" | "failed";
 
 export function TikTokDialog({ source, prerendered, info, onClose }: { source: PublishSource; prerendered: Prerendered | null; info: TikTokConnection; onClose: () => void }) {
+  const clean = useFeature("clean-export") ?? true;
   const [creator, setCreator] = useState<Creator | null>(null);
   const [creatorErr, setCreatorErr] = useState<string | null>(null);
   const [notice] = useState(() => {
@@ -142,6 +144,7 @@ export function TikTokDialog({ source, prerendered, info, onClose }: { source: P
       if (!blob) {
         setPhase("render");
         const out = await renderComposition({
+              watermark: !clean,
           comp: source.comp,
           duration: source.duration,
           width: source.render?.width ?? source.comp.canvas.width,

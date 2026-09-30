@@ -2,6 +2,7 @@
 
 import { fastExportSupported } from "@/src/lib/video/render-fast";
 import { useEffect, useRef, useState } from "react";
+import { useFeature } from "@/src/lib/use-plan";
 import { Download, Film, X, RotateCcw, Check, AlertTriangle, MonitorPlay, Loader2 } from "lucide-react";
 import type { Composition, HealthState, ValidationIssue } from "@/src/lib/video/types";
 import { estimateBitrate, renderComposition, renderSupport, RenderError, type ExportQuality, type RenderAsset } from "@/src/lib/video/render";
@@ -64,7 +65,9 @@ export function ExportStudio({
   inOut: { in: number; out: number } | null;
   onPublish?: (exp: FinishedExport) => void;
 }) {
+  const clean = useFeature("clean-export") ?? true;
   const [settings, setSettings] = useState<ExportSettings>({ height: 1080, fps: 30, quality: "high", audioKbps: 192, range: "all" });
+  const pickedHeight = clean ? settings.height : Math.min(settings.height, 720);
   const [state, setState] = useState<"idle" | "running" | "done" | "failed">("idle");
   const [progress, setProgress] = useState({ ratio: 0, message: "", eta: undefined as number | undefined });
   const [error, setError] = useState("");
@@ -80,7 +83,7 @@ export function ExportStudio({
     if (urlRef.current) URL.revokeObjectURL(urlRef.current);
   }, []);
   const support = typeof window !== "undefined" ? renderSupport() : { ok: true };
-  const { width, height } = sizeFor(comp, settings.height);
+  const { width, height } = sizeFor(comp, pickedHeight);
   const range = settings.range === "inout" && inOut ? { from: inOut.in, to: inOut.out } : { from: 0, to: duration };
   const span = Math.max(0, range.to - range.from);
   const estBytes = ((estimateBitrate(width, height, settings.fps, settings.quality) + settings.audioKbps * 1000) * span) / 8;
@@ -110,6 +113,7 @@ export function ExportStudio({
         fps: settings.fps,
         quality: settings.quality,
         audioKbps: settings.audioKbps,
+        watermark: !clean,
         range,
         assetFor,
         signal: ac.signal,
@@ -153,11 +157,12 @@ export function ExportStudio({
         <p className="text-xs font-medium">Resolution</p>
         <div className="mt-1 grid grid-cols-5 gap-1">
           {HEIGHTS.map((h) => (
-            <button key={h} type="button" onClick={() => set({ height: h })} aria-pressed={settings.height === h} disabled={state === "running"} className={cx("rounded-md border py-1.5 text-xs font-medium transition-colors", settings.height === h ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted")}>
+            <button key={h} type="button" onClick={() => set({ height: h })} aria-pressed={pickedHeight === h} disabled={state === "running" || (!clean && h > 720)} title={!clean && h > 720 ? "Available on paid plans" : undefined} className={cx("rounded-md border py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40", pickedHeight === h ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted")}>
               {HEIGHT_LABEL[h]}
             </button>
           ))}
         </div>
+        {!clean && <p className="mt-1.5 text-[11px] text-muted-text">Free plan exports are up to 720p with a small Recktube mark. <a href="/pricing" className="font-medium text-primary underline-offset-2 hover:underline">Upgrade</a> for 1080p and above without it.</p>}
       </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="text-xs">Frame rate

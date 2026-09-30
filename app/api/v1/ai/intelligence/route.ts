@@ -1,3 +1,6 @@
+import { isAdmin } from "@/src/server/admin";
+import { requireFeature } from "@/src/server/credits";
+import { TASK_FEATURES } from "@/src/lib/plans";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { INTELLIGENCE_TASKS } from "@/src/lib/intelligence/tasks";
@@ -21,6 +24,8 @@ export async function POST(request: Request) {
     caller = await guardProviderCall("text");
     const input = await parseBody(request, body);
     task = input.task;
+    const feature = TASK_FEATURES[task];
+    if (feature) await requireFeature(caller.workspaceId, feature, isAdmin(caller.user));
     const result = await requestIntelligence({ task: input.task, context: input.context });
     await recordUsage(caller, { kind: "text", provider: "gemini", model: result.model, status: "completed", ref: task });
     return NextResponse.json({ data: result });

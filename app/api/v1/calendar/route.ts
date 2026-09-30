@@ -1,3 +1,5 @@
+import { isAdmin } from "@/src/server/admin";
+import { requireFeature } from "@/src/server/credits";
 import { NextResponse } from "next/server";
 import { requireWorkspace } from "@/src/server/workspace";
 import { toErrorResponse, validationError } from "@/src/server/errors";
@@ -27,6 +29,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { workspaceId, user, db } = await requireWorkspace("editor");
+    await requireFeature(workspaceId, "scheduling", isAdmin(user));
     const i = await parseBody(request, itemSchema);
     const rows = await db.unsafe(
       `INSERT INTO calendar_items (workspace_id, user_id, project_id, title, kind, date, time, status, notes, remind) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING ${COLS}`,

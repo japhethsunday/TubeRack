@@ -1,4 +1,5 @@
 "use client";
+import { useFeature } from "@/src/lib/use-plan";
 
 import { SvgThumb } from "@/src/components/package/SvgThumb";
 
@@ -177,6 +178,7 @@ export interface AutoPublish {
 }
 
 export function PublishDialog({ source, prerendered, onClose, onRendered, auto }: { source: PublishSource; prerendered: Prerendered | null; onClose: () => void; onRendered?: (video: Prerendered) => void; auto?: AutoPublish }) {
+  const clean = useFeature("clean-export") ?? true;
   const pack = usePackaging();
   const seo = pack.seoFor(source.projectId);
   const primary = pack.primaryTitleFor(source.projectId);
@@ -398,6 +400,7 @@ export function PublishDialog({ source, prerendered, onClose, onRendered, auto }
         if (s.id === "render") {
           if (!r.blob) {
             const out = await renderComposition({
+              watermark: !clean,
               comp: source.comp,
               duration: source.duration,
               width: source.render?.width ?? source.comp.canvas.width,

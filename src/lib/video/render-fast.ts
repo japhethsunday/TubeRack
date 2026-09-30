@@ -6,7 +6,7 @@ import { drawComposition, sourceTime, type VisualSource } from "@/src/lib/video/
 import { mixGain, MUSIC_DUCK, trackVolume, voiceRanges } from "@/src/lib/video/mix";
 import { loadAudio } from "@/src/lib/video/audio-load";
 import { renderMusic, renderSfx, musicRecipe, type MusicMood, type SfxType } from "@/src/lib/media/audio";
-import { assetUrl, estimateBitrate, loadImage, loadVideo, prefetchAudio, RenderError, untilDone, type RenderOptions, type RenderResult } from "@/src/lib/video/render";
+import { assetUrl, drawWatermark, estimateBitrate, loadImage, loadVideo, prefetchAudio, RenderError, untilDone, type RenderOptions, type RenderResult } from "@/src/lib/video/render";
 
 /**
  * Fast exporter: draws every frame directly and encodes it with the
@@ -301,6 +301,7 @@ export async function renderFast(o: RenderOptions): Promise<RenderResult | null>
         sourceFor: (c) => (c.kind === "video" ? (videos.get(c.id) as VisualSource | undefined) ?? null : c.assetId ? images.get(c.assetId) ?? null : null),
         isDraft: (c) => assetOf(c)?.source === "local-draft",
       });
+      if (o.watermark) drawWatermark(ctx, W, H);
       const frame = new VideoFrame(canvas, { timestamp: Math.round(i * frameUs), duration: Math.round(frameUs) });
       videoEncoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
       frame.close();

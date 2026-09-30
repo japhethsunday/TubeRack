@@ -1,5 +1,6 @@
 import { getDb } from "@/src/server/db";
 import { BackendError } from "@/src/server/errors";
+import { atLeast, FEATURES, lockedMessage, tierOf, type Feature, type Tier } from "@/src/lib/plans";
 
 /**
  * Credits. Every workspace gets a monthly allowance that RESETS to
@@ -109,4 +110,15 @@ export async function setCreditPlan(workspaceId: string, plan: { monthlyGrant?: 
   if (plan.monthlyGrant !== undefined) await db`UPDATE credit_accounts SET monthly_grant = ${plan.monthlyGrant}, updated_at = now() WHERE workspace_id = ${workspaceId}`;
   if (plan.unlimited !== undefined) await db`UPDATE credit_accounts SET unlimited = ${plan.unlimited}, updated_at = now() WHERE workspace_id = ${workspaceId}`;
   return creditState(workspaceId);
+}
+
+/** The workspace's plan (admins and unlimited accounts count as Studio). */
+export async function planTier(workspaceId: string, admin = false): Promise<Tier> {
+  if (admin) return "studio";
+  return tierOf(await creditState(workspaceId));
+}
+
+/** Throw a friendly upgrade message when the plan doesn't include `feature`. */
+export async function requireFeature(workspaceId: string, feature: Feature, admin = false): Promise<void> {
+  if (!atLeast(await planTier(workspaceId, admin), FEATURES[feature].tier)) throw new BackendError("FORBIDDEN", lockedMessage(feature));
 }

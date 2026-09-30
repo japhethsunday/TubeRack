@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { NAV_SECTIONS, ALL_NAV_ITEMS, MOBILE_NAV_SLUGS, type NavItem } from "@/src/config/navigation";
 import { Badge } from "@/src/components/ui/Badge";
 import { cx } from "@/src/components/ui/cx";
+import { PlanBadge } from "@/src/components/shell/PlanGate";
 
 /** Query-aware active matching, computed once per sidebar (hooks rule). */
 function useActiveFor(): (item: NavItem) => boolean {
@@ -68,6 +69,7 @@ function Item({
     <>
       <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
       <span className="flex-1 truncate text-left">{item.label}</span>
+      {item.status === "live" && <PlanBadge href={item.href} />}
       {item.status === "preview" && (
         <Badge tone="preview" className="px-1.5 py-0 text-[10px]">
           Preview

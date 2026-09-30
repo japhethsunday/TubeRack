@@ -1,5 +1,7 @@
 "use client";
 
+import { PlanGate } from "@/src/components/shell/PlanGate";
+
 import { SupportWidget } from "@/src/components/support/SupportWidget";
 import { AiActivity } from "@/src/components/shell/AiActivity";
 import { BrandMark } from "@/src/components/ui/BrandMark";
@@ -151,7 +153,7 @@ export function AppShell({
                 <NextStepBar />
               </div>
               <div key={pathname} className="ui-page">
-                {children}
+                <PlanGate>{children}</PlanGate>
               </div>
             </main>
             {aside && (

@@ -1,3 +1,5 @@
+import { isAdmin } from "@/src/server/admin";
+import { requireFeature } from "@/src/server/credits";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { marketProfile } from "@/src/server/market/store";
@@ -33,6 +35,7 @@ export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
     caller = await guardProviderCall("research");
+    await requireFeature(caller.workspaceId, "paying-niches", isAdmin(caller.user));
     const input = await parseBody(request, body);
     const settled = await Promise.allSettled(
       input.items.map((it) => {

@@ -1,3 +1,5 @@
+import { isAdmin } from "@/src/server/admin";
+import { requireFeature } from "@/src/server/credits";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/src/server/db";
@@ -47,6 +49,7 @@ export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
     caller = await guardProviderCall("text");
+    await requireFeature(caller.workspaceId, "channel-creator", isAdmin(caller.user));
     await youtubeSearchBudget(caller);
     const input = await parseBody(request, body);
     if (!isTextConfigured()) throw validationError("The Channel Creator isn't available right now.");

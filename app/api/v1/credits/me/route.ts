@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { tierOf } from "@/src/lib/plans";
 import { requireUser } from "@/src/server/auth";
 import { defaultWorkspace } from "@/src/server/sync";
 import { creditState, isPaidPlan, CREDIT_COST } from "@/src/server/credits";
@@ -10,7 +11,7 @@ export async function GET() {
   try {
     const user = await requireUser();
     const state = await creditState(await defaultWorkspace(user));
-    return NextResponse.json({ data: { balance: state?.balance ?? 0, monthlyGrant: state?.monthlyGrant ?? 0, unlimited: isAdmin(user) || Boolean(state?.unlimited), refilledAt: state?.refilledAt ?? null, paid: isAdmin(user) || isPaidPlan(state), costs: CREDIT_COST } });
+    return NextResponse.json({ data: { balance: state?.balance ?? 0, monthlyGrant: state?.monthlyGrant ?? 0, unlimited: isAdmin(user) || Boolean(state?.unlimited), refilledAt: state?.refilledAt ?? null, paid: isAdmin(user) || isPaidPlan(state), tier: isAdmin(user) ? "studio" : tierOf(state), costs: CREDIT_COST } });
   } catch (error) {
     return toErrorResponse(error);
   }

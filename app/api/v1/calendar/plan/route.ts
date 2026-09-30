@@ -1,3 +1,5 @@
+import { isAdmin } from "@/src/server/admin";
+import { requireFeature } from "@/src/server/credits";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { planCalendar } from "@/src/server/ai/gemini";
@@ -23,6 +25,7 @@ export async function POST(request: Request) {
   let caller: ProviderCaller | null = null;
   try {
     caller = await guardProviderCall("text");
+    await requireFeature(caller.workspaceId, "scheduling", isAdmin(caller.user));
     const input = await parseBody(request, body);
     const { items, model } = await planCalendar(input);
     const db = getDb()!;

@@ -15,6 +15,7 @@ import { useScripts } from "@/src/components/script/ScriptProvider";
 import { useMedia } from "@/src/components/media/MediaProvider";
 import { useVideo, VideoStorageNote } from "@/src/components/video/VideoProvider";
 import { useIntelQuery } from "@/src/components/intelligence/chrome";
+import { useSession } from "@/src/components/auth/useSession";
 import { AutopilotRunner } from "@/src/components/video/AutopilotRunner";
 import { TimelinePro } from "@/src/components/video/TimelinePro";
 import { Preview, fmtTimecode } from "@/src/components/video/Preview";
@@ -145,6 +146,7 @@ function Studio() {
     return () => window.clearTimeout(t);
   }, [ready, project]);
   // Hands-free promo posting (?autopost=<promo id>&queue=<more ids>), started by the admin assistant.
+  const { user: session } = useSession();
   const [autopost] = useState(() => {
     if (typeof window === "undefined") return null;
     const q = new URLSearchParams(window.location.search);
@@ -931,7 +933,7 @@ function Studio() {
         </>
       )}
 
-      {autopost && ready && project && (
+      {autopost && session?.is_admin && ready && project && (
         <AutopilotRunner project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} promoId={autopost.id} queue={autopost.queue} index={autopost.index} />
       )}
       {showAutoVideo && !autopost && <GenerateVideoDialog project={project} sections={scriptSections} wpm={scriptsApi.scriptFor(project.id)?.wpm ?? 150} onClose={() => setShowAutoVideo(false)} />}

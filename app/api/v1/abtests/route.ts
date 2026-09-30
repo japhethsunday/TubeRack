@@ -1,3 +1,5 @@
+import { isAdmin } from "@/src/server/admin";
+import { requireFeature } from "@/src/server/credits";
 import { NextResponse } from "next/server";
 import { requireWorkspace } from "@/src/server/workspace";
 import { createTest, listTests } from "@/src/server/growth/abtests";
@@ -20,6 +22,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const caller = await requireWorkspace("editor");
+    await requireFeature(caller.workspaceId, "abtest", isAdmin(caller.user));
     const form = await request.formData().catch(() => null);
     if (!form) throw validationError("Send the test as multipart form data.");
     const videoId = String(form.get("videoId") ?? "");
