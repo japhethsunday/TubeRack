@@ -27,6 +27,9 @@ import { sendAccountReactivated, sendAccountSuspended, sendPlanChanged, sendTeam
 const email = z.string().trim().toLowerCase().email().max(254);
 const featureIds = FEATURES.map((f) => f.id) as [string, ...string[]];
 
+/** How the assistant names each kind of video. */
+const KIND_LABEL: Record<string, string> = { "how-to": "how-to", ad: "ad", mix: "how-to and ad" };
+
 export const ACTIONS = {
   give_credits: {
     permission: "credits.change",
@@ -116,9 +119,10 @@ export const ACTIONS = {
       count: z.number().int().min(1).max(5).default(2),
       feature: z.enum(PROMO_FEATURES.map((f) => f.id) as [string, ...string[]]).optional(),
       angle: z.string().trim().max(300).default(""),
+      kind: z.enum(["how-to", "ad", "mix"]).default("how-to"),
     }),
-    describe: (a: { count: number; feature?: string; angle: string }) =>
-      `Write ${a.count} new promo video${a.count === 1 ? "" : "s"} for Recktube${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : " (different features and styles)"}${a.angle ? `, angle: “${a.angle}”` : ""}. They appear on the Promo page, ready to produce.`,
+    describe: (a: { count: number; feature?: string; angle: string; kind: string }) =>
+      `Write ${a.count} new ${KIND_LABEL[a.kind] ?? "how-to"} video${a.count === 1 ? "" : "s"} for the Recktube channel${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : " (different features and styles)"}${a.angle ? `, angle: “${a.angle}”` : ""}. They appear on the Promo page, ready to produce.`,
   },
   make_and_post_videos: {
     permission: "promo.write",
@@ -127,10 +131,12 @@ export const ACTIONS = {
       feature: z.enum(PROMO_FEATURES.map((f) => f.id) as [string, ...string[]]).optional(),
       angle: z.string().trim().max(300).default(""),
       platforms: z.array(z.enum(["youtube", "tiktok"])).min(1).max(2).default(["youtube"]),
+      kind: z.enum(["how-to", "ad", "mix"]).default("how-to"),
+
       when: z.enum(["now", "morning", "afternoon", "evening"]).default("now"),
       startInDays: z.number().int().min(0).max(14).default(0),
     }),
-    describe: (a: { count: number; feature?: string; angle: string; platforms: string[]; when: string; startInDays: number }) => {
+    describe: (a: { count: number; feature?: string; angle: string; platforms: string[]; when: string; startInDays: number; kind: string }) => {
       const where = a.platforms.map((p) => (p === "tiktok" ? "TikTok" : "YouTube")).join(" and ");
       const hour = { morning: "9 AM", afternoon: "2 PM", evening: "7 PM" }[a.when as "morning"] ?? "";
       const start = a.startInDays === 0 ? "today (or tomorrow if that time has passed)" : a.startInDays === 1 ? "tomorrow" : `in ${a.startInDays} days`;
@@ -138,7 +144,7 @@ export const ACTIONS = {
         a.when === "now"
           ? a.count > 1 ? `the first goes live ${a.startInDays ? start : "now"}, the others one per day at 5 PM` : a.startInDays ? `goes live ${start} at 5 PM` : "goes live now"
           : `one per day at ${hour}, starting ${start}`;
-      return `Make ${a.count} promo video${a.count === 1 ? "" : "s"}${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : ""} and schedule ${a.count === 1 ? "it" : "them"} on ${where}, hands-free: ${plan}, your local time. A studio tab does the work: keep it open about 3–5 minutes per video.`;
+      return `Make ${a.count} ${KIND_LABEL[a.kind] ?? "how-to"} video${a.count === 1 ? "" : "s"}${a.feature ? ` about ${PROMO_FEATURES.find((f) => f.id === a.feature)?.name ?? a.feature}` : ""} and schedule ${a.count === 1 ? "it" : "them"} on ${where}, hands-free: ${plan}, your local time. A studio tab does the work: keep it open about 3–5 minutes per video.`;
     },
   },
   dismiss_failures: {
@@ -355,7 +361,7 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       if (a.feature || a.angle) {
         for (let i = 0; i < count; i++) {
           const feature = String(a.feature || PROMO_FEATURES[i % PROMO_FEATURES.length].id);
-          const style = styleFor(i);
+          const style = styleFor(i, Date.now(), a.kind);
           const pkg = await writePromo({ feature, style, platform: "YouTube Shorts", lengthSec: 30, angle: String(a.angle ?? "") });
           if (!pkg.scenes.length) continue;
           await adminDb()`INSERT INTO promo_videos (created_by, feature, style, platform, length_sec, package, source, status) VALUES (${admin.id}, ${feature}, ${style}, ${"YouTube Shorts"}, ${30}, ${JSON.stringify(pkg)}, 'manual', 'ready')`;
@@ -373,7 +379,7 @@ export async function runAction(admin: SessionUser, role: AdminRole, name: Actio
       const seed = Math.floor(Date.now() / 1000);
       for (let i = 0; i < count; i++) {
         const feature = String(a.feature || PROMO_FEATURES[(seed + i * 3) % PROMO_FEATURES.length].id);
-        const style = styleFor(i, seed * 1000);
+        const style = styleFor(i, seed * 1000, a.kind);
         try {
           const pkg = await writePromo({ feature, style, platform: "YouTube Shorts", lengthSec: 30, angle: String(a.angle ?? "") });
           if (!pkg.scenes.length) continue;

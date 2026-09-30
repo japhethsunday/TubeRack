@@ -73,7 +73,7 @@ export async function runPromoAutopilot(opts: { force?: boolean; count?: number;
   const made: { id: string; pkg: PromoPackage; feature: string }[] = [];
   for (const [n, c] of pickCombos(target, recent).entries()) {
     // Mostly teaching Shorts (3 of 4), with the occasional straight promo.
-    c.style = styleFor(n);
+    c.style = styleFor(n, Date.now(), "how-to");
     try {
       const pkg = await writePromo({ feature: c.feature, style: c.style, platform: "YouTube Shorts", lengthSec: 30, angle: "" }); // the AI invents a fresh idea, avoiding past ones
       if (!pkg.scenes.length) continue;

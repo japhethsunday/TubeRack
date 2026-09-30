@@ -125,7 +125,9 @@ describe("assistant promo videos", () => {
   it("write_promo_videos defaults to 2 and caps at 5", async () => {
     const { prepare } = await import("@/src/server/admin-agent/actions");
     assert.equal(prepare("write_promo_videos", {})?.args.count, 2);
-    assert.match(prepare("write_promo_videos", { count: 3, feature: "video-studio" })!.summary, /Write 3 new promo videos for Recktube about Video Studio/);
+    assert.match(prepare("write_promo_videos", { count: 3, feature: "video-studio" })!.summary, /Write 3 new how-to videos for the Recktube channel about Video Studio/);
+    assert.match(prepare("write_promo_videos", { count: 1, kind: "ad" })!.summary, /Write 1 new ad video/);
+    assert.equal(prepare("write_promo_videos", { kind: "promo" }), null);
     assert.equal(prepare("write_promo_videos", { count: 9 }), null);
     assert.equal(prepare("write_promo_videos", { feature: "hack" }), null);
   });
@@ -220,5 +222,13 @@ describe("clearing the error alert", () => {
     const { prepare, ACTIONS } = await import("@/src/server/admin-agent/actions");
     assert.match(prepare("dismiss_failures", {})!.summary, /clear the red error alert/);
     assert.equal(ACTIONS.dismiss_failures.permission, "usage.view");
+  });
+});
+
+describe("video kinds", () => {
+  it("how-to by default, ads only when asked", async () => {
+    const { styleFor, TEACHING_STYLES } = await import("@/src/server/growth/promo");
+    for (let i = 0; i < 8; i++) assert.ok(TEACHING_STYLES.has(styleFor(i, 1_000_000, "how-to")));
+    for (let i = 0; i < 8; i++) assert.ok(!TEACHING_STYLES.has(styleFor(i, 1_000_000, "ad")));
   });
 });

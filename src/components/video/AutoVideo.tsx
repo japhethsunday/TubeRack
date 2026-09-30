@@ -564,7 +564,13 @@ export function GenerateVideoDialog({
       built = true;
       set("build", { state: "done", detail: `${clips.length} clips · ${Math.round(scenes.reduce((n, s) => n + s.durationSec, 0))}s` });
 
-      // 6. Thumbnail: text-free art + the exact title as editable text layers.
+      // 6. Thumbnail: long videos only. Shorts, TikTok and Reels show a frame
+      // from the video itself, so a designed thumbnail would be wasted.
+      if (vertical) {
+        set("thumbnail", { state: "done", detail: "Not needed: Shorts, TikTok and Reels use a frame from the video" });
+        setFinished(true);
+        return true;
+      }
       set("thumbnail", { state: "running" });
       try {
         const subject = production?.topic || project.topic || project.name;
@@ -598,7 +604,7 @@ export function GenerateVideoDialog({
   const needsConfirm = existingClips > 0 && !replaceOk;
 
   return (
-    <Modal wide={finished} title={finished ? "Your video is ready" : "Generate video from script"} description={`${writable.length} scenes · ${aspect} · voice-over, visuals, music, captions and thumbnail`} onClose={() => { cancelled.current = true; onClose(); }}>
+    <Modal wide={finished} title={finished ? "Your video is ready" : "Generate video from script"} description={`${writable.length} scenes · ${aspect} · voice-over, visuals, music, captions${vertical ? "" : " and thumbnail"}`} onClose={() => { cancelled.current = true; onClose(); }}>
       {writable.length === 0 ? (
         <p className="text-sm text-muted-text">Write the script first — every section with text becomes a scene.</p>
       ) : (

@@ -33,10 +33,15 @@ export const PROMO_STYLES = ["How-to tutorial", "Problem → solution", "Step-by
 export const TEACHING_STYLES = new Set<string>(["How-to tutorial", "Step-by-step guide", "Myth vs fact", "Tips list"]);
 
 /** Style for the i-th video of a batch: 3 of every 4 teach, the 4th is a straight promo. */
-export function styleFor(i: number, seed = Date.now()): string {
+export type VideoKind = "how-to" | "ad" | "mix";
+
+/** How-to (teaching) videos by default; "ad" for straight adverts; "mix" = 3 how-to to 1 ad. */
+export function styleFor(i: number, seed = Date.now(), kind: VideoKind = "mix"): string {
   const teach = PROMO_STYLES.filter((x) => TEACHING_STYLES.has(x));
   const promo = PROMO_STYLES.filter((x) => !TEACHING_STYLES.has(x));
   const n = Math.abs(Math.floor(seed / 1000)) + i;
+  if (kind === "how-to") return teach[n % teach.length];
+  if (kind === "ad") return promo[n % promo.length];
   return (i + 1) % 4 === 0 ? promo[n % promo.length] : teach[n % teach.length];
 }
 export const PROMO_PLATFORMS = ["YouTube Shorts", "TikTok", "Instagram Reels"] as const;

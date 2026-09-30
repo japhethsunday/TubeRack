@@ -60,7 +60,7 @@ export const PLAYBOOK: PlaybookEntry[] = [
     name: "Generate video (full AI video)",
     where: "Script Studio → Generate video",
     plan: "Free",
-    what: "Turns a script into a finished video: voice-over, stock footage and AI pictures per scene, background music, animated captions and a thumbnail.",
+    what: "Turns a script into a finished video: voice-over, stock footage and AI pictures per scene, background music and animated captions, plus a designed thumbnail for long videos (Shorts, TikTok and Reels use a frame from the video instead).",
     steps: [
       "In Script Studio, press Generate video.",
       "Pick Short (vertical) or Long, the visual style and the music mood (or No music).",

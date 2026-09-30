@@ -279,7 +279,9 @@ export function PublishDialog({ source, prerendered, onClose, onRendered, auto }
   const [privacy, setPrivacy] = useState<"public" | "unlisted" | "private">("public");
   const [schedule, setSchedule] = useState("");
   const [playlistId, setPlaylistId] = useState("");
-  const [includeThumb, setIncludeThumb] = useState(Boolean(variant));
+  // Shorts show a frame from the video, so a custom thumbnail is off by default for vertical videos.
+  const vertical = source.comp.canvas.height > source.comp.canvas.width;
+  const [includeThumb, setIncludeThumb] = useState(Boolean(variant) && !vertical);
   const [includeCaptions, setIncludeCaptions] = useState(cueCount > 0);
   const [madeForKids, setMadeForKids] = useState(false);
   const [synthetic, setSynthetic] = useState(false);
@@ -370,7 +372,7 @@ export function PublishDialog({ source, prerendered, onClose, onRendered, auto }
         run.current.mime = prerendered.mime;
         [state, detail] = ["done", `Using your export · ${fmtMb(prerendered.blob.size)}`];
       }
-      if (id === "thumbnail" && !(includeThumb && variant)) [state, detail] = ["skipped", variant ? "Turned off" : "No thumbnail in Packaging — YouTube will pick one"];
+      if (id === "thumbnail" && !(includeThumb && variant)) [state, detail] = ["skipped", vertical ? "Shorts use a frame from the video" : variant ? "Turned off" : "No thumbnail in Packaging — YouTube will pick one"];
       if (id === "playlist" && !wantPlaylist) [state, detail] = ["skipped", "No playlist selected"];
       if (id === "captions" && !(includeCaptions && vtt)) [state, detail] = ["skipped", vtt ? "Turned off" : "No captions on the timeline"];
       if ((id === "playlist" || id === "captions") && state === "pending" && !conn?.canManage) [state, detail] = ["skipped", "Needs the playlists & captions permission"];
